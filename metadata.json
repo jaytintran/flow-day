@@ -1,0 +1,6 @@
+{
+  "name": "Timeline Journal",
+  "description": "An offline-first personal productivity app with a continuous timeline journal, task timer, and bracket containers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
