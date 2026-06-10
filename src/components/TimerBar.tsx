@@ -3,11 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "../db";
-import { Task, Objective, Goal, TimerState } from "../types";
-import { formatDuration } from "../utils";
+import React, { useState, useEffect, useRef } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db';
+import { Task, Objective, Goal, TimerState, TaskAchievement } from '../types';
+import { formatDuration } from '../utils';
 import {
   Search,
   Play,
@@ -22,18 +22,18 @@ import {
   RotateCcw,
   Square,
   CheckIcon,
-} from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
-import Settings from "./Settings";
-import ObjectivePickerSheet from "./ObjectivePickerSheet";
-import GoalPickerSheet from "./GoalPickerSheet";
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import Settings from './Settings';
+import ObjectivePickerSheet from './ObjectivePickerSheet';
+import GoalPickerSheet from './GoalPickerSheet';
 
 interface TimerBarProps {
   activeTaskId: string | null;
   setActiveTaskId: (id: string | null) => void;
 }
 
-const TIMER_STORAGE_KEY = "timerbar_state_v1";
+const TIMER_STORAGE_KEY = 'timerbar_state_v1';
 
 function loadTimerState(): TimerState | null {
   try {
@@ -55,14 +55,13 @@ function clearTimerState() {
   localStorage.removeItem(TIMER_STORAGE_KEY);
 }
 
-export default function TimerBar({
-  activeTaskId,
-  setActiveTaskId,
-}: TimerBarProps) {
-  const [searchQuery, setSearchQuery] = useState("");
+export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProps) {
+  const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [localTimeSpent, setLocalTimeSpent] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
+
+  const [achievementInput, setAchievementInput] = useState('');
 
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isGoalPickerOpen, setIsGoalPickerOpen] = useState(false);
@@ -71,8 +70,8 @@ export default function TimerBar({
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -102,16 +101,11 @@ export default function TimerBar({
   }, []); // intentionally empty — one-time mount only
 
   // Helper: accumulate time_spent to the linked objective (and its parent goal)
-  const accumulateLinkedObjective = async (
-    taskId: string,
-    timeToAdd: number,
-  ) => {
+  const accumulateLinkedObjective = async (taskId: string, timeToAdd: number) => {
     if (timeToAdd <= 0) return;
     const task = tasks.find((t) => t.id === taskId) as Task | undefined;
     if (!task?.objective_id) return;
-    const objective = (await db.entries.get(task.objective_id)) as
-      | Objective
-      | undefined;
+    const objective = (await db.entries.get(task.objective_id)) as Objective | undefined;
     if (!objective) return;
     const newObjectiveTime = (objective.time_spent || 0) + timeToAdd;
     await db.entries.update(task.objective_id, {
@@ -130,26 +124,32 @@ export default function TimerBar({
     }
   };
 
+  const handleLogAchievement = async () => {
+    if (!achievementInput.trim() || !activeTaskId) return;
+    const task = tasks.find((t) => t.id === activeTaskId) as Task | undefined;
+    if (!task) return;
+    const entry: TaskAchievement = {
+      id: crypto.randomUUID(),
+      text: achievementInput.trim(),
+      created_at: new Date(),
+    };
+    const updated = [...(task.achievements ?? []), entry];
+    await db.entries.update(activeTaskId, { achievements: updated } as any);
+    setAchievementInput('');
+  };
+
   // Fetch active task and all incomplete tasks
-  const tasks =
-    useLiveQuery(() => db.entries.where("type").equals("task").toArray()) || [];
-  const todoTasks = tasks.filter(
-    (t) => t.type === "task" && t.status === "todo",
-  ) as Task[];
-  const activeTask = tasks.find((t) => t.id === activeTaskId) as
-    | Task
-    | undefined;
+  const tasks = useLiveQuery(() => db.entries.where('type').equals('task').toArray()) || [];
+  const todoTasks = tasks.filter((t) => t.type === 'task' && t.status === 'todo') as Task[];
+  const activeTask = tasks.find((t) => t.id === activeTaskId) as Task | undefined;
 
   // Fetch objectives separately for linked-objective display
   const allObjectives =
-    useLiveQuery(() =>
-      db.entries.where("type").equals("objective").toArray(),
-    ) || [];
+    useLiveQuery(() => db.entries.where('type').equals('objective').toArray()) || [];
   const typedObjectives = allObjectives as Objective[];
 
   // Fetch goals for linked-goal display
-  const allGoals =
-    useLiveQuery(() => db.entries.where("type").equals("goal").toArray()) || [];
+  const allGoals = useLiveQuery(() => db.entries.where('type').equals('goal').toArray()) || [];
   const typedGoals = allGoals as Goal[];
 
   // Find the linked objective (if any) for the active task
@@ -165,15 +165,12 @@ export default function TimerBar({
   // Track clicks outside dropdown to close it
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // Synchronize with active task changes
@@ -313,7 +310,7 @@ export default function TimerBar({
     }
 
     await db.entries.update(activeTaskId, {
-      status: "done",
+      status: 'done',
       time_spent: finalTimeSpent,
       completed_at: new Date(),
     } as any);
@@ -368,7 +365,7 @@ export default function TimerBar({
   const handleSelectTask = (taskId: string) => {
     setActiveTaskId(taskId);
     setIsDropdownOpen(false);
-    setSearchQuery("");
+    setSearchQuery('');
   };
 
   // Link/unlink a goal on the current linked objective
@@ -386,9 +383,9 @@ export default function TimerBar({
     const newId = crypto.randomUUID();
     const newTask: Task = {
       id: newId,
-      type: "task",
+      type: 'task',
       title: searchQuery.trim(),
-      status: "todo",
+      status: 'todo',
       time_spent: 0,
       created_at: new Date(),
     };
@@ -425,9 +422,7 @@ export default function TimerBar({
                     id="task-search-input"
                     type="text"
                     placeholder={
-                      isMobile
-                        ? "Find/create task..."
-                        : "Search or quick-create a working task..."
+                      isMobile ? 'Find/create task...' : 'Search or quick-create a working task...'
                     }
                     value={searchQuery}
                     onChange={(e) => {
@@ -436,7 +431,7 @@ export default function TimerBar({
                     }}
                     onFocus={() => setIsDropdownOpen(true)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && searchQuery.trim() !== "") {
+                      if (e.key === 'Enter' && searchQuery.trim() !== '') {
                         handleCreateNewTask();
                       }
                     }}
@@ -452,9 +447,7 @@ export default function TimerBar({
                             onClick={() => handleSelectTask(task.id)}
                             className="w-full text-left px-4 py-3 text-xs sm:text-sm border-b border-stone-850/60 hover:bg-stone-900/50 flex justify-between items-center text-stone-300 hover:text-amber-500 transition-colors"
                           >
-                            <span className="truncate font-medium">
-                              {task.title}
-                            </span>
+                            <span className="truncate font-medium">{task.title}</span>
                             <span className="text-[10px] font-mono text-stone-550 bg-stone-950/40 px-2 py-0.5 rounded border border-stone-900/60 shrink-0">
                               {formatDuration(task.time_spent)}
                             </span>
@@ -466,7 +459,7 @@ export default function TimerBar({
                         </div>
                       )}
 
-                      {searchQuery.trim() !== "" && (
+                      {searchQuery.trim() !== '' && (
                         <button
                           id="create-task-btn"
                           onClick={handleCreateNewTask}
@@ -506,7 +499,7 @@ export default function TimerBar({
                         className="text-stone-100 text-sm font-serif font-bold leading-snug break-words max-w-[200px]"
                         id="active-task-title"
                       >
-                        {activeTask?.title || "Unknown Task"}
+                        {activeTask?.title || 'Unknown Task'}
                       </h3>
                     </div>
 
@@ -516,7 +509,7 @@ export default function TimerBar({
                     >
                       {(() => {
                         const s = formatDuration(localTimeSpent);
-                        const p = s.split(":");
+                        const p = s.split(':');
                         if (p.length === 3)
                           return (
                             <>
@@ -524,9 +517,7 @@ export default function TimerBar({
                               <span className="text-stone-600 px-0.5">:</span>
                               <span>{p[1]}</span>
                               <span className="text-stone-600 px-0.5">:</span>
-                              <span className="text-amber-500 font-semibold">
-                                {p[2]}
-                              </span>
+                              <span className="text-amber-500 font-semibold">{p[2]}</span>
                             </>
                           );
                         return s;
@@ -543,9 +534,7 @@ export default function TimerBar({
                           className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-[10px] font-mono text-rose-400 font-semibold hover:bg-rose-500/20 transition-colors cursor-pointer"
                         >
                           <Target className="w-3 h-3" />
-                          <span className="max-w-[120px] truncate">
-                            {linkedObjective.title}
-                          </span>
+                          <span className="max-w-[120px] truncate">{linkedObjective.title}</span>
                         </button>
                         {linkedGoal ? (
                           <button
@@ -553,9 +542,7 @@ export default function TimerBar({
                             className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-[10px] font-mono text-sky-400 font-semibold hover:bg-sky-500/20 transition-colors cursor-pointer"
                           >
                             <Flag className="w-3 h-3" />
-                            <span className="max-w-[120px] truncate">
-                              {linkedGoal.title}
-                            </span>
+                            <span className="max-w-[120px] truncate">{linkedGoal.title}</span>
                           </button>
                         ) : (
                           <button
@@ -633,6 +620,26 @@ export default function TimerBar({
                       )}
                     </div>
                   </div>
+
+                  {/* Row 4: Achievement quick-log */}
+                  <div className="flex items-center gap-2 border-t border-stone-900 pt-2">
+                    <input
+                      type="text"
+                      value={achievementInput}
+                      onChange={(e) => setAchievementInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleLogAchievement();
+                      }}
+                      placeholder="Log an achievement..."
+                      className="flex-1 bg-[#0a0a0a] border border-stone-800 rounded-lg px-3 py-1.5 text-xs text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/30 transition-colors font-mono"
+                    />
+                    <button
+                      onClick={handleLogAchievement}
+                      className="p-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 rounded-lg transition-all cursor-pointer shrink-0"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               ) : (
                 /* DESKTOP ACTIVE TIMER VIEW */
@@ -640,14 +647,14 @@ export default function TimerBar({
                   {/* Left: Task info */}
                   <div className="flex-1 min-w-0 flex items-center gap-4">
                     <span
-                      className={`w-3 h-3 rounded-full shrink-0 ${isRunning ? "bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]" : "bg-stone-700"}`}
+                      className={`w-3 h-3 rounded-full shrink-0 ${isRunning ? 'bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]' : 'bg-stone-700'}`}
                     />
                     <div className="min-w-0">
                       <h3
                         className="text-stone-100 text-base font-serif font-bold leading-snug select-all"
                         id="active-task-title"
                       >
-                        {activeTask?.title || "Unknown Task"}
+                        {activeTask?.title || 'Unknown Task'}
                       </h3>
                       <div className="flex items-center gap-1.5 mt-1 text-[11px] font-mono text-stone-500 flex-wrap">
                         {linkedObjective ? (
@@ -667,9 +674,7 @@ export default function TimerBar({
                                 className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-500/10 border border-sky-500/20 text-sky-400/80 hover:bg-sky-500/20 transition-colors cursor-pointer"
                               >
                                 <Flag className="w-3 h-3" />
-                                <span className="max-w-[140px] truncate">
-                                  {linkedGoal.title}
-                                </span>
+                                <span className="max-w-[140px] truncate">{linkedGoal.title}</span>
                               </button>
                             ) : (
                               <button
@@ -692,6 +697,26 @@ export default function TimerBar({
                     </div>
                   </div>
 
+                  {/* Achievement quick-log */}
+                  <div className="flex items-center gap-2 w-56 shrink-0">
+                    <input
+                      type="text"
+                      value={achievementInput}
+                      onChange={(e) => setAchievementInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleLogAchievement();
+                      }}
+                      placeholder="Log achievement..."
+                      className="flex-1 bg-[#0a0a0a] border border-stone-800 rounded-lg px-3 py-2 text-xs text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/30 transition-colors font-mono h-10"
+                    />
+                    <button
+                      onClick={handleLogAchievement}
+                      className="p-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 rounded-lg transition-all cursor-pointer shrink-0 h-10 w-10 flex items-center justify-center"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
                   {/* Right: clock + controls */}
                   <div className="flex items-center gap-4 shrink-0">
                     <div
@@ -700,7 +725,7 @@ export default function TimerBar({
                     >
                       {(() => {
                         const s = formatDuration(localTimeSpent);
-                        const p = s.split(":");
+                        const p = s.split(':');
                         if (p.length === 3)
                           return (
                             <>
@@ -708,9 +733,7 @@ export default function TimerBar({
                               <span className="text-stone-600 px-0.5">:</span>
                               <span>{p[1]}</span>
                               <span className="text-stone-600 px-0.5">:</span>
-                              <span className="text-amber-500 font-normal">
-                                {p[2]}
-                              </span>
+                              <span className="text-amber-500 font-normal">{p[2]}</span>
                             </>
                           );
                         return s;

@@ -3,61 +3,58 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from "react";
-import { Category } from "../types";
-import { Settings2 } from "lucide-react";
+import React from 'react';
+import { Category } from '../types';
+import { Settings2 } from 'lucide-react';
 
-const colorMap: Record<
-  string,
-  { bg: string; border: string; text: string; dot: string }
-> = {
+const colorMap: Record<string, { bg: string; border: string; text: string; dot: string }> = {
   emerald: {
-    bg: "bg-emerald-500/10",
-    border: "border-emerald-500/25",
-    text: "text-emerald-400",
-    dot: "bg-emerald-400",
+    bg: 'bg-emerald-500/10',
+    border: 'border-emerald-500/25',
+    text: 'text-emerald-400',
+    dot: 'bg-emerald-400',
   },
   sky: {
-    bg: "bg-sky-500/10",
-    border: "border-sky-500/25",
-    text: "text-sky-400",
-    dot: "bg-sky-400",
+    bg: 'bg-sky-500/10',
+    border: 'border-sky-500/25',
+    text: 'text-sky-400',
+    dot: 'bg-sky-400',
   },
   violet: {
-    bg: "bg-violet-500/10",
-    border: "border-violet-500/25",
-    text: "text-violet-400",
-    dot: "bg-violet-400",
+    bg: 'bg-violet-500/10',
+    border: 'border-violet-500/25',
+    text: 'text-violet-400',
+    dot: 'bg-violet-400',
   },
   rose: {
-    bg: "bg-rose-500/10",
-    border: "border-rose-500/25",
-    text: "text-rose-400",
-    dot: "bg-rose-400",
+    bg: 'bg-rose-500/10',
+    border: 'border-rose-500/25',
+    text: 'text-rose-400',
+    dot: 'bg-rose-400',
   },
   amber: {
-    bg: "bg-amber-500/10",
-    border: "border-amber-500/25",
-    text: "text-amber-400",
-    dot: "bg-amber-400",
+    bg: 'bg-amber-500/10',
+    border: 'border-amber-500/25',
+    text: 'text-amber-400',
+    dot: 'bg-amber-400',
   },
   indigo: {
-    bg: "bg-indigo-500/10",
-    border: "border-indigo-500/25",
-    text: "text-indigo-400",
-    dot: "bg-indigo-400",
+    bg: 'bg-indigo-500/10',
+    border: 'border-indigo-500/25',
+    text: 'text-indigo-400',
+    dot: 'bg-indigo-400',
   },
   teal: {
-    bg: "bg-teal-500/10",
-    border: "border-teal-500/25",
-    text: "text-teal-400",
-    dot: "bg-teal-400",
+    bg: 'bg-teal-500/10',
+    border: 'border-teal-500/25',
+    text: 'text-teal-400',
+    dot: 'bg-teal-400',
   },
   orange: {
-    bg: "bg-orange-500/10",
-    border: "border-orange-500/25",
-    text: "text-orange-400",
-    dot: "bg-orange-400",
+    bg: 'bg-orange-500/10',
+    border: 'border-orange-500/25',
+    text: 'text-orange-400',
+    dot: 'bg-orange-400',
   },
 };
 
@@ -82,8 +79,8 @@ export default function CategoryStrip({
           onClick={() => onSelect(null)}
           className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-mono font-semibold uppercase tracking-wide transition-all active:scale-95 cursor-pointer shrink-0 ${
             selectedCategoryId === null
-              ? "bg-stone-700/40 border-stone-600 text-stone-200"
-              : "border-stone-700 text-stone-500 hover:border-stone-500 hover:text-stone-400"
+              ? 'bg-stone-700/40 border-stone-600 text-stone-200'
+              : 'border-stone-700 text-stone-500 hover:border-stone-500 hover:text-stone-400'
           }`}
         >
           All
@@ -99,7 +96,7 @@ export default function CategoryStrip({
               className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-mono font-semibold uppercase tracking-wide transition-all active:scale-95 cursor-pointer shrink-0 ${
                 isSelected
                   ? `${c.bg} ${c.border} ${c.text}`
-                  : "border-stone-700 text-stone-500 hover:border-stone-500 hover:text-stone-400"
+                  : 'border-stone-700 text-stone-500 hover:border-stone-500 hover:text-stone-400'
               }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />

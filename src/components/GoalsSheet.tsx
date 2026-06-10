@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
-import { motion, AnimatePresence } from "motion/react";
-import { db } from "../db";
-import { Goal, Category } from "../types";
-import { formatDuration } from "../utils";
+import React, { useState, useEffect, useRef } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { motion, AnimatePresence } from 'motion/react';
+import { db } from '../db';
+import { Goal, Category } from '../types';
+import { formatDuration } from '../utils';
 import {
   Flag,
   Plus,
@@ -19,19 +19,20 @@ import {
   Clock,
   ChevronDown,
   Tag,
-} from "lucide-react";
-import CategoryStrip from "./CategoryStrip";
-import CategoryManagementSheet from "./CategoryManagementSheet";
+  MoreHorizontal,
+} from 'lucide-react';
+import CategoryStrip from './CategoryStrip';
+import CategoryManagementSheet from './CategoryManagementSheet';
 
 const colorDotMap: Record<string, string> = {
-  emerald: "bg-emerald-400",
-  sky: "bg-sky-400",
-  violet: "bg-violet-400",
-  rose: "bg-rose-400",
-  amber: "bg-amber-400",
-  indigo: "bg-indigo-400",
-  teal: "bg-teal-400",
-  orange: "bg-orange-400",
+  emerald: 'bg-emerald-400',
+  sky: 'bg-sky-400',
+  violet: 'bg-violet-400',
+  rose: 'bg-rose-400',
+  amber: 'bg-amber-400',
+  indigo: 'bg-indigo-400',
+  teal: 'bg-teal-400',
+  orange: 'bg-orange-400',
 };
 
 interface GoalsSheetProps {
@@ -41,35 +42,32 @@ interface GoalsSheetProps {
 
 export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const goals =
-    useLiveQuery(() => db.entries.where("type").equals("goal").toArray()) || [];
+  const goals = useLiveQuery(() => db.entries.where('type').equals('goal').toArray()) || [];
   const typedGoals = goals as Goal[];
 
-  const activeGoals = typedGoals.filter((o) => o.status === "active");
-  const achievedGoals = typedGoals.filter((o) => o.status === "achieved");
-  const archivedGoals = typedGoals.filter((o) => o.status === "archived");
+  const activeGoals = typedGoals.filter((o) => o.status === 'active');
+  const achievedGoals = typedGoals.filter((o) => o.status === 'achieved');
+  const archivedGoals = typedGoals.filter((o) => o.status === 'archived');
 
-  const [newTitle, setNewTitle] = useState("");
+  const [newTitle, setNewTitle] = useState('');
   const [showArchived, setShowArchived] = useState(false);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
-    null,
-  );
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [chipOpenId, setChipOpenId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const chipRef = useRef<HTMLDivElement>(null);
 
   const categories =
-    useLiveQuery(() => db.categories.where("scope").equals("goal").toArray()) ||
-    [];
+    useLiveQuery(() => db.categories.where('scope').equals('goal').toArray()) || [];
   const categoryMap = React.useMemo(() => {
     const map: Record<string, Category> = {};
     for (const c of categories) {
@@ -80,18 +78,11 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
 
   // Filter helpers — checks if an entry's category_ids includes the selected id
   const matchesFilter = (ids: string[] | undefined) =>
-    !selectedCategoryId ||
-    (Array.isArray(ids) && ids.includes(selectedCategoryId));
+    !selectedCategoryId || (Array.isArray(ids) && ids.includes(selectedCategoryId));
 
-  const filteredActiveGoals = activeGoals.filter((g) =>
-    matchesFilter(g.category_ids),
-  );
-  const filteredAchievedGoals = achievedGoals.filter((g) =>
-    matchesFilter(g.category_ids),
-  );
-  const filteredArchivedGoals = archivedGoals.filter((g) =>
-    matchesFilter(g.category_ids),
-  );
+  const filteredActiveGoals = activeGoals.filter((g) => matchesFilter(g.category_ids));
+  const filteredAchievedGoals = achievedGoals.filter((g) => matchesFilter(g.category_ids));
+  const filteredArchivedGoals = archivedGoals.filter((g) => matchesFilter(g.category_ids));
 
   // Close chip popover on outside click
   useEffect(() => {
@@ -100,20 +91,20 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
         setChipOpenId(null);
       }
     };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
   const handleToggleStatus = async (obj: Goal) => {
-    const nextStatus = obj.status === "active" ? "achieved" : "active";
+    const nextStatus = obj.status === 'active' ? 'achieved' : 'active';
     await db.entries.update(obj.id, {
       status: nextStatus,
-      achieved_at: nextStatus === "achieved" ? new Date() : undefined,
+      achieved_at: nextStatus === 'achieved' ? new Date() : undefined,
     } as any);
   };
 
   const handleArchive = async (obj: Goal) => {
-    await db.entries.update(obj.id, { status: "archived" } as any);
+    await db.entries.update(obj.id, { status: 'archived' } as any);
   };
 
   const handleDelete = async (obj: Goal) => {
@@ -124,14 +115,14 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
     if (!newTitle.trim()) return;
     const newObj: Goal = {
       id: crypto.randomUUID(),
-      type: "goal",
+      type: 'goal',
       title: newTitle.trim(),
       time_spent: 0,
-      status: "active",
+      status: 'active',
       created_at: new Date(),
     };
     await db.entries.add(newObj);
-    setNewTitle("");
+    setNewTitle('');
     inputRef.current?.focus();
   };
 
@@ -145,12 +136,8 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
   };
 
   // Count linked objectives and tasks for display
-  const allObjs =
-    useLiveQuery(() =>
-      db.entries.where("type").equals("objective").toArray(),
-    ) || [];
-  const allTasks =
-    useLiveQuery(() => db.entries.where("type").equals("task").toArray()) || [];
+  const allObjs = useLiveQuery(() => db.entries.where('type').equals('objective').toArray()) || [];
+  const allTasks = useLiveQuery(() => db.entries.where('type').equals('task').toArray()) || [];
   const { objectiveCounts, taskCounts } = React.useMemo(() => {
     const objCounts: Record<string, number> = {};
     const tCounts: Record<string, number> = {};
@@ -171,49 +158,86 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
   }, [allObjs, allTasks]);
 
   const assignedCategories = (obj: Goal) =>
-    (obj.category_ids ?? [])
-      .map((id) => categoryMap[id])
-      .filter(Boolean) as Category[];
+    (obj.category_ids ?? []).map((id) => categoryMap[id]).filter(Boolean) as Category[];
 
   const renderGoalRow = (obj: Goal) => {
     const assigned = assignedCategories(obj);
     return (
       <div
         key={obj.id}
-        className="flex flex-col gap-1.5 px-4 py-3 bg-[#0a0a0a] border border-stone-800/80 rounded-xl hover:border-stone-700 transition-colors group"
+        className={`relative flex flex-col gap-1.5 px-4 py-3 border rounded-xl transition-colors group ${
+          obj.status === 'achieved'
+            ? 'bg-emerald-950/10 border-emerald-900/30 hover:border-emerald-800/50'
+            : obj.status === 'archived'
+              ? 'bg-stone-900/20 border-stone-800/40 hover:border-stone-700/60'
+              : 'bg-[#0a0a0a] border-stone-800/80 hover:border-stone-700'
+        }`}
       >
         {/* Top row: Status circle + Title + Actions (archive/delete) */}
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={() => handleToggleStatus(obj)}
             className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
-              obj.status === "achieved"
-                ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
-                : "border-stone-700 hover:border-stone-500"
+              obj.status === 'achieved'
+                ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+                : 'border-stone-700 hover:border-stone-500'
             }`}
           >
-            {obj.status === "achieved" && (
-              <Check className="w-3 h-3 stroke-[3]" />
-            )}
+            {obj.status === 'achieved' && <Check className="w-3 h-3 stroke-[3]" />}
           </button>
 
           <span
             className={`flex-1 text-sm font-serif min-w-0 truncate ${
-              obj.status === "achieved"
-                ? "line-through text-stone-500"
-                : "text-stone-200"
+              obj.status === 'achieved' ? 'line-through text-stone-500' : 'text-stone-200'
             }`}
           >
             {obj.title}
           </span>
 
-          {obj.status !== "archived" && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpenId(menuOpenId === obj.id ? null : obj.id);
+            }}
+            className="md:hidden p-1.5 rounded text-stone-600 hover:text-stone-400 transition-all cursor-pointer shrink-0"
+          >
+            <MoreHorizontal className="w-3.5 h-3.5" />
+          </button>
+
+          {menuOpenId === obj.id && (
+            <div className="absolute right-2 top-8 z-50 bg-[#1a1a1a] border border-stone-700 rounded-lg shadow-xl flex flex-col overflow-hidden min-w-[120px]">
+              {obj.status !== 'archived' && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleArchive(obj);
+                    setMenuOpenId(null);
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 text-[11px] font-mono text-stone-400 hover:bg-stone-800 hover:text-amber-400 transition-colors cursor-pointer"
+                >
+                  <Archive className="w-3.5 h-3.5" /> Archive
+                </button>
+              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(obj);
+                  setMenuOpenId(null);
+                }}
+                className="flex items-center gap-2 px-3 py-2 text-[11px] font-mono text-stone-400 hover:bg-stone-800 hover:text-red-400 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Delete
+              </button>
+            </div>
+          )}
+
+          {obj.status !== 'archived' && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 handleArchive(obj);
               }}
-              className="md:opacity-0 md:group-hover:opacity-100 p-1.5 rounded text-stone-600 hover:text-amber-400 hover:bg-amber-950/20 transition-all cursor-pointer shrink-0"
+              className="opacity-0 group-hover:opacity-100 p-1.5 rounded text-stone-600 hover:text-amber-400 hover:bg-amber-950/20 transition-all cursor-pointer shrink-0"
               title="Archive"
             >
               <Archive className="w-3.5 h-3.5" />
@@ -224,7 +248,7 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
               e.stopPropagation();
               handleDelete(obj);
             }}
-            className="md:opacity-0 md:group-hover:opacity-100 p-1.5 rounded text-stone-600 hover:text-red-400 hover:bg-red-950/20 transition-all cursor-pointer shrink-0"
+            className="opacity-0 group-hover:opacity-100 p-1.5 rounded text-stone-600 hover:text-red-400 hover:bg-red-950/20 transition-all cursor-pointer shrink-0"
             title="Delete"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -257,7 +281,7 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
               className="text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 border border-stone-700/50 text-stone-300 bg-stone-800/40"
             >
               <span
-                className={`w-1.5 h-1.5 rounded-full ${colorDotMap[cat.color] ?? "bg-stone-500"}`}
+                className={`w-1.5 h-1.5 rounded-full ${colorDotMap[cat.color] ?? 'bg-stone-500'}`}
               />
               {cat.name}
             </span>
@@ -293,17 +317,15 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
                         }}
                         className={`flex items-center gap-2 px-2 py-1 rounded text-[11px] font-mono transition-colors cursor-pointer text-left ${
                           isActive
-                            ? "bg-stone-700/50 text-stone-200"
-                            : "text-stone-400 hover:bg-stone-800/60 hover:text-stone-300"
+                            ? 'bg-stone-700/50 text-stone-200'
+                            : 'text-stone-400 hover:bg-stone-800/60 hover:text-stone-300'
                         }`}
                       >
                         <span
-                          className={`w-2 h-2 rounded-full shrink-0 ${colorDotMap[cat.color] ?? "bg-stone-500"}`}
+                          className={`w-2 h-2 rounded-full shrink-0 ${colorDotMap[cat.color] ?? 'bg-stone-500'}`}
                         />
                         <span className="flex-1">{cat.name}</span>
-                        {isActive && (
-                          <Check className="w-3 h-3 text-emerald-400" />
-                        )}
+                        {isActive && <Check className="w-3 h-3 text-emerald-400" />}
                       </button>
                     );
                   })}
@@ -339,29 +361,6 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
         onManage={() => setIsCategoryManagerOpen(true)}
       />
 
-      {/* Create input */}
-      <div className="px-4 pt-4 pb-2">
-        <div className="flex items-center gap-2">
-          <input
-            ref={inputRef}
-            type="text"
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleCreate();
-            }}
-            placeholder="New goal or project..."
-            className="flex-1 bg-[#0a0a0a] text-stone-100 border border-stone-800 rounded-lg px-3 py-2 text-sm placeholder-stone-600 focus:outline-none focus:border-sky-500/40 transition-colors"
-          />
-          <button
-            onClick={handleCreate}
-            className="p-2 bg-sky-500/10 border border-sky-500/30 text-sky-400 hover:bg-sky-500/20 rounded-lg transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
       {/* List */}
       <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-1.5">
         {filteredActiveGoals.length > 0 && (
@@ -389,7 +388,7 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
               className="flex items-center gap-2 px-1 pt-4 pb-1 text-stone-500 hover:text-stone-400 transition-colors cursor-pointer"
             >
               <ChevronDown
-                className={`w-3 h-3 transition-transform ${showArchived ? "" : "-rotate-90"}`}
+                className={`w-3 h-3 transition-transform ${showArchived ? '' : '-rotate-90'}`}
               />
               <span className="text-[9px] font-mono font-bold uppercase tracking-widest">
                 Archived ({filteredArchivedGoals.length})
@@ -399,7 +398,7 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
               {showArchived && (
                 <motion.div
                   initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
+                  animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   className="space-y-1.5 overflow-hidden"
                 >
@@ -415,11 +414,34 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
             <Flag className="w-8 h-8 mx-auto mb-2 text-stone-700" />
             <p className="text-xs font-sans">No goals or projects yet</p>
             <p className="text-[10px] font-sans text-stone-700 mt-1">
-              Create your first goal above. A goal (or project) is a high-level
-              ambition that groups multiple objectives together.
+              Create your first goal above. A goal (or project) is a high-level ambition that groups
+              multiple objectives together.
             </p>
           </div>
         )}
+      </div>
+
+      {/* Create input */}
+      <div className="flex-none px-4 py-3 border-t border-stone-800/60">
+        <div className="flex items-center gap-2">
+          <input
+            ref={inputRef}
+            type="text"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleCreate();
+            }}
+            placeholder="New goal or project..."
+            className="flex-1 bg-[#0a0a0a] text-stone-100 border border-stone-800 rounded-lg px-3 py-2 text-sm placeholder-stone-600 focus:outline-none focus:border-sky-500/40 transition-colors"
+          />
+          <button
+            onClick={handleCreate}
+            className="p-2 bg-sky-500/10 border border-sky-500/30 text-sky-400 hover:bg-sky-500/20 rounded-lg transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -428,20 +450,18 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
     <AnimatePresence>
       {open && (
         <>
-          <div
-            onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[999]"
-          />
+          <div onClick={onClose} className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[999]" />
 
           {isMobile ? (
             <div className="fixed inset-0 z-[999] flex items-end justify-center font-sans pointer-events-none">
-              <div className="relative w-full min-h-[70vh] max-h-[85vh] bg-[#121212] border-t border-stone-850 rounded-t-2xl shadow-2xl z-10 flex flex-col overflow-hidden pointer-events-auto translate-y-0 transition-transform duration-300 ease-out animate-slide-up">
+              <div className="relative w-full h-[82vh] bg-[#121212] border-t border-stone-850 rounded-t-2xl shadow-2xl z-10 flex flex-col overflow-hidden pointer-events-auto animate-slide-up">
                 <div className="flex-none flex justify-center pt-3 pb-0">
-                  <div className="w-12 h-1 bg-stone-800 rounded-full" />
+                  <button
+                    onClick={onClose}
+                    className="w-12 h-1 bg-stone-700 hover:bg-stone-500 rounded-full transition-colors cursor-pointer"
+                  />
                 </div>
-                <div className="flex-1 overflow-hidden flex flex-col">
-                  {content}
-                </div>
+                <div className="flex-1 overflow-hidden flex flex-col">{content}</div>
               </div>
             </div>
           ) : (
@@ -451,11 +471,9 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 onClick={(e) => e.stopPropagation()}
-                className="bg-[#121212] border border-stone-800 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl relative flex flex-col max-h-[85vh] pointer-events-auto"
+                className="bg-[#121212] border border-stone-800 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl relative flex flex-col h-[85vh] pointer-events-auto"
               >
-                <div className="flex-1 overflow-hidden flex flex-col">
-                  {content}
-                </div>
+                <div className="flex-1 overflow-hidden flex flex-col">{content}</div>
               </motion.div>
             </div>
           )}

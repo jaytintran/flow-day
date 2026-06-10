@@ -3,11 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { ReactNode } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import { X } from "lucide-react";
+import React, { ReactNode } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { X } from 'lucide-react';
 
-export type LabelColor = "blue" | "indigo" | "amber" | "emerald";
+export type LabelColor = 'blue' | 'indigo' | 'amber' | 'emerald';
 
 interface DetailSheetProps {
   open: boolean;
@@ -19,17 +19,17 @@ interface DetailSheetProps {
 }
 
 const colorClasses: Record<LabelColor, string> = {
-  blue: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-  indigo: "text-indigo-400 bg-indigo-500/10 border-indigo-500/20",
-  amber: "text-amber-400 bg-amber-500/10 border-amber-500/20",
-  emerald: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+  blue: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  indigo: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
+  amber: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+  emerald: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
 };
 
 export default function DetailSheet({
   open,
   onClose,
   label,
-  labelColor = "blue",
+  labelColor = 'blue',
   isMobile,
   children,
 }: DetailSheetProps) {
@@ -51,15 +51,18 @@ export default function DetailSheet({
             />
             {/* Sheet container */}
             <motion.div
-              initial={{ y: "100%" }}
+              initial={{ y: '100%' }}
               animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 220 }}
-              className="relative w-full max-h-[85vh] bg-[#121212] border-t border-stone-850 rounded-t-2xl shadow-2xl z-10 flex flex-col overflow-hidden pb-6"
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="relative w-full min-h-[85vh] max-h-[100vh] bg-[#121212] border-t border-stone-850 rounded-t-2xl shadow-2xl z-10 flex flex-col overflow-hidden pb-6"
             >
               {/* Drag Handle & Close header */}
               <div className="flex-none flex flex-col items-center pt-3 pb-2 border-b border-stone-850/60 relative">
-                <div className="w-12 h-1 bg-stone-800 rounded-full mb-3" />
+                <button
+                  onClick={onClose}
+                  className="w-12 h-1 bg-stone-700 hover:bg-stone-500 rounded-full mb-3 transition-colors cursor-pointer"
+                />
                 <div className="w-full px-5 flex justify-between items-center">
                   <span
                     className={`text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border ${chipClass}`}
@@ -76,9 +79,7 @@ export default function DetailSheet({
               </div>
 
               {/* Sheet content area */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-4 min-h-[300px]">
-                {children}
-              </div>
+              <div className="flex-1 overflow-y-auto p-5 space-y-4 min-h-[300px]">{children}</div>
             </motion.div>
           </div>
         ) : (
@@ -112,9 +113,7 @@ export default function DetailSheet({
               </div>
 
               {/* Content area */}
-              <div className="p-5 overflow-y-auto flex-1 min-h-[250px] space-y-4">
-                {children}
-              </div>
+              <div className="p-5 overflow-y-auto flex-1 min-h-[250px] space-y-4">{children}</div>
             </motion.div>
           </div>
         ))}

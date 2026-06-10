@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
-import { motion, AnimatePresence } from "motion/react";
+import React, { useState, useEffect, useRef } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Repeat2,
   Plus,
@@ -16,11 +16,12 @@ import {
   CalendarDays,
   ChevronDown,
   RotateCcw,
-} from "lucide-react";
-import { db } from "../db";
-import { Habit, HabitLog } from "../types";
-import { toLocalDateString } from "../utils";
-import HabitConsistencyModal from "./HabitConsistencyModal";
+  MoreHorizontal,
+} from 'lucide-react';
+import { db } from '../db';
+import { Habit, HabitLog } from '../types';
+import { toLocalDateString } from '../utils';
+import HabitConsistencyModal from './HabitConsistencyModal';
 
 interface HabitsSheetProps {
   open: boolean;
@@ -31,17 +32,53 @@ interface HabitsSheetProps {
 
 // ─── Color palette ────────────────────────────────────────────────────────────
 
-const COLORS: Array<{ key: Habit["color"]; dot: string; ring: string; filled: string; icon: string }> = [
-  { key: "emerald", dot: "bg-emerald-500",  ring: "ring-emerald-500",  filled: "bg-emerald-500/15 border-emerald-500/40 text-emerald-400", icon: "text-emerald-400" },
-  { key: "sky",     dot: "bg-sky-500",      ring: "ring-sky-500",      filled: "bg-sky-500/15 border-sky-500/40 text-sky-400",             icon: "text-sky-400" },
-  { key: "violet",  dot: "bg-violet-500",   ring: "ring-violet-500",   filled: "bg-violet-500/15 border-violet-500/40 text-violet-400",    icon: "text-violet-400" },
-  { key: "rose",    dot: "bg-rose-500",     ring: "ring-rose-500",     filled: "bg-rose-500/15 border-rose-500/40 text-rose-400",          icon: "text-rose-400" },
-  { key: "amber",   dot: "bg-amber-500",    ring: "ring-amber-500",    filled: "bg-amber-500/15 border-amber-500/40 text-amber-400",       icon: "text-amber-400" },
+const COLORS: Array<{
+  key: Habit['color'];
+  dot: string;
+  ring: string;
+  filled: string;
+  icon: string;
+}> = [
+  {
+    key: 'emerald',
+    dot: 'bg-emerald-500',
+    ring: 'ring-emerald-500',
+    filled: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400',
+    icon: 'text-emerald-400',
+  },
+  {
+    key: 'sky',
+    dot: 'bg-sky-500',
+    ring: 'ring-sky-500',
+    filled: 'bg-sky-500/15 border-sky-500/40 text-sky-400',
+    icon: 'text-sky-400',
+  },
+  {
+    key: 'violet',
+    dot: 'bg-violet-500',
+    ring: 'ring-violet-500',
+    filled: 'bg-violet-500/15 border-violet-500/40 text-violet-400',
+    icon: 'text-violet-400',
+  },
+  {
+    key: 'rose',
+    dot: 'bg-rose-500',
+    ring: 'ring-rose-500',
+    filled: 'bg-rose-500/15 border-rose-500/40 text-rose-400',
+    icon: 'text-rose-400',
+  },
+  {
+    key: 'amber',
+    dot: 'bg-amber-500',
+    ring: 'ring-amber-500',
+    filled: 'bg-amber-500/15 border-amber-500/40 text-amber-400',
+    icon: 'text-amber-400',
+  },
 ];
 const DEFAULT_COLOR = COLORS[0];
 
 function getColorSet(habit: Habit) {
-  return COLORS.find(c => c.key === habit.color) ?? DEFAULT_COLOR;
+  return COLORS.find((c) => c.key === habit.color) ?? DEFAULT_COLOR;
 }
 
 // ─── Mini 7-day strip ─────────────────────────────────────────────────────────
@@ -76,11 +113,11 @@ function MiniStrip({ habitId, activeDate, logs, colorDot, colorFilled }: MiniStr
 
   return (
     <div className="flex items-center gap-1 mt-1.5">
-      {days.map(day => {
+      {days.map((day) => {
         const dayStr = toLocalDateString(day);
         const isLogged = loggedDays.has(dayStr);
         const isToday = dayStr === todayStr;
-        const label = day.toLocaleString("default", { weekday: "narrow" });
+        const label = day.toLocaleString('default', { weekday: 'narrow' });
 
         return (
           <div key={dayStr} className="flex flex-col items-center gap-0.5">
@@ -90,8 +127,8 @@ function MiniStrip({ habitId, activeDate, logs, colorDot, colorFilled }: MiniStr
                 isLogged
                   ? `${colorFilled} border`
                   : isToday
-                    ? "border-stone-500 bg-stone-800/50"
-                    : "border-stone-800 bg-transparent"
+                    ? 'border-stone-500 bg-stone-800/50'
+                    : 'border-stone-800 bg-transparent'
               }`}
             >
               {isLogged && <span className={`w-1.5 h-1.5 rounded-full ${colorDot}`} />}
@@ -107,33 +144,34 @@ function MiniStrip({ habitId, activeDate, logs, colorDot, colorFilled }: MiniStr
 
 export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetProps) {
   const [isMobile, setIsMobile] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newColor, setNewColor] = useState<Habit["color"]>("emerald");
+  const [newTitle, setNewTitle] = useState('');
+  const [newColor, setNewColor] = useState<Habit['color']>('emerald');
   const [showArchived, setShowArchived] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editColor, setEditColor] = useState<Habit["color"]>("emerald");
+  const [editTitle, setEditTitle] = useState('');
+  const [editColor, setEditColor] = useState<Habit['color']>('emerald');
   const [consistencyHabit, setConsistencyHabit] = useState<Habit | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
   }, []);
 
   // ── Data ──────────────────────────────────────────────────────────────────
 
   const habits = useLiveQuery(() => db.habits.toArray()) || [];
-  const activeHabits = habits.filter(h => h.status === "active");
-  const archivedHabits = habits.filter(h => h.status === "archived");
+  const activeHabits = habits.filter((h) => h.status === 'active');
+  const archivedHabits = habits.filter((h) => h.status === 'archived');
 
   // Load ALL habit-logs for mini strip & check button (scoped to habit later)
   const allLogs =
     useLiveQuery(
-      () => db.entries.where("type").equals("habit-log").toArray() as Promise<HabitLog[]>,
+      () => db.entries.where('type').equals('habit-log').toArray() as Promise<HabitLog[]>,
     ) || [];
 
   const activeDateStr = toLocalDateString(activeDate);
@@ -147,11 +185,11 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
       id: crypto.randomUUID(),
       title: t,
       created_at: new Date(),
-      status: "active",
+      status: 'active',
       color: newColor,
     };
     await db.habits.add(habit);
-    setNewTitle("");
+    setNewTitle('');
     inputRef.current?.focus();
   };
 
@@ -159,7 +197,7 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
   const handleToggleTick = async (habit: Habit) => {
     // Find existing log(s) for this habit on the active date
     const todayLogs = allLogs.filter(
-      l => l.habit_id === habit.id && toLocalDateString(new Date(l.timestamp)) === activeDateStr,
+      (l) => l.habit_id === habit.id && toLocalDateString(new Date(l.timestamp)) === activeDateStr,
     );
     if (todayLogs.length > 0) {
       // Already ticked → remove the most recent one
@@ -168,7 +206,7 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
       // Not ticked → add a log
       const log: HabitLog = {
         id: crypto.randomUUID(),
-        type: "habit-log",
+        type: 'habit-log',
         habit_id: habit.id,
         title: habit.title,
         timestamp: new Date(),
@@ -196,11 +234,11 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
   };
 
   const handleArchive = async (habit: Habit) => {
-    await db.habits.update(habit.id, { status: "archived" });
+    await db.habits.update(habit.id, { status: 'archived' });
   };
 
   const handleUnarchive = async (habit: Habit) => {
-    await db.habits.update(habit.id, { status: "active" });
+    await db.habits.update(habit.id, { status: 'active' });
   };
 
   const handleDelete = async (habit: Habit) => {
@@ -210,7 +248,7 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
     }
     // Confirmed: delete habit + all its logs
     await db.habits.delete(habit.id);
-    await db.entries.where("habit_id").equals(habit.id).delete();
+    await db.entries.where('habit_id').equals(habit.id).delete();
     setDeletingId(null);
   };
 
@@ -222,7 +260,7 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
     const isDeleting = deletingId === habit.id;
 
     const todayLogs = allLogs.filter(
-      l => l.habit_id === habit.id && toLocalDateString(new Date(l.timestamp)) === activeDateStr,
+      (l) => l.habit_id === habit.id && toLocalDateString(new Date(l.timestamp)) === activeDateStr,
     );
     const isTicked = todayLogs.length > 0;
 
@@ -240,9 +278,9 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
               className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-all cursor-pointer ${
                 isTicked
                   ? `${cs.filled} border`
-                  : "border-stone-700 hover:border-stone-500 bg-transparent"
+                  : 'border-stone-700 hover:border-stone-500 bg-transparent'
               }`}
-              title={isTicked ? "Uncheck habit for this day" : "Check habit for this day"}
+              title={isTicked ? 'Uncheck habit for this day' : 'Check habit for this day'}
             >
               {isTicked && <Check className="w-3 h-3 stroke-[3]" />}
             </button>
@@ -255,10 +293,10 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
                 <input
                   autoFocus
                   value={editTitle}
-                  onChange={e => setEditTitle(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === "Enter") commitEdit(habit);
-                    if (e.key === "Escape") setEditingId(null);
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitEdit(habit);
+                    if (e.key === 'Escape') setEditingId(null);
                   }}
                   onBlur={() => commitEdit(habit)}
                   className="w-full bg-transparent text-sm text-stone-100 border-b border-stone-600 focus:outline-none focus:border-stone-400 font-serif pb-0.5"
@@ -266,13 +304,15 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
                 {/* Inline color picker */}
                 <div className="flex items-center gap-1.5">
                   <div className="flex gap-1">
-                    {COLORS.map(c => (
+                    {COLORS.map((c) => (
                       <button
                         key={c.key}
-                        onMouseDown={e => e.preventDefault()}
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => setEditColor(c.key)}
                         className={`w-3.5 h-3.5 rounded-full ${c.dot} transition-all cursor-pointer ${
-                          editColor === c.key ? `ring-2 ring-offset-1 ring-offset-[#0a0a0a] ${c.ring}` : "opacity-40 hover:opacity-80"
+                          editColor === c.key
+                            ? `ring-2 ring-offset-1 ring-offset-[#0a0a0a] ${c.ring}`
+                            : 'opacity-40 hover:opacity-80'
                         }`}
                         title={c.key}
                       />
@@ -285,8 +325,8 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
                 onClick={() => !isArchived && startEdit(habit)}
                 className={`text-sm font-serif truncate block text-left w-full cursor-pointer ${
                   isArchived
-                    ? "text-stone-600 line-through cursor-default"
-                    : "text-stone-200 hover:text-white transition-colors"
+                    ? 'text-stone-600 line-through cursor-default'
+                    : 'text-stone-200 hover:text-white transition-colors'
                 }`}
               >
                 {habit.title}
@@ -296,7 +336,7 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
 
           {/* Action buttons */}
           <div className="flex items-center gap-0.5 shrink-0">
-            {/* Consistency calendar button */}
+            {/* Consistency calendar — always visible */}
             <button
               onClick={() => setConsistencyHabit(habit)}
               className="p-1.5 rounded text-stone-600 hover:text-amber-400 hover:bg-amber-950/20 transition-all cursor-pointer"
@@ -305,47 +345,91 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
               <CalendarDays className="w-3.5 h-3.5" />
             </button>
 
+            {/* Desktop hover actions */}
             {!isArchived && (
-              <>
-                {/* Archive */}
-                <button
-                  onClick={() => handleArchive(habit)}
-                  className="md:opacity-0 md:group-hover:opacity-100 p-1.5 rounded text-stone-600 hover:text-amber-400 hover:bg-amber-950/20 transition-all cursor-pointer"
-                  title="Archive"
-                >
-                  <Archive className="w-3.5 h-3.5" />
-                </button>
-              </>
+              <button
+                onClick={() => handleArchive(habit)}
+                className="hidden md:block opacity-0 group-hover:opacity-100 p-1.5 rounded text-stone-600 hover:text-amber-400 hover:bg-amber-950/20 transition-all cursor-pointer"
+                title="Archive"
+              >
+                <Archive className="w-3.5 h-3.5" />
+              </button>
             )}
 
             {isArchived && (
               <button
                 onClick={() => handleUnarchive(habit)}
-                className="p-1.5 rounded text-stone-600 hover:text-emerald-400 hover:bg-emerald-950/20 transition-all cursor-pointer"
+                className="hidden md:block p-1.5 rounded text-stone-600 hover:text-emerald-400 hover:bg-emerald-950/20 transition-all cursor-pointer"
                 title="Unarchive"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
             )}
 
-            {/* Delete */}
             {isDeleting ? (
               <button
                 onClick={() => handleDelete(habit)}
                 className="px-2 py-1 text-[10px] bg-red-950/80 border border-red-800/80 rounded text-red-400 font-mono font-bold hover:bg-red-900 transition-colors cursor-pointer"
-                title="Confirm delete"
               >
                 Sure?
               </button>
             ) : (
               <button
                 onClick={() => handleDelete(habit)}
-                className="md:opacity-0 md:group-hover:opacity-100 p-1.5 rounded text-stone-600 hover:text-red-400 hover:bg-red-950/20 transition-all cursor-pointer"
-                title="Delete habit and all logs"
+                className="hidden md:block opacity-0 group-hover:opacity-100 p-1.5 rounded text-stone-600 hover:text-red-400 hover:bg-red-950/20 transition-all cursor-pointer"
+                title="Delete"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             )}
+
+            {/* Mobile ... menu */}
+            <div className="relative md:hidden">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpenId(menuOpenId === habit.id ? null : habit.id);
+                }}
+                className="p-1.5 rounded text-stone-600 hover:text-stone-400 transition-all cursor-pointer"
+              >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </button>
+              {menuOpenId === habit.id && (
+                <div className="absolute right-0 top-8 z-50 bg-[#1a1a1a] border border-stone-700 rounded-lg shadow-xl flex flex-col overflow-hidden min-w-[130px]">
+                  {!isArchived && (
+                    <button
+                      onClick={() => {
+                        handleArchive(habit);
+                        setMenuOpenId(null);
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 text-[11px] font-mono text-stone-400 hover:bg-stone-800 hover:text-amber-400 transition-colors cursor-pointer"
+                    >
+                      <Archive className="w-3.5 h-3.5" /> Archive
+                    </button>
+                  )}
+                  {isArchived && (
+                    <button
+                      onClick={() => {
+                        handleUnarchive(habit);
+                        setMenuOpenId(null);
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 text-[11px] font-mono text-stone-400 hover:bg-stone-800 hover:text-emerald-400 transition-colors cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Unarchive
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      handleDelete(habit);
+                      setMenuOpenId(null);
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 text-[11px] font-mono text-stone-400 hover:bg-stone-800 hover:text-red-400 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -383,44 +467,6 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
         </button>
       </div>
 
-      {/* Create new habit */}
-      <div className="px-4 pt-4 pb-2 border-b border-stone-800/40">
-        <div className="flex items-center gap-2">
-          <input
-            ref={inputRef}
-            type="text"
-            value={newTitle}
-            onChange={e => setNewTitle(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") handleCreate(); }}
-            placeholder="New habit..."
-            className="flex-1 bg-[#0a0a0a] text-stone-100 border border-stone-800 rounded-lg px-3 py-2 text-sm placeholder-stone-600 focus:outline-none focus:border-emerald-500/40 transition-colors"
-          />
-          <button
-            onClick={handleCreate}
-            className="p-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 rounded-lg transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Color picker */}
-        <div className="flex items-center gap-2 mt-2.5 px-0.5">
-          <span className="text-[9px] font-mono text-stone-600 uppercase tracking-widest">Color:</span>
-          <div className="flex gap-1.5">
-            {COLORS.map(c => (
-              <button
-                key={c.key}
-                onClick={() => setNewColor(c.key)}
-                className={`w-4 h-4 rounded-full ${c.dot} transition-all cursor-pointer ${
-                  newColor === c.key ? `ring-2 ring-offset-1 ring-offset-[#131313] ${c.ring}` : "opacity-40 hover:opacity-70"
-                }`}
-                title={c.key}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-
       {/* List */}
       <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-1.5">
         {activeHabits.length > 0 && (
@@ -430,16 +476,18 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
             </span>
           </div>
         )}
-        {activeHabits.map(h => renderHabitRow(h, false))}
+        {activeHabits.map((h) => renderHabitRow(h, false))}
 
         {/* Archived section */}
         {archivedHabits.length > 0 && (
           <>
             <button
-              onClick={() => setShowArchived(s => !s)}
+              onClick={() => setShowArchived((s) => !s)}
               className="flex items-center gap-2 px-1 pt-4 pb-1 text-stone-500 hover:text-stone-400 transition-colors cursor-pointer"
             >
-              <ChevronDown className={`w-3 h-3 transition-transform ${showArchived ? "" : "-rotate-90"}`} />
+              <ChevronDown
+                className={`w-3 h-3 transition-transform ${showArchived ? '' : '-rotate-90'}`}
+              />
               <span className="text-[9px] font-mono font-bold uppercase tracking-widest">
                 Archived ({archivedHabits.length})
               </span>
@@ -448,16 +496,60 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
               {showArchived && (
                 <motion.div
                   initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
+                  animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   className="space-y-1.5 overflow-hidden"
                 >
-                  {archivedHabits.map(h => renderHabitRow(h, true))}
+                  {archivedHabits.map((h) => renderHabitRow(h, true))}
                 </motion.div>
               )}
             </AnimatePresence>
           </>
         )}
+
+        {/* Create new habit */}
+        <div className="px-4 pt-4 pb-2 border-b border-stone-800/40">
+          <div className="flex items-center gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreate();
+              }}
+              placeholder="New habit..."
+              className="flex-1 bg-[#0a0a0a] text-stone-100 border border-stone-800 rounded-lg px-3 py-2 text-sm placeholder-stone-600 focus:outline-none focus:border-emerald-500/40 transition-colors"
+            />
+            <button
+              onClick={handleCreate}
+              className="p-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 rounded-lg transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Color picker */}
+          <div className="flex items-center gap-2 mt-2.5 px-0.5">
+            <span className="text-[9px] font-mono text-stone-600 uppercase tracking-widest">
+              Color:
+            </span>
+            <div className="flex gap-1.5">
+              {COLORS.map((c) => (
+                <button
+                  key={c.key}
+                  onClick={() => setNewColor(c.key)}
+                  className={`w-4 h-4 rounded-full ${c.dot} transition-all cursor-pointer ${
+                    newColor === c.key
+                      ? `ring-2 ring-offset-1 ring-offset-[#131313] ${c.ring}`
+                      : 'opacity-40 hover:opacity-70'
+                  }`}
+                  title={c.key}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
 
         {habits.length === 0 && (
           <div className="py-12 text-center text-stone-600">
@@ -478,31 +570,20 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
         {open && (
           <>
             {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={onClose}
-              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[999]"
-            />
+            <div onClick={onClose} className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[999]" />
 
             {isMobile ? (
               /* MOBILE BOTTOM SHEET */
               <div className="fixed inset-0 z-[999] flex items-end justify-center font-sans pointer-events-none">
-                <motion.div
-                  initial={{ y: "100%" }}
-                  animate={{ y: 0 }}
-                  exit={{ y: "100%" }}
-                  transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                  className="relative w-full min-h-[70vh] max-h-[85vh] bg-[#121212] border-t border-stone-800 rounded-t-2xl shadow-2xl z-10 flex flex-col overflow-hidden pointer-events-auto"
-                >
+                <div className="relative w-full h-[82vh] bg-[#121212] border-t border-stone-800 rounded-t-2xl shadow-2xl z-10 flex flex-col overflow-hidden pointer-events-auto animate-slide-up">
                   <div className="flex-none flex justify-center pt-3 pb-0">
-                    <div className="w-12 h-1 bg-stone-800 rounded-full" />
+                    <button
+                      onClick={onClose}
+                      className="w-12 h-1 bg-stone-700 hover:bg-stone-500 rounded-full transition-colors cursor-pointer"
+                    />
                   </div>
-                  <div className="flex-1 overflow-hidden flex flex-col">
-                    {content}
-                  </div>
-                </motion.div>
+                  <div className="flex-1 overflow-hidden flex flex-col">{content}</div>
+                </div>
               </div>
             ) : (
               /* DESKTOP MODAL */
@@ -511,12 +592,10 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  onClick={e => e.stopPropagation()}
-                  className="bg-[#121212] border border-stone-800 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl relative flex flex-col max-h-[85vh] pointer-events-auto"
+                  onClick={(e) => e.stopPropagation()}
+                  className="bg-[#121212] border border-stone-800 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl relative flex flex-col h-[85vh] pointer-events-auto"
                 >
-                  <div className="flex-1 overflow-hidden flex flex-col">
-                    {content}
-                  </div>
+                  <div className="flex-1 overflow-hidden flex flex-col">{content}</div>
                 </motion.div>
               </div>
             )}
@@ -526,10 +605,7 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
 
       {/* Consistency modal — rendered outside AnimatePresence so it can persist when sheet is closed */}
       {consistencyHabit && (
-        <HabitConsistencyModal
-          habit={consistencyHabit}
-          onClose={() => setConsistencyHabit(null)}
-        />
+        <HabitConsistencyModal habit={consistencyHabit} onClose={() => setConsistencyHabit(null)} />
       )}
     </>
   );

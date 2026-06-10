@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
-import { db } from "../db";
-import { EntryType, TimelineEntry } from "../types";
+import React, { useState, useEffect } from 'react';
+import { db } from '../db';
+import { EntryType, TimelineEntry } from '../types';
 import {
   CheckSquare,
   Calendar,
@@ -15,9 +15,9 @@ import {
   HelpCircle,
   X,
   ChevronDown,
-} from "lucide-react";
-import { toLocalDateString } from "../utils";
-import { motion, AnimatePresence } from "motion/react";
+} from 'lucide-react';
+import { toLocalDateString } from '../utils';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface InputBarProps {
   activeDate: Date;
@@ -41,11 +41,11 @@ function parseSmartDate(
     const d = new Date();
     d.setDate(d.getDate() + 1);
     targetDate.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
-    cleanText = cleanText.replace(tomorrowRegex, " ");
+    cleanText = cleanText.replace(tomorrowRegex, ' ');
   } else if (todayRegex.test(cleanText)) {
     const d = new Date();
     targetDate.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
-    cleanText = cleanText.replace(todayRegex, " ");
+    cleanText = cleanText.replace(todayRegex, ' ');
   } else {
     const inXMatch = cleanText.match(inXDaysRegex);
     if (inXMatch) {
@@ -53,15 +53,13 @@ function parseSmartDate(
       const d = new Date();
       d.setDate(d.getDate() + daysCount);
       targetDate.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
-      cleanText = cleanText.replace(inXDaysRegex, " ");
+      cleanText = cleanText.replace(inXDaysRegex, ' ');
     } else {
       const exactMatch = cleanText.match(exactDateRegex);
       if (exactMatch) {
         const day = parseInt(exactMatch[1], 10);
         const month = parseInt(exactMatch[2], 10) - 1;
-        const year = exactMatch[3]
-          ? parseInt(exactMatch[3], 10)
-          : new Date().getFullYear();
+        const year = exactMatch[3] ? parseInt(exactMatch[3], 10) : new Date().getFullYear();
 
         let fullYear = year;
         if (exactMatch[3] && exactMatch[3].length === 2) {
@@ -75,13 +73,13 @@ function parseSmartDate(
           tempDate.getDate() === day
         ) {
           targetDate.setFullYear(fullYear, month, day);
-          cleanText = cleanText.replace(exactDateRegex, " ");
+          cleanText = cleanText.replace(exactDateRegex, ' ');
         }
       }
     }
   }
 
-  cleanText = cleanText.trim().replace(/\s+/g, " ");
+  cleanText = cleanText.trim().replace(/\s+/g, ' ');
   return { parsedDate: targetDate, textAfterDateRemoval: cleanText };
 }
 
@@ -101,19 +99,19 @@ function parseSmartTime(
     const ampm = match[3] ? match[3].toLowerCase() : null;
 
     let targetHour = h;
-    if (ampm === "pm" && h < 12) {
+    if (ampm === 'pm' && h < 12) {
       targetHour += 12;
-    } else if (ampm === "am" && h === 12) {
+    } else if (ampm === 'am' && h === 12) {
       targetHour = 0;
     }
 
     if (targetHour >= 0 && targetHour < 24 && m >= 0 && m < 60) {
       targetDate.setHours(targetHour, m, 0, 0);
-      cleanText = cleanText.replace(timeRegex, " ");
+      cleanText = cleanText.replace(timeRegex, ' ');
     }
   }
 
-  cleanText = cleanText.trim().replace(/\s+/g, " ");
+  cleanText = cleanText.trim().replace(/\s+/g, ' ');
   return { parsedDate: targetDate, textAfterTimeRemoval: cleanText };
 }
 
@@ -159,10 +157,10 @@ function parseTimeBlock(
       endAmpm = startAmpm;
     }
 
-    if (startAmpm === "pm" && startH < 12) startH += 12;
-    if (startAmpm === "am" && startH === 12) startH = 0;
-    if (endAmpm === "pm" && endH < 12) endH += 12;
-    if (endAmpm === "am" && endH === 12) endH = 0;
+    if (startAmpm === 'pm' && startH < 12) startH += 12;
+    if (startAmpm === 'am' && startH === 12) startH = 0;
+    if (endAmpm === 'pm' && endH < 12) endH += 12;
+    if (endAmpm === 'am' && endH === 12) endH = 0;
 
     if (startH >= 0 && startH < 24 && startM >= 0 && startM < 60) {
       startAt.setHours(startH, startM, 0, 0);
@@ -174,7 +172,7 @@ function parseTimeBlock(
       }
     }
     hasFromTo = true;
-    cleanText = cleanText.replace(fromToRegex, " ").trim().replace(/\s+/g, " ");
+    cleanText = cleanText.replace(fromToRegex, ' ').trim().replace(/\s+/g, ' ');
   }
 
   // 3. Otherwise try discrete "at X" (e.g. "at 6pm") as startAt
@@ -187,9 +185,9 @@ function parseTimeBlock(
       let ampm = timeMatch[3] ? timeMatch[3].toLowerCase() : null;
 
       let targetHour = h;
-      if (ampm === "pm" && h < 12) {
+      if (ampm === 'pm' && h < 12) {
         targetHour += 12;
-      } else if (ampm === "am" && h === 12) {
+      } else if (ampm === 'am' && h === 12) {
         targetHour = 0;
       }
 
@@ -198,7 +196,7 @@ function parseTimeBlock(
         endAt = new Date(startAt);
         endAt.setHours(startAt.getHours() + 1);
       }
-      cleanText = cleanText.replace(timeRegex, " ").trim().replace(/\s+/g, " ");
+      cleanText = cleanText.replace(timeRegex, ' ').trim().replace(/\s+/g, ' ');
     }
   }
 
@@ -215,19 +213,13 @@ function parseTimeBlock(
     const m = durMatch[2] ? parseInt(durMatch[2], 10) : 0;
     durationMinutes = h * 60 + m;
     matchedDuration = true;
-    cleanText = cleanText
-      .replace(durationRegex, " ")
-      .trim()
-      .replace(/\s+/g, " ");
+    cleanText = cleanText.replace(durationRegex, ' ').trim().replace(/\s+/g, ' ');
   } else {
     const minMatch = cleanText.match(durationOnlyMinutesRegex);
     if (minMatch) {
       durationMinutes = parseInt(minMatch[1], 10);
       matchedDuration = true;
-      cleanText = cleanText
-        .replace(durationOnlyMinutesRegex, " ")
-        .trim()
-        .replace(/\s+/g, " ");
+      cleanText = cleanText.replace(durationOnlyMinutesRegex, ' ').trim().replace(/\s+/g, ' ');
     }
   }
 
@@ -244,16 +236,16 @@ function parseTimeBlock(
 
 // Helpers for compact human-readable manual date & time display
 const formatHumanDateTime = (dtStr: string) => {
-  if (!dtStr) return "";
+  if (!dtStr) return '';
   try {
     const d = new Date(dtStr);
     if (isNaN(d.getTime())) return dtStr;
     return (
-      d.toLocaleDateString([], { month: "short", day: "numeric" }) +
-      " @ " +
+      d.toLocaleDateString([], { month: 'short', day: 'numeric' }) +
+      ' @ ' +
       d.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
+        hour: '2-digit',
+        minute: '2-digit',
         hour12: true,
       })
     );
@@ -263,13 +255,13 @@ const formatHumanDateTime = (dtStr: string) => {
 };
 
 const formatHumanTimeOnly = (dtStr: string) => {
-  if (!dtStr) return "";
+  if (!dtStr) return '';
   try {
     const d = new Date(dtStr);
     if (isNaN(d.getTime())) return dtStr;
     return d.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
+      hour: '2-digit',
+      minute: '2-digit',
       hour12: true,
     });
   } catch {
@@ -278,23 +270,23 @@ const formatHumanTimeOnly = (dtStr: string) => {
 };
 
 export default function InputBar({ activeDate }: InputBarProps) {
-  const [activeType, setActiveType] = useState<EntryType>("task");
+  const [activeType, setActiveType] = useState<EntryType>('task');
   const [showHelp, setShowHelp] = useState(false);
   const [showTimePopup, setShowTimePopup] = useState(false);
 
   // Field values
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState(""); // for Notes
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState(''); // for Notes
 
   // Note Modal state and inputs
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
-  const [modalTitle, setModalTitle] = useState("");
-  const [modalContent, setModalContent] = useState("");
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalContent, setModalContent] = useState('');
 
   // Timestamps (defaults populated based on activeDate)
-  const [timestampStr, setTimestampStr] = useState("");
-  const [startAtStr, setStartAtStr] = useState("");
-  const [endAtStr, setEndAtStr] = useState("");
+  const [timestampStr, setTimestampStr] = useState('');
+  const [startAtStr, setStartAtStr] = useState('');
+  const [endAtStr, setEndAtStr] = useState('');
   const [timeManuallySet, setTimeManuallySet] = useState(false);
 
   // Close time manual popup if activeType changes
@@ -310,7 +302,7 @@ export default function InputBar({ activeDate }: InputBarProps) {
     d.setHours(now.getHours(), now.getMinutes(), 0, 0);
 
     // Format to YYYY-MM-DDTHH:mm for datetime-local
-    const pad = (n: number) => n.toString().padStart(2, "0");
+    const pad = (n: number) => n.toString().padStart(2, '0');
     const localISO = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
     setTimestampStr(localISO);
@@ -325,21 +317,13 @@ export default function InputBar({ activeDate }: InputBarProps) {
   }, [activeDate]);
 
   // Combine base date from activeDate context and exact hour/minute/second from 'now'
-  const getBaseCompletedDate = (overrideTime?: {
-    hour: number;
-    minute: number;
-  }) => {
+  const getBaseCompletedDate = (overrideTime?: { hour: number; minute: number }) => {
     const d = new Date(activeDate);
     const now = new Date();
     if (overrideTime) {
       d.setHours(overrideTime.hour, overrideTime.minute, 0, 0);
     } else {
-      d.setHours(
-        now.getHours(),
-        now.getMinutes(),
-        now.getSeconds(),
-        now.getMilliseconds(),
-      );
+      d.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
     }
     return d;
   };
@@ -351,7 +335,7 @@ export default function InputBar({ activeDate }: InputBarProps) {
     const entryId = crypto.randomUUID();
     let newEntry: TimelineEntry | null = null;
 
-    if (activeType === "task") {
+    if (activeType === 'task') {
       let cleanTitle = title.trim();
       let defaultBaseDate = getBaseCompletedDate();
 
@@ -361,10 +345,7 @@ export default function InputBar({ activeDate }: InputBarProps) {
       );
       cleanTitle = textAfterDateRemoval;
 
-      const { parsedDate: finalDate, textAfterTimeRemoval } = parseSmartTime(
-        cleanTitle,
-        dateBase,
-      );
+      const { parsedDate: finalDate, textAfterTimeRemoval } = parseSmartTime(cleanTitle, dateBase);
       cleanTitle = textAfterTimeRemoval;
 
       const finalTitle = cleanTitle || title.trim();
@@ -372,18 +353,17 @@ export default function InputBar({ activeDate }: InputBarProps) {
 
       newEntry = {
         id: entryId,
-        type: "task",
+        type: 'task',
         title: finalTitle,
-        status: "todo",
+        status: 'todo',
         time_spent: 0,
         created_at: getBaseCompletedDate(),
         scheduled_at: finalDate,
       };
-    } else if (activeType === "event") {
+    } else if (activeType === 'event') {
       let cleanTitle = title.trim();
-      let defaultBaseDate = timeManuallySet && timestampStr
-        ? new Date(timestampStr)
-        : getBaseCompletedDate();
+      let defaultBaseDate =
+        timeManuallySet && timestampStr ? new Date(timestampStr) : getBaseCompletedDate();
 
       const { parsedDate: dateBase, textAfterDateRemoval } = parseSmartDate(
         cleanTitle,
@@ -391,10 +371,7 @@ export default function InputBar({ activeDate }: InputBarProps) {
       );
       cleanTitle = textAfterDateRemoval;
 
-      const { parsedDate: finalDate, textAfterTimeRemoval } = parseSmartTime(
-        cleanTitle,
-        dateBase,
-      );
+      const { parsedDate: finalDate, textAfterTimeRemoval } = parseSmartTime(cleanTitle, dateBase);
       cleanTitle = textAfterTimeRemoval;
 
       const finalTitle = cleanTitle || title.trim();
@@ -402,18 +379,17 @@ export default function InputBar({ activeDate }: InputBarProps) {
 
       newEntry = {
         id: entryId,
-        type: "event",
+        type: 'event',
         title: finalTitle,
         content: content.trim(),
         timestamp: finalDate,
         created_at: getBaseCompletedDate(),
         scheduled_at: finalDate,
       };
-    } else if (activeType === "note") {
+    } else if (activeType === 'note') {
       let cleanTitle = title.trim();
-      let defaultBaseDate = timeManuallySet && timestampStr
-        ? new Date(timestampStr)
-        : getBaseCompletedDate();
+      let defaultBaseDate =
+        timeManuallySet && timestampStr ? new Date(timestampStr) : getBaseCompletedDate();
 
       const { parsedDate: dateBase, textAfterDateRemoval } = parseSmartDate(
         cleanTitle,
@@ -421,10 +397,7 @@ export default function InputBar({ activeDate }: InputBarProps) {
       );
       cleanTitle = textAfterDateRemoval;
 
-      const { parsedDate: finalDate, textAfterTimeRemoval } = parseSmartTime(
-        cleanTitle,
-        dateBase,
-      );
+      const { parsedDate: finalDate, textAfterTimeRemoval } = parseSmartTime(cleanTitle, dateBase);
       cleanTitle = textAfterTimeRemoval;
 
       const finalTitle = cleanTitle || title.trim();
@@ -432,32 +405,30 @@ export default function InputBar({ activeDate }: InputBarProps) {
 
       newEntry = {
         id: entryId,
-        type: "note",
+        type: 'note',
         title: finalTitle,
         content: content.trim(),
         timestamp: finalDate,
         created_at: getBaseCompletedDate(),
         scheduled_at: finalDate,
       };
-    } else if (activeType === "time-block") {
+    } else if (activeType === 'time-block') {
       let cleanTitle = title.trim();
       if (!cleanTitle) return;
 
-      const defaultStart = startAtStr
-        ? new Date(startAtStr)
-        : getBaseCompletedDate();
+      const defaultStart = startAtStr ? new Date(startAtStr) : getBaseCompletedDate();
 
       const parsedBlock = parseTimeBlock(cleanTitle, defaultStart);
       const finalTitle = parsedBlock.title || title.trim();
 
       if (parsedBlock.endAt <= parsedBlock.startAt) {
-        alert("End time must be after start time.");
+        alert('End time must be after start time.');
         return;
       }
 
       newEntry = {
         id: entryId,
-        type: "time-block",
+        type: 'time-block',
         title: finalTitle,
         start_at: parsedBlock.startAt,
         end_at: parsedBlock.endAt,
@@ -469,14 +440,14 @@ export default function InputBar({ activeDate }: InputBarProps) {
       await db.entries.add(newEntry);
 
       // Reset text inputs
-      setTitle("");
-      setContent("");
+      setTitle('');
+      setContent('');
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     // Submit on Enter
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
     }
@@ -495,24 +466,16 @@ export default function InputBar({ activeDate }: InputBarProps) {
               initial={{ opacity: 0, y: 12, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 12, scale: 0.98 }}
-              transition={{ duration: 0.15, ease: "easeOut" }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
               className="absolute bottom-full mb-4 left-0 right-0 bg-[#141414] border border-stone-800/90 rounded-xl p-5 shadow-2xl z-50 text-stone-300 backdrop-blur-md"
               id="smart-parser-help-tooltip"
             >
               <div className="flex items-center justify-between border-b border-stone-800 pb-2.5 mb-3">
                 <div className="flex items-center gap-2">
-                  {activeType === "task" && (
-                    <CheckSquare className="w-4 h-4 text-emerald-400" />
-                  )}
-                  {activeType === "event" && (
-                    <Calendar className="w-4 h-4 text-amber-400" />
-                  )}
-                  {activeType === "note" && (
-                    <FileText className="w-4 h-4 text-blue-400" />
-                  )}
-                  {activeType === "time-block" && (
-                    <Clock className="w-4 h-4 text-indigo-400" />
-                  )}
+                  {activeType === 'task' && <CheckSquare className="w-4 h-4 text-emerald-400" />}
+                  {activeType === 'event' && <Calendar className="w-4 h-4 text-amber-400" />}
+                  {activeType === 'note' && <FileText className="w-4 h-4 text-blue-400" />}
+                  {activeType === 'time-block' && <Clock className="w-4 h-4 text-indigo-400" />}
                   <h4 className="font-mono font-bold text-[11px] uppercase tracking-wider text-stone-100">
                     {activeType} NLP Smart Engine Guidelines
                   </h4>
@@ -529,12 +492,11 @@ export default function InputBar({ activeDate }: InputBarProps) {
 
               {/* Help Content */}
               <div className="space-y-3.5 font-sans text-xs">
-                {activeType === "task" && (
+                {activeType === 'task' && (
                   <>
                     <p className="text-stone-400 leading-relaxed">
-                      Our task input scans your words dynamically for dates and
-                      times, creates the timeline entry correctly, and formats
-                      the clean residual title.
+                      Our task input scans your words dynamically for dates and times, creates the
+                      timeline entry correctly, and formats the clean residual title.
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                       <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
@@ -542,11 +504,11 @@ export default function InputBar({ activeDate }: InputBarProps) {
                           Time Recognition
                         </div>
                         <p className="text-stone-300 leading-relaxed">
-                          Type{" "}
+                          Type{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
                             at 3:45pm
-                          </code>{" "}
-                          or{" "}
+                          </code>{' '}
+                          or{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
                             at 20:15
                           </code>
@@ -558,19 +520,19 @@ export default function InputBar({ activeDate }: InputBarProps) {
                           Date Recognition
                         </div>
                         <p className="text-stone-300 leading-relaxed">
-                          Type{" "}
+                          Type{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
                             today
                           </code>
-                          ,{" "}
+                          ,{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
                             tomorrow
                           </code>
-                          ,{" "}
+                          ,{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
                             in 3 days
                           </code>
-                          , or specific date{" "}
+                          , or specific date{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
                             24/6
                           </code>
@@ -587,29 +549,24 @@ export default function InputBar({ activeDate }: InputBarProps) {
                       </span>
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-mono text-stone-400 border-t border-emerald-900/20 pt-1.5">
                         <span>
-                          ✓ Clean Title:{" "}
-                          <strong className="text-emerald-400">
-                            "Review engineering specs"
-                          </strong>
+                          ✓ Clean Title:{' '}
+                          <strong className="text-emerald-400">"Review engineering specs"</strong>
                         </span>
                         <span>
-                          ✓ Calculated Date:{" "}
-                          <strong className="text-emerald-400">
-                            Tomorrow @ 11:00 AM
-                          </strong>
+                          ✓ Calculated Date:{' '}
+                          <strong className="text-emerald-400">Tomorrow @ 11:00 AM</strong>
                         </span>
                       </div>
                     </div>
                   </>
                 )}
 
-                {activeType === "event" && (
+                {activeType === 'event' && (
                   <>
                     <p className="text-stone-400 leading-relaxed">
-                      Events map visual milestones or specific schedule goals.
-                      Type natural dates/hours in the input to configure the
-                      schedule automatically, or click the custom date-time
-                      picker!
+                      Events map visual milestones or specific schedule goals. Type natural
+                      dates/hours in the input to configure the schedule automatically, or click the
+                      custom date-time picker!
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                       <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
@@ -617,11 +574,11 @@ export default function InputBar({ activeDate }: InputBarProps) {
                           Time Alignment
                         </div>
                         <p className="text-stone-300 leading-relaxed">
-                          Add phrases like{" "}
+                          Add phrases like{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-amber-400">
                             at 9am
-                          </code>{" "}
-                          or{" "}
+                          </code>{' '}
+                          or{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-amber-400">
                             at 18:30
                           </code>
@@ -633,18 +590,18 @@ export default function InputBar({ activeDate }: InputBarProps) {
                           Relative Dates
                         </div>
                         <p className="text-stone-300 leading-relaxed">
-                          Words like{" "}
+                          Words like{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-amber-400">
                             today
                           </code>
-                          ,{" "}
+                          ,{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-amber-400">
                             tomorrow
                           </code>
-                          , or{" "}
+                          , or{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-amber-400">
                             inXdays
-                          </code>{" "}
+                          </code>{' '}
                           map instantly.
                         </p>
                       </div>
@@ -658,28 +615,24 @@ export default function InputBar({ activeDate }: InputBarProps) {
                       </span>
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-mono text-stone-400 border-t border-amber-900/20 pt-1.5">
                         <span>
-                          ✓ Saved Title:{" "}
+                          ✓ Saved Title:{' '}
                           <strong className="text-amber-400">
                             "Sprint planning demonstration"
                           </strong>
                         </span>
                         <span>
-                          ✓ Date Set:{" "}
-                          <strong className="text-amber-400">
-                            Today @ 3:00 PM
-                          </strong>
+                          ✓ Date Set: <strong className="text-amber-400">Today @ 3:00 PM</strong>
                         </span>
                       </div>
                     </div>
                   </>
                 )}
 
-                {activeType === "note" && (
+                {activeType === 'note' && (
                   <>
                     <p className="text-stone-400 leading-relaxed">
-                      Record quick text blocks, diary logs, or logs. You can
-                      inject timestamps inline via plain-text parsing or use the
-                      manual custom override below!
+                      Record quick text blocks, diary logs, or logs. You can inject timestamps
+                      inline via plain-text parsing or use the manual custom override below!
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                       <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
@@ -687,14 +640,14 @@ export default function InputBar({ activeDate }: InputBarProps) {
                           Chronology Override
                         </div>
                         <p className="text-stone-300 leading-relaxed">
-                          Insert{" "}
+                          Insert{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-blue-400">
                             at 10pm
-                          </code>{" "}
-                          or{" "}
+                          </code>{' '}
+                          or{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-blue-400">
                             at 12:45
-                          </code>{" "}
+                          </code>{' '}
                           to date of the logs of note.
                         </p>
                       </div>
@@ -703,18 +656,18 @@ export default function InputBar({ activeDate }: InputBarProps) {
                           Custom Dates
                         </div>
                         <p className="text-stone-300 leading-relaxed">
-                          Words like{" "}
+                          Words like{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-blue-400">
                             tomorrow
                           </code>
-                          ,{" "}
+                          ,{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-blue-400">
                             today
                           </code>
-                          , or exact dates like{" "}
+                          , or exact dates like{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-blue-400">
                             5/6
-                          </code>{" "}
+                          </code>{' '}
                           can be parsed.
                         </p>
                       </div>
@@ -722,11 +675,11 @@ export default function InputBar({ activeDate }: InputBarProps) {
                   </>
                 )}
 
-                {activeType === "time-block" && (
+                {activeType === 'time-block' && (
                   <>
                     <p className="text-stone-400 leading-relaxed">
-                      Establish rich duration spans on your productivity
-                      timeline with simple expressions.
+                      Establish rich duration spans on your productivity timeline with simple
+                      expressions.
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                       <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
@@ -734,7 +687,7 @@ export default function InputBar({ activeDate }: InputBarProps) {
                           Span Range Keyword
                         </div>
                         <p className="text-stone-300 leading-relaxed">
-                          Type{" "}
+                          Type{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-indigo-400">
                             from 1pm to 3:30pm
                           </code>
@@ -746,11 +699,11 @@ export default function InputBar({ activeDate }: InputBarProps) {
                           Duration Keywords
                         </div>
                         <p className="text-stone-300 leading-relaxed">
-                          Type starting time and duration:{" "}
+                          Type starting time and duration:{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-indigo-400">
                             at 10am 2h30
-                          </code>{" "}
-                          or{" "}
+                          </code>{' '}
+                          or{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-indigo-400">
                             at 5pm 45m
                           </code>
@@ -770,13 +723,13 @@ export default function InputBar({ activeDate }: InputBarProps) {
           {/* Subtle Ambient Accent Border depending on activeType */}
           <div
             className={`absolute top-0 left-0 right-0 h-[2px] transition-all duration-300 ${
-              activeType === "task"
-                ? "bg-gradient-to-r from-emerald-500/20 via-emerald-500 to-emerald-500/20"
-                : activeType === "event"
-                  ? "bg-gradient-to-r from-amber-500/20 via-amber-500 to-amber-500/20"
-                  : activeType === "note"
-                    ? "bg-gradient-to-r from-blue-500/20 via-blue-500 to-blue-500/20"
-                    : "bg-gradient-to-r from-indigo-500/20 via-indigo-500 to-indigo-500/20"
+              activeType === 'task'
+                ? 'bg-gradient-to-r from-emerald-500/20 via-emerald-500 to-emerald-500/20'
+                : activeType === 'event'
+                  ? 'bg-gradient-to-r from-amber-500/20 via-amber-500 to-amber-500/20'
+                  : activeType === 'note'
+                    ? 'bg-gradient-to-r from-blue-500/20 via-blue-500 to-blue-500/20'
+                    : 'bg-gradient-to-r from-indigo-500/20 via-indigo-500 to-indigo-500/20'
             }`}
           />
 
@@ -796,11 +749,11 @@ export default function InputBar({ activeDate }: InputBarProps) {
                 <button
                   type="button"
                   id="chip-task"
-                  onClick={() => setActiveType("task")}
+                  onClick={() => setActiveType('task')}
                   className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                    activeType === "task"
-                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-md font-extrabold"
-                      : "text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-transparent"
+                    activeType === 'task'
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-md font-extrabold'
+                      : 'text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-transparent'
                   }`}
                 >
                   <CheckSquare className="w-3.5 h-3.5" />
@@ -811,11 +764,11 @@ export default function InputBar({ activeDate }: InputBarProps) {
                 <button
                   type="button"
                   id="chip-event"
-                  onClick={() => setActiveType("event")}
+                  onClick={() => setActiveType('event')}
                   className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                    activeType === "event"
-                      ? "bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-md font-extrabold"
-                      : "text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-transparent"
+                    activeType === 'event'
+                      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-md font-extrabold'
+                      : 'text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-transparent'
                   }`}
                 >
                   <Calendar className="w-3.5 h-3.5" />
@@ -826,11 +779,11 @@ export default function InputBar({ activeDate }: InputBarProps) {
                 <button
                   type="button"
                   id="chip-note"
-                  onClick={() => setActiveType("note")}
+                  onClick={() => setActiveType('note')}
                   className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                    activeType === "note"
-                      ? "bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-md font-extrabold"
-                      : "text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-transparent"
+                    activeType === 'note'
+                      ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-md font-extrabold'
+                      : 'text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-transparent'
                   }`}
                 >
                   <FileText className="w-3.5 h-3.5" />
@@ -841,11 +794,11 @@ export default function InputBar({ activeDate }: InputBarProps) {
                 <button
                   type="button"
                   id="chip-time-block"
-                  onClick={() => setActiveType("time-block")}
+                  onClick={() => setActiveType('time-block')}
                   className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                    activeType === "time-block"
-                      ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-md font-extrabold"
-                      : "text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-transparent"
+                    activeType === 'time-block'
+                      ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-md font-extrabold'
+                      : 'text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-transparent'
                   }`}
                 >
                   <Clock className="w-3.5 h-3.5" />
@@ -854,7 +807,7 @@ export default function InputBar({ activeDate }: InputBarProps) {
               </div>
 
               {/* Combined Trigger Button Next to tab selector */}
-              {activeType !== "task" && (
+              {activeType !== 'task' && (
                 <div
                   className="max-sm:hidden relative inline-block z-40"
                   id="manual-time-popup-trigger-container"
@@ -864,27 +817,27 @@ export default function InputBar({ activeDate }: InputBarProps) {
                     onClick={() => setShowTimePopup(!showTimePopup)}
                     className={`flex items-center justify-center p-2 bg-[#0e0e0e] border rounded-xl text-xs font-mono font-medium transition-all duration-200 cursor-pointer ${
                       showTimePopup
-                        ? "text-white border-stone-700 bg-stone-900 shadow-md ring-1 ring-stone-800"
-                        : "text-stone-300 border-stone-850 hover:text-white hover:bg-stone-900/40"
+                        ? 'text-white border-stone-700 bg-stone-900 shadow-md ring-1 ring-stone-800'
+                        : 'text-stone-300 border-stone-850 hover:text-white hover:bg-stone-900/40'
                     }`}
                     style={{
                       borderColor: showTimePopup
-                        ? activeType === "event"
-                          ? "#f59e0b"
-                          : activeType === "note"
-                            ? "#3b82f6"
-                            : "#6366f1"
+                        ? activeType === 'event'
+                          ? '#f59e0b'
+                          : activeType === 'note'
+                            ? '#3b82f6'
+                            : '#6366f1'
                         : undefined,
                     }}
                     title={`Configure ${activeType} time settings manually`}
                   >
                     <Clock
                       className={`w-4 h-4 ${
-                        activeType === "event"
-                          ? "text-amber-400"
-                          : activeType === "note"
-                            ? "text-blue-400"
-                            : "text-indigo-400"
+                        activeType === 'event'
+                          ? 'text-amber-400'
+                          : activeType === 'note'
+                            ? 'text-blue-400'
+                            : 'text-indigo-400'
                       }`}
                     />
                   </button>
@@ -895,7 +848,7 @@ export default function InputBar({ activeDate }: InputBarProps) {
                         initial={{ opacity: 0, y: 8, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                        transition={{ duration: 0.12, ease: "easeOut" }}
+                        transition={{ duration: 0.12, ease: 'easeOut' }}
                         className="absolute bottom-full mb-3 left-0 bg-[#161616] border border-stone-800 rounded-xl p-4 shadow-2xl z-[999] w-72 backdrop-blur-md"
                         id="time-setting-popup"
                       >
@@ -915,7 +868,7 @@ export default function InputBar({ activeDate }: InputBarProps) {
 
                         {/* Config fields */}
                         <div className="space-y-3">
-                          {activeType === "event" && (
+                          {activeType === 'event' && (
                             <div className="space-y-1.5">
                               <div className="flex items-center gap-1.5">
                                 <Calendar className="w-3.5 h-3.5 text-amber-400" />
@@ -936,7 +889,7 @@ export default function InputBar({ activeDate }: InputBarProps) {
                             </div>
                           )}
 
-                          {activeType === "note" && (
+                          {activeType === 'note' && (
                             <div className="space-y-1.5">
                               <div className="flex items-center gap-1.5">
                                 <FileText className="w-3.5 h-3.5 text-blue-400" />
@@ -957,7 +910,7 @@ export default function InputBar({ activeDate }: InputBarProps) {
                             </div>
                           )}
 
-                          {activeType === "time-block" && (
+                          {activeType === 'time-block' && (
                             <div className="space-y-3">
                               {/* Start Time with green icon */}
                               <div className="space-y-1.5">
@@ -972,9 +925,7 @@ export default function InputBar({ activeDate }: InputBarProps) {
                                   type="datetime-local"
                                   required
                                   value={startAtStr}
-                                  onChange={(e) =>
-                                    setStartAtStr(e.target.value)
-                                  }
+                                  onChange={(e) => setStartAtStr(e.target.value)}
                                   className="w-full bg-[#0b0b0b] hover:bg-stone-900 text-stone-200 border border-stone-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-indigo-500/40 font-mono cursor-pointer transition-colors"
                                 />
                               </div>
@@ -1020,22 +971,22 @@ export default function InputBar({ activeDate }: InputBarProps) {
             {/* Smart Hints / Config Panel Tips */}
             <div className="max-sm:hidden flex items-center justify-between lg:justify-end gap-3 self-stretch lg:self-auto">
               <div className="flex items-center gap-2">
-                {activeType === "task" && (
+                {activeType === 'task' && (
                   <span className="text-[10px] font-mono font-semibold text-emerald-400 bg-emerald-950/15 border border-emerald-950 px-2 py-0.5 rounded-md">
                     Parser Enabled
                   </span>
                 )}
-                {activeType === "event" && (
+                {activeType === 'event' && (
                   <span className="text-[10px] font-mono font-semibold text-amber-400 bg-amber-950/15 border border-amber-950 px-2 py-0.5 rounded-md">
                     Implicit Schedule Active
                   </span>
                 )}
-                {activeType === "note" && (
+                {activeType === 'note' && (
                   <span className="text-[10px] font-mono font-semibold text-blue-400 bg-blue-950/15 border border-blue-950 px-2 py-0.5 rounded-md">
                     Time Override Active
                   </span>
                 )}
-                {activeType === "time-block" && (
+                {activeType === 'time-block' && (
                   <span className="text-[10px] font-mono font-semibold text-indigo-400 bg-indigo-950/15 border border-indigo-950 px-2 py-0.5 rounded-md">
                     Duration Span Active
                   </span>
@@ -1047,8 +998,8 @@ export default function InputBar({ activeDate }: InputBarProps) {
                 onClick={() => setShowHelp(!showHelp)}
                 className={`py-1 px-2.5 rounded-lg text-xs font-mono transition-all cursor-pointer flex items-center gap-1.5 ${
                   showHelp
-                    ? "bg-stone-800 text-stone-200 border border-stone-700"
-                    : "text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-transparent"
+                    ? 'bg-stone-800 text-stone-200 border border-stone-700'
+                    : 'text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-transparent'
                 }`}
                 title="Review parser syntax hints"
               >
@@ -1059,15 +1010,11 @@ export default function InputBar({ activeDate }: InputBarProps) {
           </div>
 
           {/* Form Interactive Layout with STABLE Static Area Height */}
-          <form
-            onSubmit={handleSubmit}
-            className="w-full h-[46px]"
-            id="timeline-input-form"
-          >
+          <form onSubmit={handleSubmit} className="w-full h-[46px]" id="timeline-input-form">
             {/* INPUT FIELDS ACCORDING TO STATE TYPE */}
             <div className="w-full h-full">
               {/* TASK INJECT */}
-              {activeType === "task" && (
+              {activeType === 'task' && (
                 <div className="relative w-full flex gap-3.5 items-stretch h-full">
                   <div className="relative flex-1">
                     <input
@@ -1096,13 +1043,13 @@ export default function InputBar({ activeDate }: InputBarProps) {
               )}
 
               {/* EVENT INJECT */}
-              {activeType === "event" && (
+              {activeType === 'event' && (
                 <div className="relative w-full flex gap-3.5 items-stretch h-full">
                   <button
                     type="button"
                     onClick={() => {
                       setModalTitle(title);
-                      setModalContent("");
+                      setModalContent('');
                       setIsNoteModalOpen(true);
                     }}
                     className="flex items-center justify-center px-4 bg-stone-950 border border-stone-850 hover:border-stone-750 text-amber-400 hover:text-amber-300 rounded-xl transition-all hover:bg-stone-900 cursor-pointer"
@@ -1146,13 +1093,13 @@ export default function InputBar({ activeDate }: InputBarProps) {
               )}
 
               {/* NOTE INJECT */}
-              {activeType === "note" && (
+              {activeType === 'note' && (
                 <div className="relative w-full flex gap-3.5 items-stretch h-full">
                   <button
                     type="button"
                     onClick={() => {
                       setModalTitle(title);
-                      setModalContent("");
+                      setModalContent('');
                       setIsNoteModalOpen(true);
                     }}
                     className="flex items-center justify-center px-4 bg-stone-950 border border-stone-850 hover:border-stone-750 text-blue-400 hover:text-blue-300 rounded-xl transition-all hover:bg-stone-900 cursor-pointer"
@@ -1195,7 +1142,7 @@ export default function InputBar({ activeDate }: InputBarProps) {
               )}
 
               {/* TIME BLOCK INJECT */}
-              {activeType === "time-block" && (
+              {activeType === 'time-block' && (
                 <div className="relative w-full flex gap-3.5 items-stretch h-full">
                   <input
                     id="input-timeblock-title"
@@ -1230,17 +1177,19 @@ export default function InputBar({ activeDate }: InputBarProps) {
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
               className="bg-[#121212] border border-stone-800 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl relative flex flex-col"
             >
               {/* Header */}
               <div className="flex items-center justify-between border-b border-stone-850 p-4">
-                <span className={`text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border ${
-                  activeType === "event"
-                    ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
-                    : "text-blue-400 bg-blue-500/10 border-blue-500/20"
-                }`}>
-                  {activeType === "event" ? "New detailed event" : "New detailed note"}
+                <span
+                  className={`text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border ${
+                    activeType === 'event'
+                      ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                      : 'text-blue-400 bg-blue-500/10 border-blue-500/20'
+                  }`}
+                >
+                  {activeType === 'event' ? 'New detailed event' : 'New detailed note'}
                 </span>
                 <button
                   type="button"
@@ -1258,24 +1207,29 @@ export default function InputBar({ activeDate }: InputBarProps) {
                   if (!modalTitle.trim()) return;
 
                   const entryId = crypto.randomUUID();
-                  let defaultBaseDate = timeManuallySet && timestampStr
-                    ? new Date(timestampStr)
-                    : getBaseCompletedDate();
+                  let defaultBaseDate =
+                    timeManuallySet && timestampStr
+                      ? new Date(timestampStr)
+                      : getBaseCompletedDate();
 
                   let cleanTitle = modalTitle.trim();
-                  const { parsedDate: dateBase, textAfterDateRemoval } =
-                    parseSmartDate(cleanTitle, defaultBaseDate);
+                  const { parsedDate: dateBase, textAfterDateRemoval } = parseSmartDate(
+                    cleanTitle,
+                    defaultBaseDate,
+                  );
                   cleanTitle = textAfterDateRemoval;
 
-                  const { parsedDate: finalDate, textAfterTimeRemoval } =
-                    parseSmartTime(cleanTitle, dateBase);
+                  const { parsedDate: finalDate, textAfterTimeRemoval } = parseSmartTime(
+                    cleanTitle,
+                    dateBase,
+                  );
                   cleanTitle = textAfterTimeRemoval;
 
                   const finalTitle = cleanTitle || modalTitle.trim();
 
                   const newEntry = {
                     id: entryId,
-                    type: (activeType === "event" ? "event" : "note") as "event" | "note",
+                    type: (activeType === 'event' ? 'event' : 'note') as 'event' | 'note',
                     title: finalTitle,
                     content: modalContent.trim(),
                     timestamp: finalDate,
@@ -1287,16 +1241,16 @@ export default function InputBar({ activeDate }: InputBarProps) {
 
                   // Reset states
                   setIsNoteModalOpen(false);
-                  setModalTitle("");
-                  setModalContent("");
-                  setTitle("");
-                  setContent("");
+                  setModalTitle('');
+                  setModalContent('');
+                  setTitle('');
+                  setContent('');
                 }}
                 className="p-5 space-y-4"
               >
                 <div className="space-y-1.5">
                   <label className="text-[10px] uppercase tracking-wider font-mono text-stone-500 font-bold block">
-                    {activeType === "event" ? "Event Title" : "Note Title"}
+                    {activeType === 'event' ? 'Event Title' : 'Note Title'}
                   </label>
                   <input
                     type="text"
@@ -1304,31 +1258,35 @@ export default function InputBar({ activeDate }: InputBarProps) {
                     value={modalTitle}
                     onChange={(e) => setModalTitle(e.target.value)}
                     className={`w-full bg-[#0a0a0a] text-stone-100 border border-stone-850 rounded-xl px-4 py-3 text-sm focus:outline-none placeholder-stone-700 font-serif ${
-                      activeType === "event" ? "focus:border-amber-500/50" : "focus:border-blue-500/50"
+                      activeType === 'event'
+                        ? 'focus:border-amber-500/50'
+                        : 'focus:border-blue-500/50'
                     }`}
                     placeholder={
-                      activeType === "event"
-                        ? "Enter event summary/title (e.g. Project briefing presentation tomorrow at 10am)..."
-                        : "Enter short summary/title (e.g. Brainstorming session today at 2pm)..."
+                      activeType === 'event'
+                        ? 'Enter event summary/title (e.g. Project briefing presentation tomorrow at 10am)...'
+                        : 'Enter short summary/title (e.g. Brainstorming session today at 2pm)...'
                     }
                   />
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-[10px] uppercase tracking-wider font-mono text-stone-500 font-bold block">
-                    {activeType === "event" ? "Event Content / Description" : "Note Content / Body"}
+                    {activeType === 'event' ? 'Event Content / Description' : 'Note Content / Body'}
                   </label>
                   <textarea
                     value={modalContent}
                     rows={6}
                     onChange={(e) => setModalContent(e.target.value)}
                     className={`w-full bg-[#0a0a0a] text-stone-100 border border-stone-850 rounded-xl px-4 py-3 text-sm focus:outline-none font-sans leading-relaxed resize-none ${
-                      activeType === "event" ? "focus:border-amber-500/50" : "focus:border-blue-500/50"
+                      activeType === 'event'
+                        ? 'focus:border-amber-500/50'
+                        : 'focus:border-blue-500/50'
                     }`}
                     placeholder={
-                      activeType === "event"
-                        ? "Write event details, description, location, or agenda..."
-                        : "Write structured thoughts, reflections, details, or markdown formatting..."
+                      activeType === 'event'
+                        ? 'Write event details, description, location, or agenda...'
+                        : 'Write structured thoughts, reflections, details, or markdown formatting...'
                     }
                   />
                 </div>
@@ -1344,12 +1302,12 @@ export default function InputBar({ activeDate }: InputBarProps) {
                   <button
                     type="submit"
                     className={`px-5 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded-xl border transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-1.5 ${
-                      activeType === "event"
-                        ? "bg-amber-500 hover:bg-amber-400 text-[#0e0c08] border-amber-400"
-                        : "bg-blue-500 hover:bg-blue-400 text-[#070a0e] border-blue-400"
+                      activeType === 'event'
+                        ? 'bg-amber-500 hover:bg-amber-400 text-[#0e0c08] border-amber-400'
+                        : 'bg-blue-500 hover:bg-blue-400 text-[#070a0e] border-blue-400'
                     }`}
                   >
-                    <span>{activeType === "event" ? "Save Event" : "Save Note"}</span>
+                    <span>{activeType === 'event' ? 'Save Event' : 'Save Note'}</span>
                     <Send className="w-3.5 h-3.5" />
                   </button>
                 </div>

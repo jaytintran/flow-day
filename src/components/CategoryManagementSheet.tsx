@@ -3,50 +3,44 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
-import { motion, AnimatePresence } from "motion/react";
-import { db } from "../db";
-import { Category, CategoryScope } from "../types";
-import {
-  Plus,
-  X,
-  Trash2,
-  Check,
-  Palette,
-} from "lucide-react";
+import React, { useState, useRef } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { motion, AnimatePresence } from 'motion/react';
+import { db } from '../db';
+import { Category, CategoryScope } from '../types';
+import { Plus, X, Trash2, Check, Palette } from 'lucide-react';
 
 const CATEGORY_COLORS = [
-  "emerald",
-  "sky",
-  "violet",
-  "rose",
-  "amber",
-  "indigo",
-  "teal",
-  "orange",
+  'emerald',
+  'sky',
+  'violet',
+  'rose',
+  'amber',
+  'indigo',
+  'teal',
+  'orange',
 ] as const;
 
 const colorMap: Record<string, string> = {
-  emerald: "bg-emerald-500",
-  sky: "bg-sky-500",
-  violet: "bg-violet-500",
-  rose: "bg-rose-500",
-  amber: "bg-amber-500",
-  indigo: "bg-indigo-500",
-  teal: "bg-teal-500",
-  orange: "bg-orange-500",
+  emerald: 'bg-emerald-500',
+  sky: 'bg-sky-500',
+  violet: 'bg-violet-500',
+  rose: 'bg-rose-500',
+  amber: 'bg-amber-500',
+  indigo: 'bg-indigo-500',
+  teal: 'bg-teal-500',
+  orange: 'bg-orange-500',
 };
 
 const borderMap: Record<string, string> = {
-  emerald: "border-emerald-500",
-  sky: "border-sky-500",
-  violet: "border-violet-500",
-  rose: "border-rose-500",
-  amber: "border-amber-500",
-  indigo: "border-indigo-500",
-  teal: "border-teal-500",
-  orange: "border-orange-500",
+  emerald: 'border-emerald-500',
+  sky: 'border-sky-500',
+  violet: 'border-violet-500',
+  rose: 'border-rose-500',
+  amber: 'border-amber-500',
+  indigo: 'border-indigo-500',
+  teal: 'border-teal-500',
+  orange: 'border-orange-500',
 };
 
 interface CategoryManagementSheetProps {
@@ -60,14 +54,13 @@ export default function CategoryManagementSheet({
   onClose,
   scope,
 }: CategoryManagementSheetProps) {
-  const categories =
-    useLiveQuery(() => db.categories.where("scope").equals(scope).toArray()) || [];
+  const categories = useLiveQuery(() => db.categories.where('scope').equals(scope).toArray()) || [];
 
-  const [newName, setNewName] = useState("");
-  const [newColor, setNewColor] = useState<typeof CATEGORY_COLORS[number]>("emerald");
+  const [newName, setNewName] = useState('');
+  const [newColor, setNewColor] = useState<(typeof CATEGORY_COLORS)[number]>('emerald');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editColor, setEditColor] = useState<typeof CATEGORY_COLORS[number]>("emerald");
+  const [editName, setEditName] = useState('');
+  const [editColor, setEditColor] = useState<(typeof CATEGORY_COLORS)[number]>('emerald');
   const inputRef = useRef<HTMLInputElement>(null);
 
   const isMobile = window.innerWidth < 768;
@@ -86,8 +79,8 @@ export default function CategoryManagementSheet({
       created_at: new Date(),
     };
     await db.categories.add(cat);
-    setNewName("");
-    setNewColor("emerald");
+    setNewName('');
+    setNewColor('emerald');
     inputRef.current?.focus();
   };
 
@@ -120,7 +113,7 @@ export default function CategoryManagementSheet({
       <div className="flex items-center justify-between border-b border-stone-850 p-4">
         <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border text-stone-300 bg-stone-800/40 border-stone-700 flex items-center gap-1.5">
           <Palette className="w-3 h-3" />
-          {scope === "goal" ? "Goal" : "Objective"} Categories
+          {scope === 'goal' ? 'Goal' : 'Objective'} Categories
         </span>
         <button
           onClick={onClose}
@@ -139,7 +132,7 @@ export default function CategoryManagementSheet({
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") handleCreate();
+              if (e.key === 'Enter') handleCreate();
             }}
             placeholder="New category name..."
             className="flex-1 bg-[#0a0a0a] text-stone-100 border border-stone-800 rounded-lg px-3 py-2 text-sm placeholder-stone-600 focus:outline-none focus:border-stone-500 transition-colors"
@@ -151,7 +144,7 @@ export default function CategoryManagementSheet({
                 key={c}
                 onClick={() => setNewColor(c)}
                 className={`w-5 h-5 rounded-full ${colorMap[c]} transition-all cursor-pointer ${
-                  newColor === c ? "ring-2 ring-white/60 scale-110" : "opacity-50 hover:opacity-80"
+                  newColor === c ? 'ring-2 ring-white/60 scale-110' : 'opacity-50 hover:opacity-80'
                 }`}
                 title={c}
               />
@@ -193,8 +186,8 @@ export default function CategoryManagementSheet({
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") handleUpdate(cat);
-                      if (e.key === "Escape") setEditingId(null);
+                      if (e.key === 'Enter') handleUpdate(cat);
+                      if (e.key === 'Escape') setEditingId(null);
                     }}
                     className="flex-1 bg-transparent text-sm text-stone-200 border-b border-stone-700 focus:outline-none focus:border-stone-500 px-1 py-0.5"
                     autoFocus
@@ -205,7 +198,9 @@ export default function CategoryManagementSheet({
                         key={c}
                         onClick={() => setEditColor(c)}
                         className={`w-4 h-4 rounded-full ${colorMap[c]} transition-all cursor-pointer ${
-                          editColor === c ? "ring-2 ring-white/60 scale-110" : "opacity-50 hover:opacity-80"
+                          editColor === c
+                            ? 'ring-2 ring-white/60 scale-110'
+                            : 'opacity-50 hover:opacity-80'
                         }`}
                       />
                     ))}
@@ -219,7 +214,9 @@ export default function CategoryManagementSheet({
                 </>
               ) : (
                 <>
-                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${colorMap[cat.color] ?? "bg-stone-500"}`} />
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full shrink-0 ${colorMap[cat.color] ?? 'bg-stone-500'}`}
+                  />
                   <span className="flex-1 text-sm font-serif text-stone-200 truncate">
                     {cat.name}
                   </span>
@@ -266,18 +263,16 @@ export default function CategoryManagementSheet({
             /* MOBILE BOTTOM SHEET */
             <div className="fixed inset-0 z-[1000] flex items-end justify-center font-sans pointer-events-none">
               <motion.div
-                initial={{ y: "100%" }}
+                initial={{ y: '100%' }}
                 animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 220 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 220 }}
                 className="relative w-full min-h-[50vh] max-h-[80vh] bg-[#121212] border-t border-stone-850 rounded-t-2xl shadow-2xl z-10 flex flex-col overflow-hidden pointer-events-auto"
               >
                 <div className="flex-none flex justify-center pt-3 pb-0">
                   <div className="w-12 h-1 bg-stone-800 rounded-full" />
                 </div>
-                <div className="flex-1 overflow-hidden flex flex-col">
-                  {content}
-                </div>
+                <div className="flex-1 overflow-hidden flex flex-col">{content}</div>
               </motion.div>
             </div>
           ) : (
@@ -290,9 +285,7 @@ export default function CategoryManagementSheet({
                 onClick={(e) => e.stopPropagation()}
                 className="bg-[#121212] border border-stone-800 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl relative flex flex-col max-h-[80vh] pointer-events-auto"
               >
-                <div className="flex-1 overflow-hidden flex flex-col">
-                  {content}
-                </div>
+                <div className="flex-1 overflow-hidden flex flex-col">{content}</div>
               </motion.div>
             </div>
           )}

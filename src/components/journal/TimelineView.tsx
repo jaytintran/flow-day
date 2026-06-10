@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from "react";
-import DayTimeline, { RenderItem } from "./DayTimeline";
-import { TimelineEntry, Task } from "../../types";
-import { Calendar } from "lucide-react";
+import React from 'react';
+import DayTimeline, { RenderItem } from './DayTimeline';
+import { TimelineEntry, Task } from '../../types';
+import { Calendar } from 'lucide-react';
 
 interface TimelineViewProps {
   sortedTimelineDays: string[];
@@ -84,9 +84,8 @@ export default function TimelineView({
         Your timeline is completely empty
       </h4>
       <p className="text-xs font-sans max-w-md mx-auto leading-relaxed text-stone-500">
-        Start capturing entries using the input engine below. Switch back
-        to "Day View" to log your tasks and build an offline productivity
-        timeline easily.
+        Start capturing entries using the input engine below. Switch back to "Day View" to log your
+        tasks and build an offline productivity timeline easily.
       </p>
     </div>
   );

@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from "react";
-import { FileText, Sparkles, Calendar, Trash2, Search } from "lucide-react";
-import { TimelineEntry, Event, Note } from "../../types";
-import { toLocalDateString } from "../../utils";
+import React, { useState, useMemo } from 'react';
+import { FileText, Sparkles, Calendar, Trash2, Search } from 'lucide-react';
+import { TimelineEntry, Event, Note } from '../../types';
+import { toLocalDateString } from '../../utils';
 
 interface RecordsViewProps {
   entries: TimelineEntry[];
@@ -25,25 +25,26 @@ export default function RecordsView({
   formatTime,
   formatDateStringLabel,
 }: RecordsViewProps) {
-  const [filterType, setFilterType] = useState<"all" | "event" | "note">("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState<'all' | 'event' | 'note'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const allRecords = entries.filter(
-    (e) => e.type === "event" || e.type === "note",
-  ) as (Event | Note)[];
+  const allRecords = entries.filter((e) => e.type === 'event' || e.type === 'note') as (
+    | Event
+    | Note
+  )[];
 
   const filteredRecords =
-    filterType === "all"
-      ? allRecords
-      : allRecords.filter((r) => r.type === filterType);
+    filterType === 'all' ? allRecords : allRecords.filter((r) => r.type === filterType);
 
   // Apply search filter
   const searchedRecords = useMemo(() => {
     if (!searchQuery.trim()) return filteredRecords;
     const q = searchQuery.toLowerCase();
     return filteredRecords.filter((r) => {
-      const title = ((r.type === "note" ? (r as Note).title : (r as Event).title) || "").toLowerCase();
-      const content = (r.content || "").toLowerCase();
+      const title = (
+        (r.type === 'note' ? (r as Note).title : (r as Event).title) || ''
+      ).toLowerCase();
+      const content = (r.content || '').toLowerCase();
       return title.includes(q) || content.includes(q);
     });
   }, [filteredRecords, searchQuery]);
@@ -63,7 +64,7 @@ export default function RecordsView({
   );
 
   const renderCard = (record: Event | Note) => {
-    const isEvent = record.type === "event";
+    const isEvent = record.type === 'event';
 
     return (
       <div
@@ -72,8 +73,8 @@ export default function RecordsView({
         onClick={() => onOpenDetail(record)}
         className={`group/card relative flex flex-col justify-between p-3.5 bg-[#121212]/90 border rounded-xl shadow-sm transition-all duration-200 hover:border-stone-700 hover:-translate-y-0.5 cursor-pointer ${
           isEvent
-            ? "border-indigo-500/20 hover:bg-indigo-500/5"
-            : "border-stone-850 hover:bg-stone-900/10"
+            ? 'border-indigo-500/20 hover:bg-indigo-500/5'
+            : 'border-stone-850 hover:bg-stone-900/10'
         }`}
       >
         {/* Top Badge header row */}
@@ -81,11 +82,11 @@ export default function RecordsView({
           <span
             className={`text-[8px] font-mono font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
               isEvent
-                ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
-                : "bg-stone-850 text-stone-400 border border-stone-850"
+                ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                : 'bg-stone-850 text-stone-400 border border-stone-850'
             }`}
           >
-            {isEvent ? "Event" : "Note"}
+            {isEvent ? 'Event' : 'Note'}
           </span>
 
           <div className="flex items-center gap-1.5">
@@ -123,7 +124,7 @@ export default function RecordsView({
           ) : (
             <div className="space-y-1.5">
               <h4 className="font-serif font-semibold text-sm text-stone-100 tracking-wide break-words leading-snug">
-                {(record as Note).title || "Untitled Note"}
+                {(record as Note).title || 'Untitled Note'}
               </h4>
               {record.content?.trim() ? (
                 <p className="text-[11px] text-stone-400 font-serif leading-relaxed line-clamp-2">
@@ -143,9 +144,7 @@ export default function RecordsView({
         {/* Footer warning if delete is safety-primed */}
         {deletingId === record.id && (
           <div className="mt-3 pt-2 border-t border-red-950/30 flex items-center justify-between font-mono">
-            <span className="text-[8px] text-red-400 font-bold uppercase">
-              Confirm deletion?
-            </span>
+            <span className="text-[8px] text-red-400 font-bold uppercase">Confirm deletion?</span>
             <button
               type="button"
               onClick={(e) => {
@@ -169,18 +168,18 @@ export default function RecordsView({
         <div>
           <h3 className="text-sm uppercase font-mono font-bold tracking-widest text-stone-400 flex items-center gap-2">
             <FileText className="w-4 h-4 text-stone-500" />
-            {filterType === "all"
-              ? "All Notes & Events"
-              : filterType === "event"
-                ? "Events"
-                : "Notes"}
+            {filterType === 'all'
+              ? 'All Notes & Events'
+              : filterType === 'event'
+                ? 'Events'
+                : 'Notes'}
           </h3>
           <p className="text-xs text-stone-500 font-sans mt-0.5">
-            {filterType === "all"
-              ? "Browse all notes and events ever created across all dates."
-              : filterType === "event"
-                ? "Browse all scheduled events."
-                : "Browse all recorded notes."}
+            {filterType === 'all'
+              ? 'Browse all notes and events ever created across all dates.'
+              : filterType === 'event'
+                ? 'Browse all scheduled events.'
+                : 'Browse all recorded notes.'}
           </p>
         </div>
 
@@ -199,36 +198,36 @@ export default function RecordsView({
 
           {/* Type Filter Switcher */}
           <div className="flex items-center gap-1 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 w-fit">
-          <button
-            onClick={() => setFilterType("all")}
-            className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-              filterType === "all"
-                ? "bg-stone-800 text-stone-200 shadow-sm"
-                : "text-stone-500 hover:text-stone-300"
-            }`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setFilterType("event")}
-            className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-              filterType === "event"
-                ? "bg-indigo-900/60 text-indigo-300 shadow-sm"
-                : "text-stone-500 hover:text-stone-300"
-            }`}
-          >
-            Events
-          </button>
-          <button
-            onClick={() => setFilterType("note")}
-            className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-              filterType === "note"
-                ? "bg-blue-900/60 text-blue-300 shadow-sm"
-                : "text-stone-500 hover:text-stone-300"
-            }`}
-          >
-            Notes
-          </button>
+            <button
+              onClick={() => setFilterType('all')}
+              className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
+                filterType === 'all'
+                  ? 'bg-stone-800 text-stone-200 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-300'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setFilterType('event')}
+              className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
+                filterType === 'event'
+                  ? 'bg-indigo-900/60 text-indigo-300 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-300'
+              }`}
+            >
+              Events
+            </button>
+            <button
+              onClick={() => setFilterType('note')}
+              className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
+                filterType === 'note'
+                  ? 'bg-blue-900/60 text-blue-300 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-300'
+              }`}
+            >
+              Notes
+            </button>
           </div>
         </div>
       </div>
@@ -240,11 +239,7 @@ export default function RecordsView({
             if (!dayRecords || dayRecords.length === 0) return null;
 
             return (
-              <div
-                key={dayStr}
-                className="space-y-4"
-                id={`historic-day-group-${dayStr}`}
-              >
+              <div key={dayStr} className="space-y-4" id={`historic-day-group-${dayStr}`}>
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-stone-950/80 border border-stone-900 rounded-lg">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                   <span className="text-xs font-mono font-bold text-stone-400 uppercase tracking-widest">
@@ -267,19 +262,19 @@ export default function RecordsView({
           <Sparkles className="w-8 h-8 text-stone-800 mx-auto mb-3" />
           <p className="text-sm font-sans font-medium text-stone-400">
             {searchQuery.trim()
-              ? "No matching results"
-              : filterType === "all"
-                ? "Your Records catalog is empty"
-                : filterType === "event"
-                  ? "No events yet"
-                  : "No notes yet"}
+              ? 'No matching results'
+              : filterType === 'all'
+                ? 'Your Records catalog is empty'
+                : filterType === 'event'
+                  ? 'No events yet'
+                  : 'No notes yet'}
           </p>
           <p className="text-xs font-sans text-stone-600 mt-1 max-w-sm mx-auto">
             {searchQuery.trim()
-              ? "Try a different search term."
-              : filterType === "all"
-                ? "Once you start creating event and note entries with the input engine below, they will show up here nicely organized by date."
-                : filterType === "event"
+              ? 'Try a different search term.'
+              : filterType === 'all'
+                ? 'Once you start creating event and note entries with the input engine below, they will show up here nicely organized by date.'
+                : filterType === 'event'
                   ? "Use the input engine to capture events and they'll appear here."
                   : "Use the input engine to record notes and they'll appear here."}
           </p>

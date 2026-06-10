@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -13,21 +13,21 @@ import {
   Flag,
   Repeat2,
   Check,
-} from "lucide-react";
-import { useLiveQuery } from "dexie-react-hooks";
-import { motion, AnimatePresence } from "motion/react";
-import { db } from "../db";
-import { Task, Habit, HabitLog } from "../types";
-import { formatDateLabel, isSameDay, toLocalDateString } from "../utils";
-import ObjectivesSheet from "./ObjectivesSheet";
-import GoalsSheet from "./GoalsSheet";
-import HabitsSheet from "./HabitsSheet";
+} from 'lucide-react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { motion, AnimatePresence } from 'motion/react';
+import { db } from '../db';
+import { Task, Habit, HabitLog } from '../types';
+import { formatDateLabel, isSameDay, toLocalDateString } from '../utils';
+import ObjectivesSheet from './ObjectivesSheet';
+import GoalsSheet from './GoalsSheet';
+import HabitsSheet from './HabitsSheet';
 
 interface DayNavigatorProps {
   activeDate: Date;
   setActiveDate: (date: Date) => void;
-  viewMode: "day" | "timeline" | "records";
-  setViewMode: (mode: "day" | "timeline" | "records") => void;
+  viewMode: 'day' | 'timeline' | 'records';
+  setViewMode: (mode: 'day' | 'timeline' | 'records') => void;
 }
 
 export default function DayNavigator({
@@ -40,39 +40,31 @@ export default function DayNavigator({
   const [isObjectivesOpen, setIsObjectivesOpen] = useState(false);
   const [isGoalsOpen, setIsGoalsOpen] = useState(false);
   const [isHabitsOpen, setIsHabitsOpen] = useState(false);
-  const [displayedMonth, setDisplayedMonth] = useState<Date>(
-    new Date(activeDate),
-  );
+  const [displayedMonth, setDisplayedMonth] = useState<Date>(new Date(activeDate));
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Load entries reactively
   const entries = useLiveQuery(() => db.entries.toArray()) || [];
 
   // Habits for quick-tick strip
-  const activeHabits = (useLiveQuery(() =>
-    db.habits.where("status").equals("active").toArray(),
-  ) || []) as Habit[];
+  const activeHabits = (useLiveQuery(() => db.habits.where('status').equals('active').toArray()) ||
+    []) as Habit[];
   const habitLogs = (useLiveQuery(
-    () =>
-      db.entries.where("type").equals("habit-log").toArray() as Promise<
-        HabitLog[]
-      >,
+    () => db.entries.where('type').equals('habit-log').toArray() as Promise<HabitLog[]>,
   ) || []) as HabitLog[];
 
   const activeDateStr = toLocalDateString(activeDate);
 
   const handleQuickTick = async (habit: Habit) => {
     const todayLogs = habitLogs.filter(
-      (l) =>
-        l.habit_id === habit.id &&
-        toLocalDateString(new Date(l.timestamp)) === activeDateStr,
+      (l) => l.habit_id === habit.id && toLocalDateString(new Date(l.timestamp)) === activeDateStr,
     );
     if (todayLogs.length > 0) {
       await db.entries.delete(todayLogs[todayLogs.length - 1].id);
     } else {
       const log: HabitLog = {
         id: crypto.randomUUID(),
-        type: "habit-log",
+        type: 'habit-log',
         habit_id: habit.id,
         title: habit.title,
         timestamp: new Date(),
@@ -93,9 +85,9 @@ export default function DayNavigator({
 
     entries.forEach((e) => {
       const d =
-        e.type === "time-block"
+        e.type === 'time-block'
           ? e.start_at
-          : e.type === "event" || e.type === "note"
+          : e.type === 'event' || e.type === 'note'
             ? e.timestamp
             : e.created_at;
       const dayStr = toLocalDateString(new Date(d));
@@ -108,13 +100,13 @@ export default function DayNavigator({
         };
       }
 
-      if (e.type === "task") {
-        if (e.status === "done") {
+      if (e.type === 'task') {
+        if (e.status === 'done') {
           map[dayStr].completedTasks++;
         } else {
           map[dayStr].incompleteTasks++;
         }
-      } else if (e.type === "event" || e.type === "note") {
+      } else if (e.type === 'event' || e.type === 'note') {
         map[dayStr].recordsCount++;
       }
     });
@@ -127,7 +119,7 @@ export default function DayNavigator({
   // Previous incomplete tasks count
   const previousIncompleteTasksCount = React.useMemo(() => {
     return entries.filter((e) => {
-      if (e.type !== "task" || e.status !== "todo") return false;
+      if (e.type !== 'task' || e.status !== 'todo') return false;
       const taskDayStr = toLocalDateString(new Date(e.created_at));
       return taskDayStr < activeDayStr;
     }).length;
@@ -135,14 +127,14 @@ export default function DayNavigator({
 
   const handleTransferTasks = async () => {
     const previousTasks = entries.filter((e) => {
-      if (e.type !== "task" || e.status !== "todo") return false;
+      if (e.type !== 'task' || e.status !== 'todo') return false;
       const taskDayStr = toLocalDateString(new Date(e.created_at));
       return taskDayStr < activeDayStr;
     }) as Task[];
 
     if (previousTasks.length === 0) return;
 
-    await db.transaction("rw", db.entries, async () => {
+    await db.transaction('rw', db.entries, async () => {
       for (const t of previousTasks) {
         const oldD = new Date(t.created_at);
         const newD = new Date(activeDate);
@@ -167,15 +159,12 @@ export default function DayNavigator({
   // Click outside listener to close calendar
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsCalendarOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // Shifting active day
@@ -210,7 +199,7 @@ export default function DayNavigator({
   };
 
   // Weekdays header
-  const weekdays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+  const weekdays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
   // Grid list construction
   const dayCells: (number | null)[] = [];
@@ -227,23 +216,20 @@ export default function DayNavigator({
     setIsCalendarOpen(false);
   };
 
-  const monthLabel = displayedMonth.toLocaleString("en-US", {
-    month: "long",
-    year: "numeric",
+  const monthLabel = displayedMonth.toLocaleString('en-US', {
+    month: 'long',
+    year: 'numeric',
   });
 
   return (
-    <div
-      className="w-full border-t border-stone-800 bg-[#121212] text-sm"
-      ref={containerRef}
-    >
+    <div className="w-full border-t border-stone-800 bg-[#121212] text-sm" ref={containerRef}>
       <div
-        className="max-w-3xl mx-auto px-5 md:px-6 py-3 flex flex-col gap-3 w-full"
+        className="max-w-4xl mx-auto px-5 md:px-6 py-3 flex flex-col gap-3 w-full"
         id="day-navigator-container"
       >
         <div className="flex md:flex-row flex-col items-center justify-between gap-4 w-full">
           {/* 1. Day Navigator Controls / Records Catalog Title */}
-          {viewMode === "records" ? (
+          {viewMode === 'records' ? (
             <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
               <div className="flex items-center gap-4">
                 <span className="py-1.5 text-stone-100 text-sm font-mono tracking-widest uppercase text-center font-bold flex items-center gap-2">
@@ -302,7 +288,7 @@ export default function DayNavigator({
                 <button
                   id="toggle-goals-btn"
                   onClick={() => setIsGoalsOpen(true)}
-                  className={`p-1.5 rounded active:scale-95 transition-all flex items-center justify-center cursor-pointer ${"text-stone-500 hover:text-sky-400 hover:bg-sky-950/20"}`}
+                  className={`p-1.5 rounded active:scale-95 transition-all flex items-center justify-center cursor-pointer ${'text-stone-500 hover:text-sky-400 hover:bg-sky-950/20'}`}
                   title="Goals / Projects"
                 >
                   <Flag className="w-4 h-4" />
@@ -312,7 +298,7 @@ export default function DayNavigator({
                 <button
                   id="toggle-objectives-btn"
                   onClick={() => setIsObjectivesOpen(true)}
-                  className={`p-1.5 rounded active:scale-95 transition-all flex items-center justify-center cursor-pointer ${"text-stone-500 hover:text-rose-400 hover:bg-rose-950/20"}`}
+                  className={`p-1.5 rounded active:scale-95 transition-all flex items-center justify-center cursor-pointer ${'text-stone-500 hover:text-rose-400 hover:bg-rose-950/20'}`}
                   title="Objectives"
                 >
                   <Target className="w-4 h-4" />
@@ -334,8 +320,8 @@ export default function DayNavigator({
                   onClick={() => setIsCalendarOpen(!isCalendarOpen)}
                   className={`p-1.5 rounded active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
                     isCalendarOpen
-                      ? "bg-amber-500/10 text-amber-500"
-                      : "text-stone-500 hover:text-stone-300 hover:bg-stone-800/50"
+                      ? 'bg-amber-500/10 text-amber-500'
+                      : 'text-stone-500 hover:text-stone-300 hover:bg-stone-800/50'
                   }`}
                   title="Choose specific date"
                 >
@@ -352,33 +338,33 @@ export default function DayNavigator({
           >
             <button
               id="view-mode-day"
-              onClick={() => setViewMode("day")}
+              onClick={() => setViewMode('day')}
               className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer ${
-                viewMode === "day"
-                  ? "bg-amber-500 text-black"
-                  : "text-stone-500 hover:text-stone-300"
+                viewMode === 'day'
+                  ? 'bg-amber-500 text-black'
+                  : 'text-stone-500 hover:text-stone-300'
               }`}
             >
               Day
             </button>
             <button
               id="view-mode-timeline"
-              onClick={() => setViewMode("timeline")}
+              onClick={() => setViewMode('timeline')}
               className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer ${
-                viewMode === "timeline"
-                  ? "bg-amber-500 text-black"
-                  : "text-stone-500 hover:text-stone-300"
+                viewMode === 'timeline'
+                  ? 'bg-amber-500 text-black'
+                  : 'text-stone-500 hover:text-stone-300'
               }`}
             >
               Timeline
             </button>
             <button
               id="view-mode-records"
-              onClick={() => setViewMode("records")}
+              onClick={() => setViewMode('records')}
               className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer ${
-                viewMode === "records"
-                  ? "bg-amber-500 text-black"
-                  : "text-stone-500 hover:text-stone-300"
+                viewMode === 'records'
+                  ? 'bg-amber-500 text-black'
+                  : 'text-stone-500 hover:text-stone-300'
               }`}
             >
               Records
@@ -399,39 +385,32 @@ export default function DayNavigator({
               const isTicked = count > 0;
               const colorMap: Record<string, string> = {
                 emerald: isTicked
-                  ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300"
-                  : "border-stone-700 text-stone-500 hover:border-emerald-500/40 hover:text-emerald-400",
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                  : 'border-stone-700 text-stone-500 hover:border-emerald-500/40 hover:text-emerald-400',
                 sky: isTicked
-                  ? "bg-sky-500/15 border-sky-500/40 text-sky-300"
-                  : "border-stone-700 text-stone-500 hover:border-sky-500/40 hover:text-sky-400",
+                  ? 'bg-sky-500/15 border-sky-500/40 text-sky-300'
+                  : 'border-stone-700 text-stone-500 hover:border-sky-500/40 hover:text-sky-400',
                 violet: isTicked
-                  ? "bg-violet-500/15 border-violet-500/40 text-violet-300"
-                  : "border-stone-700 text-stone-500 hover:border-violet-500/40 hover:text-violet-400",
+                  ? 'bg-violet-500/15 border-violet-500/40 text-violet-300'
+                  : 'border-stone-700 text-stone-500 hover:border-violet-500/40 hover:text-violet-400',
                 rose: isTicked
-                  ? "bg-rose-500/15 border-rose-500/40 text-rose-300"
-                  : "border-stone-700 text-stone-500 hover:border-rose-500/40 hover:text-rose-400",
+                  ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
+                  : 'border-stone-700 text-stone-500 hover:border-rose-500/40 hover:text-rose-400',
                 amber: isTicked
-                  ? "bg-amber-500/15 border-amber-500/40 text-amber-300"
-                  : "border-stone-700 text-stone-500 hover:border-amber-500/40 hover:text-amber-400",
+                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                  : 'border-stone-700 text-stone-500 hover:border-amber-500/40 hover:text-amber-400',
               };
-              const cls =
-                colorMap[habit.color ?? "emerald"] ?? colorMap.emerald;
+              const cls = colorMap[habit.color ?? 'emerald'] ?? colorMap.emerald;
               return (
                 <button
                   key={habit.id}
                   onClick={() => handleQuickTick(habit)}
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-mono font-semibold uppercase tracking-wide transition-all active:scale-95 cursor-pointer shrink-0 ${cls}`}
-                  title={
-                    isTicked
-                      ? `Uncheck "${habit.title}"`
-                      : `Check "${habit.title}"`
-                  }
+                  title={isTicked ? `Uncheck "${habit.title}"` : `Check "${habit.title}"`}
                 >
                   {isTicked && <Check className="w-3 h-3 stroke-[3]" />}
                   {habit.title}
-                  {count > 1 && (
-                    <span className="ml-0.5 opacity-70">×{count}</span>
-                  )}
+                  {count > 1 && <span className="ml-0.5 opacity-70">×{count}</span>}
                 </button>
               );
             })}
@@ -446,10 +425,10 @@ export default function DayNavigator({
             id="calendar-drawer"
             key="calendar-drawer"
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
+            animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
-            style={{ overflow: "hidden" }}
+            style={{ overflow: 'hidden' }}
             className="border-t border-stone-800/60 bg-[#0e0e0e]"
           >
             <div className="max-w-4xl mx-auto px-5 md:px-6 py-4">
@@ -510,25 +489,24 @@ export default function DayNavigator({
                       onClick={() => handleSelectCalendarDay(day)}
                       className={`py-1.5 min-h-[52px] flex flex-col justify-between items-center text-xs font-mono rounded-lg border transition-all cursor-pointer active:scale-95 ${
                         isCurrentDay
-                          ? "bg-amber-500 border-amber-400 text-stone-950 font-semibold shadow-[0_0_12px_rgba(245,158,11,0.3)]"
+                          ? 'bg-amber-500 border-amber-400 text-stone-950 font-semibold shadow-[0_0_12px_rgba(245,158,11,0.3)]'
                           : isToday
-                            ? "border-amber-500/30 bg-stone-900/40 text-amber-400 font-semibold"
-                            : "border-stone-800/50 text-stone-400 hover:bg-stone-800/60 hover:text-stone-200 hover:border-stone-700"
+                            ? 'border-amber-500/30 bg-stone-900/40 text-amber-400 font-semibold'
+                            : 'border-stone-800/50 text-stone-400 hover:bg-stone-800/60 hover:text-stone-200 hover:border-stone-700'
                       }`}
                     >
                       <span className="text-xs mt-1">{day}</span>
 
                       {hasStats ? (
                         <div className="w-full flex flex-row justify-center gap-0.5 mb-0.5 text-[8px] select-none">
-                          {(stats.completedTasks > 0 ||
-                            stats.incompleteTasks > 0) && (
+                          {(stats.completedTasks > 0 || stats.incompleteTasks > 0) && (
                             <div className="flex items-center gap-0.5 justify-center leading-none">
                               {stats.completedTasks > 0 && (
                                 <span
                                   className={
                                     isCurrentDay
-                                      ? "text-stone-900 font-extrabold"
-                                      : "text-emerald-500 font-extrabold"
+                                      ? 'text-stone-900 font-extrabold'
+                                      : 'text-emerald-500 font-extrabold'
                                   }
                                   title={`${stats.completedTasks} tasks complete`}
                                 >
@@ -539,8 +517,8 @@ export default function DayNavigator({
                                 <span
                                   className={
                                     isCurrentDay
-                                      ? "text-stone-800 font-bold"
-                                      : "text-stone-500 font-bold"
+                                      ? 'text-stone-800 font-bold'
+                                      : 'text-stone-500 font-bold'
                                   }
                                   title={`${stats.incompleteTasks} tasks incomplete`}
                                 >
@@ -553,8 +531,8 @@ export default function DayNavigator({
                             <span
                               className={
                                 isCurrentDay
-                                  ? "text-indigo-950 font-extrabold"
-                                  : "text-indigo-400 font-bold"
+                                  ? 'text-indigo-950 font-extrabold'
+                                  : 'text-indigo-400 font-bold'
                               }
                               title={`${stats.recordsCount} events/notes`}
                             >
@@ -579,10 +557,7 @@ export default function DayNavigator({
       <GoalsSheet open={isGoalsOpen} onClose={() => setIsGoalsOpen(false)} />
 
       {/* OBJECTIVES SHEET */}
-      <ObjectivesSheet
-        open={isObjectivesOpen}
-        onClose={() => setIsObjectivesOpen(false)}
-      />
+      <ObjectivesSheet open={isObjectivesOpen} onClose={() => setIsObjectivesOpen(false)} />
 
       {/* HABITS SHEET */}
       <HabitsSheet

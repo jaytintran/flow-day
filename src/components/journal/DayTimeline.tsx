@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
+import React, { useState } from 'react';
 import {
   ChevronRight,
   ChevronDown,
@@ -19,25 +19,18 @@ import {
   CalendarArrowUp,
   Undo2,
   Repeat2,
-} from "lucide-react";
-import {
-  TimelineEntry,
-  Task,
-  Event,
-  Note,
-  TimeBlock,
-  HabitLog,
-} from "../../types";
-import { formatDuration } from "../../utils";
+} from 'lucide-react';
+import { TimelineEntry, Task, Event, Note, TimeBlock, HabitLog } from '../../types';
+import { formatDuration } from '../../utils';
 
 export type RenderItem =
   | {
-      type: "bracket";
+      type: 'bracket';
       block: TimeBlock;
       children: TimelineEntry[];
       sortTime: number;
     }
-  | { type: "standalone"; entry: TimelineEntry; sortTime: number };
+  | { type: 'standalone'; entry: TimelineEntry; sortTime: number };
 
 interface DayTimelineProps {
   items: RenderItem[];
@@ -81,7 +74,7 @@ export default function DayTimeline({
   const [habitsCollapsed, setHabitsCollapsed] = useState(() => {
     try {
       const stored = localStorage.getItem(HABITS_COLLAPSE_KEY);
-      return stored === null ? true : stored === "true";
+      return stored === null ? true : stored === 'true';
     } catch {
       return true;
     }
@@ -91,19 +84,19 @@ export default function DayTimeline({
     entry: TimelineEntry,
     isFirst: boolean,
     isLast: boolean,
-    customSpineMargin = "left-[19.5px]",
+    customSpineMargin = 'left-[19.5px]',
   ) => {
-    const isTask = entry.type === "task";
-    const isEvent = entry.type === "event";
-    const isNote = entry.type === "note";
-    const isHabitLog = entry.type === "habit-log";
+    const isTask = entry.type === 'task';
+    const isEvent = entry.type === 'event';
+    const isNote = entry.type === 'note';
+    const isHabitLog = entry.type === 'habit-log';
 
     // Extract primary time to display in the gutter
-    let primaryTime = "";
+    let primaryTime = '';
     let isCompletedTask = false;
     if (isTask) {
       const task = entry as Task;
-      if (task.status === "done" && task.completed_at) {
+      if (task.status === 'done' && task.completed_at) {
         primaryTime = formatTime(task.completed_at);
         isCompletedTask = true;
       } else {
@@ -123,16 +116,14 @@ export default function DayTimeline({
         id={`entry-${entry.id}`}
         onClick={() => !isHabitLog && handleOpenDetail(entry)}
         className={`group relative flex items-start gap-2.5 py-2 rounded px-2 md:px-3 transition-colors border-b border-stone-900/50 last:border-b-0 ${
-          isHabitLog ? "" : "hover:bg-stone-900/40 cursor-pointer"
+          isHabitLog ? '' : 'hover:bg-stone-900/40 cursor-pointer'
         }`}
       >
         {/* Left Column 1: Time Gutter */}
         <div className="w-12 pt-1.5 text-right shrink-0 select-none">
           <span
             className={`text-[10px] font-mono font-medium tracking-tight ${
-              isCompletedTask || isHabitLog
-                ? "text-emerald-600 font-semibold"
-                : "text-stone-500"
+              isCompletedTask || isHabitLog ? 'text-emerald-600 font-semibold' : 'text-stone-500'
             }`}
           >
             {primaryTime}
@@ -149,9 +140,9 @@ export default function DayTimeline({
                 handleToggleTaskStatus(entry as Task);
               }}
               className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors cursor-pointer ${
-                (entry as Task).status === "done"
-                  ? "bg-stone-800 border-stone-700 text-stone-400"
-                  : "border-stone-700 bg-[#0a0a0a] text-transparent hover:text-stone-400 hover:bg-stone-900/60"
+                (entry as Task).status === 'done'
+                  ? 'bg-stone-800 border-stone-700 text-stone-400'
+                  : 'border-stone-700 bg-[#0a0a0a] text-transparent hover:text-stone-400 hover:bg-stone-900/60'
               }`}
             >
               <Check className="w-3.5 h-3.5 stroke-[3]" />
@@ -168,8 +159,8 @@ export default function DayTimeline({
             <div
               className={`w-6 h-6 rounded border bg-[#121212] flex items-center justify-center transition-all ${
                 Boolean((entry as Note).content?.trim())
-                  ? "border-blue-500/20 text-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.05)]"
-                  : "border-stone-800 text-stone-600"
+                  ? 'border-blue-500/20 text-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.05)]'
+                  : 'border-stone-800 text-stone-600'
               }`}
             >
               <FileText className="w-3.5 h-3.5" />
@@ -192,11 +183,14 @@ export default function DayTimeline({
                 <p
                   id={`task-title-${entry.id}`}
                   className={`text-sm font-serif break-words line-clamp-2 ${
-                    (entry as Task).status === "done"
-                      ? "text-stone-500 line-through font-light"
-                      : "text-stone-200 font-medium tracking-wide"
+                    (entry as Task).status === 'done'
+                      ? 'text-amber-400/80 line-through font-light'
+                      : 'text-stone-200 font-medium tracking-wide'
                   }`}
                 >
+                  {(entry as Task).status === 'done' && (
+                    <span className="mr-1.5 not-italic">🏆</span>
+                  )}
                   {(entry as Task).title}
                 </p>
               )}
@@ -216,7 +210,7 @@ export default function DayTimeline({
                     id={`note-title-${entry.id}`}
                     className="text-sm font-sans font-medium text-stone-100 tracking-wide break-words line-clamp-2"
                   >
-                    {(entry as Note).title || "Untitled Note"}
+                    {(entry as Note).title || 'Untitled Note'}
                   </span>
                 </div>
               )}
@@ -233,7 +227,7 @@ export default function DayTimeline({
 
             {/* Action Tools */}
             <div className="flex items-center gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
-              {isTask && (entry as Task).status === "todo" && (
+              {isTask && (entry as Task).status === 'todo' && (
                 <button
                   id={`activate-task-btn-${entry.id}`}
                   onClick={(e) => {
@@ -415,7 +409,7 @@ export default function DayTimeline({
                   child,
                   cIdx === 0,
                   cIdx === children.length - 1,
-                  "left-[19.5px]",
+                  'left-[19.5px]',
                 ),
               )}
             </div>
@@ -442,7 +436,7 @@ export default function DayTimeline({
           <button
             onClick={() => toggleDayCollapse(labelString)}
             className="w-10 flex items-center justify-center shrink-0 py-4 text-stone-600 hover:text-amber-500 transition-colors cursor-pointer"
-            title={isCollapsed ? "Expand day" : "Collapse day"}
+            title={isCollapsed ? 'Expand day' : 'Collapse day'}
           >
             {isCollapsed ? (
               <ChevronRight className="w-3.5 h-3.5" />
@@ -457,7 +451,7 @@ export default function DayTimeline({
           >
             {formatDateStringLabel(labelString)}
             <span className="ml-2 text-[10px] font-normal normal-case text-stone-600">
-              ({items.length} {items.length === 1 ? "entry" : "entries"})
+              ({items.length} {items.length === 1 ? 'entry' : 'entries'})
             </span>
           </button>
         </div>
@@ -469,15 +463,9 @@ export default function DayTimeline({
           <div className="space-y-0 pt-1">
             {/* Non-habit items render normally */}
             {items
-              .filter(
-                (item) =>
-                  !(
-                    item.type === "standalone" &&
-                    item.entry.type === "habit-log"
-                  ),
-              )
+              .filter((item) => !(item.type === 'standalone' && item.entry.type === 'habit-log'))
               .map((item) => {
-                if (item.type === "standalone") {
+                if (item.type === 'standalone') {
                   return renderStandaloneRow(item.entry, false, false);
                 } else {
                   return renderBracketItem(item.block, item.children);
@@ -487,8 +475,7 @@ export default function DayTimeline({
             {/* Habit logs grouped into a collapsible section at the bottom */}
             {(() => {
               const habitItems = items.filter(
-                (item) =>
-                  item.type === "standalone" && item.entry.type === "habit-log",
+                (item) => item.type === 'standalone' && item.entry.type === 'habit-log',
               );
               if (habitItems.length === 0) return null;
 
@@ -501,10 +488,7 @@ export default function DayTimeline({
                         setHabitsCollapsed((v) => {
                           const next = !v;
                           try {
-                            localStorage.setItem(
-                              HABITS_COLLAPSE_KEY,
-                              String(next),
-                            );
+                            localStorage.setItem(HABITS_COLLAPSE_KEY, String(next));
                           } catch {}
                           return next;
                         })
@@ -514,7 +498,7 @@ export default function DayTimeline({
                       <Repeat2 className="w-3 h-3" />
                       <span>
                         {habitItems.length} habit
-                        {habitItems.length !== 1 ? "s" : ""} done
+                        {habitItems.length !== 1 ? 's' : ''} done
                       </span>
                       {habitsCollapsed ? (
                         <ChevronRight className="w-3 h-3" />
@@ -531,7 +515,7 @@ export default function DayTimeline({
                         renderStandaloneRow(
                           (
                             item as {
-                              type: "standalone";
+                              type: 'standalone';
                               entry: TimelineEntry;
                               sortTime: number;
                             }
@@ -553,9 +537,8 @@ export default function DayTimeline({
               Your timeline is completely empty
             </h4>
             <p className="text-xs font-sans max-w-md mx-auto leading-relaxed text-stone-500">
-              Start capturing entries using the input engine below. Switch back
-              to "Day View" to log your tasks and build an offline productivity
-              timeline easily.
+              Start capturing entries using the input engine below. Switch back to "Day View" to log
+              your tasks and build an offline productivity timeline easily.
             </p>
           </div>
         ))}

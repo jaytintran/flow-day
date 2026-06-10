@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from "react";
-import DayTimeline, { RenderItem } from "./DayTimeline";
-import { TimelineEntry, Task } from "../../types";
+import React from 'react';
+import DayTimeline, { RenderItem } from './DayTimeline';
+import { TimelineEntry, Task } from '../../types';
 
 interface DayViewProps {
   activeDayString: string;

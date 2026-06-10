@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   Settings as SettingsIcon,
   X,
@@ -18,49 +18,49 @@ import {
   Info,
   Check,
   ClipboardList,
-} from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
-import { db } from "../db";
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { db } from '../db';
 
 const STORAGE_KEYS = {
-  PAT: "flow_day_github_pat",
-  GIST_ID: "flow_day_gist_id",
-  LAST_SYNC: "flow_day_last_sync",
+  PAT: 'flow_day_github_pat',
+  GIST_ID: 'flow_day_gist_id',
+  LAST_SYNC: 'flow_day_last_sync',
 };
 
 export default function Settings() {
   const [isOpen, setIsOpen] = useState(false);
-  const [pat, setPat] = useState("");
-  const [gistId, setGistId] = useState("");
+  const [pat, setPat] = useState('');
+  const [gistId, setGistId] = useState('');
   const [showPat, setShowPat] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
   // Status management
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [statusMsg, setStatusMsg] = useState("");
-  const [confirmAction, setConfirmAction] = useState<"push" | "pull" | null>(null);
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [statusMsg, setStatusMsg] = useState('');
+  const [confirmAction, setConfirmAction] = useState<'push' | 'pull' | null>(null);
 
   // Load credentials on mount
   useEffect(() => {
-    setPat(localStorage.getItem(STORAGE_KEYS.PAT) || "");
-    setGistId(localStorage.getItem(STORAGE_KEYS.GIST_ID) || "");
+    setPat(localStorage.getItem(STORAGE_KEYS.PAT) || '');
+    setGistId(localStorage.getItem(STORAGE_KEYS.GIST_ID) || '');
     setLastSync(localStorage.getItem(STORAGE_KEYS.LAST_SYNC) || null);
   }, [isOpen]);
 
   const handleSaveCredentials = () => {
     localStorage.setItem(STORAGE_KEYS.PAT, pat.trim());
     localStorage.setItem(STORAGE_KEYS.GIST_ID, gistId.trim());
-    showToast("Credentials saved!", "success");
+    showToast('Credentials saved!', 'success');
   };
 
-  const showToast = (msg: string, type: "success" | "error" | "loading" | "idle" = "success") => {
+  const showToast = (msg: string, type: 'success' | 'error' | 'loading' | 'idle' = 'success') => {
     setStatus(type);
     setStatusMsg(msg);
-    if (type !== "loading") {
+    if (type !== 'loading') {
       setTimeout(() => {
-        setStatus("idle");
-        setStatusMsg("");
+        setStatus('idle');
+        setStatusMsg('');
       }, 4000);
     }
   };
@@ -70,7 +70,7 @@ export default function Settings() {
     const res = await fetch(`https://api.github.com/gists/${id}`, {
       headers: {
         Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github+json",
+        Accept: 'application/vnd.github+json',
       },
     });
     if (!res.ok) {
@@ -81,44 +81,44 @@ export default function Settings() {
 
   const testConnection = async () => {
     if (!pat.trim() || !gistId.trim()) {
-      showToast("Please enter both PAT and Gist ID", "error");
+      showToast('Please enter both PAT and Gist ID', 'error');
       return;
     }
-    showToast("Testing connection...", "loading");
+    showToast('Testing connection...', 'loading');
     try {
       await fetchGist(pat.trim(), gistId.trim());
-      showToast("Connection successful!", "success");
+      showToast('Connection successful!', 'success');
     } catch (err: any) {
-      showToast(err.message || "Failed to connect to Gist", "error");
+      showToast(err.message || 'Failed to connect to Gist', 'error');
     }
   };
 
   const handleAutoCreateGist = async () => {
     if (!pat.trim()) {
-      showToast("Personal Access Token (PAT) is required first", "error");
+      showToast('Personal Access Token (PAT) is required first', 'error');
       return;
     }
-    showToast("Creating Gist...", "loading");
+    showToast('Creating Gist...', 'loading');
 
     try {
       // Export current data as initial content
       const payload = await exportDatabase();
       const body = {
-        description: "FlowDay Sync Data (Private)",
+        description: 'FlowDay Sync Data (Private)',
         public: false,
         files: {
-          "flow-day-backup.json": {
+          'flow-day-backup.json': {
             content: JSON.stringify(payload, null, 2),
           },
         },
       };
 
-      const res = await fetch("https://api.github.com/gists", {
-        method: "POST",
+      const res = await fetch('https://api.github.com/gists', {
+        method: 'POST',
         headers: {
           Authorization: `Bearer ${pat.trim()}`,
-          Accept: "application/vnd.github+json",
-          "Content-Type": "application/json",
+          Accept: 'application/vnd.github+json',
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
       });
@@ -131,9 +131,9 @@ export default function Settings() {
       setGistId(gist.id);
       localStorage.setItem(STORAGE_KEYS.PAT, pat.trim());
       localStorage.setItem(STORAGE_KEYS.GIST_ID, gist.id);
-      showToast("Private Gist created and saved!", "success");
+      showToast('Private Gist created and saved!', 'success');
     } catch (err: any) {
-      showToast(err.message || "Failed to auto-create Gist", "error");
+      showToast(err.message || 'Failed to auto-create Gist', 'error');
     }
   };
 
@@ -152,28 +152,28 @@ export default function Settings() {
 
   const pushToCloud = async () => {
     if (!pat.trim() || !gistId.trim()) {
-      showToast("PAT and Gist ID are required to sync", "error");
+      showToast('PAT and Gist ID are required to sync', 'error');
       return;
     }
     setConfirmAction(null);
-    showToast("Uploading to cloud...", "loading");
+    showToast('Uploading to cloud...', 'loading');
 
     try {
       const payload = await exportDatabase();
       const body = {
         files: {
-          "flow-day-backup.json": {
+          'flow-day-backup.json': {
             content: JSON.stringify(payload, null, 2),
           },
         },
       };
 
       const res = await fetch(`https://api.github.com/gists/${gistId.trim()}`, {
-        method: "PATCH",
+        method: 'PATCH',
         headers: {
           Authorization: `Bearer ${pat.trim()}`,
-          Accept: "application/vnd.github+json",
-          "Content-Type": "application/json",
+          Accept: 'application/vnd.github+json',
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
       });
@@ -185,25 +185,25 @@ export default function Settings() {
       const nowStr = new Date().toLocaleString();
       setLastSync(nowStr);
       localStorage.setItem(STORAGE_KEYS.LAST_SYNC, nowStr);
-      showToast("Successfully backed up to cloud!", "success");
+      showToast('Successfully backed up to cloud!', 'success');
     } catch (err: any) {
-      showToast(err.message || "Sync upload failed", "error");
+      showToast(err.message || 'Sync upload failed', 'error');
     }
   };
 
   const pullFromCloud = async () => {
     if (!pat.trim() || !gistId.trim()) {
-      showToast("PAT and Gist ID are required to sync", "error");
+      showToast('PAT and Gist ID are required to sync', 'error');
       return;
     }
     setConfirmAction(null);
-    showToast("Downloading from cloud...", "loading");
+    showToast('Downloading from cloud...', 'loading');
 
     try {
       const gist = await fetchGist(pat.trim(), gistId.trim());
-      const file = gist.files["flow-day-backup.json"];
+      const file = gist.files['flow-day-backup.json'];
       if (!file) {
-        throw new Error("FlowDay backup file not found inside Gist");
+        throw new Error('FlowDay backup file not found inside Gist');
       }
 
       const backupData = JSON.parse(file.content);
@@ -212,15 +212,20 @@ export default function Settings() {
       const nowStr = new Date().toLocaleString();
       setLastSync(nowStr);
       localStorage.setItem(STORAGE_KEYS.LAST_SYNC, nowStr);
-      showToast("Successfully restored from cloud!", "success");
+      showToast('Successfully restored from cloud!', 'success');
     } catch (err: any) {
-      showToast(err.message || "Sync restore failed", "error");
+      showToast(err.message || 'Sync restore failed', 'error');
     }
   };
 
   const importDatabase = async (data: any) => {
-    if (!data || !Array.isArray(data.entries) || !Array.isArray(data.habits) || !Array.isArray(data.categories)) {
-      throw new Error("Invalid Gist backup payload");
+    if (
+      !data ||
+      !Array.isArray(data.entries) ||
+      !Array.isArray(data.habits) ||
+      !Array.isArray(data.categories)
+    ) {
+      throw new Error('Invalid Gist backup payload');
     }
 
     const parseEntryDates = (e: any) => {
@@ -248,7 +253,7 @@ export default function Settings() {
     const parsedHabits = data.habits.map(parseHabitDates);
     const parsedCategories = data.categories.map(parseCategoryDates);
 
-    await db.transaction("rw", [db.entries, db.habits, db.categories], async () => {
+    await db.transaction('rw', [db.entries, db.habits, db.categories], async () => {
       await db.entries.clear();
       await db.habits.clear();
       await db.categories.clear();
@@ -296,7 +301,9 @@ export default function Settings() {
                   <button
                     onClick={() => setShowHelp(!showHelp)}
                     className={`p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1 text-xs font-mono font-bold uppercase tracking-wider ${
-                      showHelp ? "bg-amber-500/10 text-amber-500 border border-amber-500/30" : "text-stone-500 hover:text-stone-300 hover:bg-stone-850 border border-transparent"
+                      showHelp
+                        ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30'
+                        : 'text-stone-500 hover:text-stone-300 hover:bg-stone-850 border border-transparent'
                     }`}
                     title="How to Setup Sync"
                   >
@@ -319,13 +326,12 @@ export default function Settings() {
 
               {/* Main Content Area */}
               <div className="overflow-y-auto flex-1 p-5 md:p-6 space-y-6">
-                
                 {/* HELP GUIDE / TOOLTIP DRAWER */}
                 <AnimatePresence>
                   {showHelp && (
                     <motion.div
                       initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
+                      animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
                       className="overflow-hidden border border-amber-500/20 bg-amber-950/10 rounded-xl p-4 text-xs space-y-2.5 text-stone-300 font-mono leading-relaxed"
                     >
@@ -335,22 +341,35 @@ export default function Settings() {
                       </div>
                       <ol className="list-decimal pl-4 space-y-1.5 text-stone-400">
                         <li>
-                          Visit <a href="https://github.com/settings/tokens" target="_blank" rel="noreferrer" className="text-amber-500 hover:underline">GitHub Personal Access Tokens</a>.
+                          Visit{' '}
+                          <a
+                            href="https://github.com/settings/tokens"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-amber-500 hover:underline"
+                          >
+                            GitHub Personal Access Tokens
+                          </a>
+                          .
                         </li>
                         <li>
-                          Generate a token (Classic) with the <strong className="text-stone-300">gist</strong> scope checked.
+                          Generate a token (Classic) with the{' '}
+                          <strong className="text-stone-300">gist</strong> scope checked.
+                        </li>
+                        <li>Copy and paste your generated PAT below.</li>
+                        <li>
+                          Click <strong className="text-stone-300">Auto-Create Gist</strong> to
+                          initialize a new private Gist for FlowDay.
                         </li>
                         <li>
-                          Copy and paste your generated PAT below.
+                          Once your Gist is created, click{' '}
+                          <strong className="text-stone-300">Push to Cloud</strong> to save your
+                          current local database.
                         </li>
                         <li>
-                          Click <strong className="text-stone-300">Auto-Create Gist</strong> to initialize a new private Gist for FlowDay.
-                        </li>
-                        <li>
-                          Once your Gist is created, click <strong className="text-stone-300">Push to Cloud</strong> to save your current local database.
-                        </li>
-                        <li>
-                          On your other device (mobile/web), enter the same PAT & Gist ID, and click <strong className="text-stone-300">Pull from Cloud</strong> to load your data.
+                          On your other device (mobile/web), enter the same PAT & Gist ID, and click{' '}
+                          <strong className="text-stone-300">Pull from Cloud</strong> to load your
+                          data.
                         </li>
                       </ol>
                     </motion.div>
@@ -378,7 +397,7 @@ export default function Settings() {
                       </label>
                       <div className="relative">
                         <input
-                          type={showPat ? "text" : "password"}
+                          type={showPat ? 'text' : 'password'}
                           placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
                           value={pat}
                           onChange={(e) => setPat(e.target.value)}
@@ -438,21 +457,27 @@ export default function Settings() {
                   </div>
 
                   {/* Dynamic Status Bar */}
-                  {status !== "idle" && (
+                  {status !== 'idle' && (
                     <motion.div
                       initial={{ opacity: 0, y: 5 }}
                       animate={{ opacity: 1, y: 0 }}
                       className={`p-3 rounded-xl border flex items-center gap-3 text-xs font-mono leading-relaxed ${
-                        status === "loading"
-                          ? "bg-stone-900/60 border-stone-800 text-stone-400"
-                          : status === "success"
-                            ? "bg-emerald-950/15 border-emerald-500/25 text-emerald-400"
-                            : "bg-red-950/15 border-red-500/25 text-red-400"
+                        status === 'loading'
+                          ? 'bg-stone-900/60 border-stone-800 text-stone-400'
+                          : status === 'success'
+                            ? 'bg-emerald-950/15 border-emerald-500/25 text-emerald-400'
+                            : 'bg-red-950/15 border-red-500/25 text-red-400'
                       }`}
                     >
-                      {status === "loading" && <RefreshCw className="w-4 h-4 animate-spin shrink-0 text-stone-400" />}
-                      {status === "success" && <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />}
-                      {status === "error" && <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />}
+                      {status === 'loading' && (
+                        <RefreshCw className="w-4 h-4 animate-spin shrink-0 text-stone-400" />
+                      )}
+                      {status === 'success' && (
+                        <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
+                      )}
+                      {status === 'error' && (
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+                      )}
                       <span className="flex-1">{statusMsg}</span>
                     </motion.div>
                   )}
@@ -463,7 +488,7 @@ export default function Settings() {
                       <div className="grid grid-cols-2 gap-3">
                         <button
                           type="button"
-                          onClick={() => setConfirmAction("push")}
+                          onClick={() => setConfirmAction('push')}
                           className="flex flex-col items-center justify-center p-3.5 bg-stone-900 border border-stone-800/80 hover:border-amber-500/25 hover:bg-stone-900/60 rounded-xl transition-all cursor-pointer group active:scale-[0.98]"
                         >
                           <UploadCloud className="w-5 h-5 text-stone-500 group-hover:text-amber-500 transition-colors mb-1.5" />
@@ -477,7 +502,7 @@ export default function Settings() {
 
                         <button
                           type="button"
-                          onClick={() => setConfirmAction("pull")}
+                          onClick={() => setConfirmAction('pull')}
                           className="flex flex-col items-center justify-center p-3.5 bg-stone-900 border border-stone-800/80 hover:border-amber-500/25 hover:bg-stone-900/60 rounded-xl transition-all cursor-pointer group active:scale-[0.98]"
                         >
                           <DownloadCloud className="w-5 h-5 text-stone-500 group-hover:text-amber-500 transition-colors mb-1.5" />
@@ -497,7 +522,7 @@ export default function Settings() {
                     {confirmAction && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
+                        animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
                         className="bg-amber-950/15 border border-amber-500/20 rounded-xl p-4 text-xs font-mono space-y-3"
                       >
@@ -506,14 +531,14 @@ export default function Settings() {
                           Are you sure?
                         </div>
                         <p className="text-stone-400 leading-relaxed">
-                          {confirmAction === "push"
-                            ? "This will OVERWRITE the cloud backup with your current local data. Your other devices will pull this version next time."
-                            : "This will OVERWRITE all local data on this device with the version stored in the cloud. Your unsaved local edits will be lost."}
+                          {confirmAction === 'push'
+                            ? 'This will OVERWRITE the cloud backup with your current local data. Your other devices will pull this version next time.'
+                            : 'This will OVERWRITE all local data on this device with the version stored in the cloud. Your unsaved local edits will be lost.'}
                         </p>
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={confirmAction === "push" ? pushToCloud : pullFromCloud}
+                            onClick={confirmAction === 'push' ? pushToCloud : pullFromCloud}
                             className="px-3.5 py-1.5 bg-amber-500 text-stone-950 rounded-lg text-[9px] font-mono font-bold uppercase tracking-wider hover:bg-amber-400 active:scale-95 cursor-pointer"
                           >
                             Yes, proceed
@@ -538,4 +563,3 @@ export default function Settings() {
     </>
   );
 }
-

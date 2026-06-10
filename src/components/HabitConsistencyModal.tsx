@@ -3,23 +3,43 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import { ChevronLeft, ChevronRight, X, Repeat2 } from "lucide-react";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "../db";
-import { Habit, HabitLog } from "../types";
-import { toLocalDateString } from "../utils";
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { ChevronLeft, ChevronRight, X, Repeat2 } from 'lucide-react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db';
+import { Habit, HabitLog } from '../types';
+import { toLocalDateString } from '../utils';
 
 const HABIT_COLORS: Record<
-  NonNullable<Habit["color"]>,
+  NonNullable<Habit['color']>,
   { dot: string; filled: string; label: string }
 > = {
-  emerald: { dot: "bg-emerald-500", filled: "bg-emerald-500/20 border-emerald-500/50 text-emerald-400", label: "text-emerald-400" },
-  sky:     { dot: "bg-sky-500",     filled: "bg-sky-500/20 border-sky-500/50 text-sky-400",             label: "text-sky-400" },
-  violet:  { dot: "bg-violet-500",  filled: "bg-violet-500/20 border-violet-500/50 text-violet-400",    label: "text-violet-400" },
-  rose:    { dot: "bg-rose-500",    filled: "bg-rose-500/20 border-rose-500/50 text-rose-400",          label: "text-rose-400" },
-  amber:   { dot: "bg-amber-500",   filled: "bg-amber-500/20 border-amber-500/50 text-amber-400",       label: "text-amber-400" },
+  emerald: {
+    dot: 'bg-emerald-500',
+    filled: 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400',
+    label: 'text-emerald-400',
+  },
+  sky: {
+    dot: 'bg-sky-500',
+    filled: 'bg-sky-500/20 border-sky-500/50 text-sky-400',
+    label: 'text-sky-400',
+  },
+  violet: {
+    dot: 'bg-violet-500',
+    filled: 'bg-violet-500/20 border-violet-500/50 text-violet-400',
+    label: 'text-violet-400',
+  },
+  rose: {
+    dot: 'bg-rose-500',
+    filled: 'bg-rose-500/20 border-rose-500/50 text-rose-400',
+    label: 'text-rose-400',
+  },
+  amber: {
+    dot: 'bg-amber-500',
+    filled: 'bg-amber-500/20 border-amber-500/50 text-amber-400',
+    label: 'text-amber-400',
+  },
 };
 
 const DEFAULT_COLOR = HABIT_COLORS.emerald;
@@ -28,7 +48,7 @@ function getColorTheme(habit: Habit) {
   return habit.color ? HABIT_COLORS[habit.color] : DEFAULT_COLOR;
 }
 
-const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 interface Props {
   habit: Habit;
@@ -45,8 +65,7 @@ export default function HabitConsistencyModal({ habit, onClose }: Props) {
   // Load all habit-logs for this habit
   const logs =
     useLiveQuery(
-      () =>
-        (db.entries.where("habit_id").equals(habit.id).toArray() as Promise<HabitLog[]>),
+      () => db.entries.where('habit_id').equals(habit.id).toArray() as Promise<HabitLog[]>,
       [habit.id],
     ) || [];
 
@@ -74,18 +93,22 @@ export default function HabitConsistencyModal({ habit, onClose }: Props) {
 
   const todayStr = toLocalDateString(now);
 
-  const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleString("default", {
-    month: "long",
-    year: "numeric",
+  const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleString('default', {
+    month: 'long',
+    year: 'numeric',
   });
 
   const handlePrev = () => {
-    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
-    else setViewMonth(m => m - 1);
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear((y) => y - 1);
+    } else setViewMonth((m) => m - 1);
   };
   const handleNext = () => {
-    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
-    else setViewMonth(m => m + 1);
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear((y) => y + 1);
+    } else setViewMonth((m) => m + 1);
   };
 
   return (
@@ -102,14 +125,16 @@ export default function HabitConsistencyModal({ habit, onClose }: Props) {
           initial={{ opacity: 0, scale: 0.93, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.93, y: 12 }}
-          transition={{ type: "spring", damping: 26, stiffness: 260 }}
-          onClick={e => e.stopPropagation()}
+          transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+          onClick={(e) => e.stopPropagation()}
           className="w-full max-w-sm bg-[#131313] border border-stone-800 rounded-2xl shadow-2xl overflow-hidden"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-stone-800/60">
             <div className="flex items-center gap-2.5 min-w-0">
-              <span className={`p-1.5 rounded-lg bg-stone-900 border border-stone-800 ${theme.label}`}>
+              <span
+                className={`p-1.5 rounded-lg bg-stone-900 border border-stone-800 ${theme.label}`}
+              >
                 <Repeat2 className="w-4 h-4" />
               </span>
               <div className="min-w-0">
@@ -140,7 +165,7 @@ export default function HabitConsistencyModal({ habit, onClose }: Props) {
                 {monthLabel}
               </span>
               <p className={`text-[10px] font-mono mt-0.5 ${theme.label}`}>
-                {totalThisMonth} day{totalThisMonth !== 1 ? "s" : ""} logged
+                {totalThisMonth} day{totalThisMonth !== 1 ? 's' : ''} logged
               </p>
             </div>
             <button
@@ -155,7 +180,7 @@ export default function HabitConsistencyModal({ habit, onClose }: Props) {
           <div className="px-4 pb-5">
             {/* Weekday headers */}
             <div className="grid grid-cols-7 mb-2">
-              {WEEKDAYS.map(wd => (
+              {WEEKDAYS.map((wd) => (
                 <span
                   key={wd}
                   className="text-center text-[9px] font-mono font-bold text-stone-600 uppercase tracking-wider py-1"
@@ -181,20 +206,19 @@ export default function HabitConsistencyModal({ habit, onClose }: Props) {
                     key={cellStr}
                     className={`
                       aspect-square flex flex-col items-center justify-center rounded-lg border text-[11px] font-mono transition-all
-                      ${isLogged
-                        ? `${theme.filled} border font-bold`
-                        : isToday
-                          ? "border-stone-600 bg-stone-800/60 text-stone-300"
-                          : isFuture
-                            ? "border-stone-800/30 text-stone-700"
-                            : "border-stone-800/50 text-stone-500"
+                      ${
+                        isLogged
+                          ? `${theme.filled} border font-bold`
+                          : isToday
+                            ? 'border-stone-600 bg-stone-800/60 text-stone-300'
+                            : isFuture
+                              ? 'border-stone-800/30 text-stone-700'
+                              : 'border-stone-800/50 text-stone-500'
                       }
                     `}
                   >
                     {day}
-                    {isLogged && (
-                      <span className={`w-1 h-1 rounded-full mt-0.5 ${theme.dot}`} />
-                    )}
+                    {isLogged && <span className={`w-1 h-1 rounded-full mt-0.5 ${theme.dot}`} />}
                   </div>
                 );
               })}

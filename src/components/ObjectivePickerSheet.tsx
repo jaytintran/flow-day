@@ -3,13 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from "react";
-import { useLiveQuery } from "dexie-react-hooks";
-import { motion, AnimatePresence } from "motion/react";
-import { db } from "../db";
-import { Objective } from "../types";
-import { formatDuration } from "../utils";
-import { Target, X, Clock, Link2, Unlink2 } from "lucide-react";
+import React, { useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { motion, AnimatePresence } from 'motion/react';
+import { db } from '../db';
+import { Objective } from '../types';
+import { formatDuration } from '../utils';
+import { Target, X, Clock, Link2, Unlink2, Search } from 'lucide-react';
 
 interface ObjectivePickerSheetProps {
   open: boolean;
@@ -26,16 +26,21 @@ export default function ObjectivePickerSheet({
   currentObjectiveId,
   isMobile,
 }: ObjectivePickerSheetProps) {
+  const [search, setSearch] = useState('');
+
   const objectives =
-    useLiveQuery(
-      () =>
-        db.entries
-          .where("type")
-          .equals("objective")
-          .filter((o) => (o as Objective).status !== "archived")
-          .toArray(),
+    useLiveQuery(() =>
+      db.entries
+        .where('type')
+        .equals('objective')
+        .filter((o) => (o as Objective).status !== 'archived')
+        .toArray(),
     ) || [];
   const typedObjectives = objectives as Objective[];
+
+  const filteredObjectives = typedObjectives.filter((g) =>
+    g.title.toLowerCase().includes(search.toLowerCase()),
+  );
 
   const handleLink = async (objectiveId: string) => {
     if (!activeTaskId) return;
@@ -51,6 +56,17 @@ export default function ObjectivePickerSheet({
 
   const renderContent = () => (
     <>
+      <div className="relative mb-2">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-500" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search objectives..."
+          className="w-full bg-[#0a0a0a] border border-stone-800 rounded-lg pl-9 pr-3 py-2 text-xs text-stone-200 placeholder-stone-600 focus:outline-none focus:border-rose-500/30 transition-colors font-mono"
+        />
+      </div>
+
       {/* Current link */}
       {currentObjectiveId && (
         <div className="pt-1 pb-2">
@@ -59,16 +75,14 @@ export default function ObjectivePickerSheet({
             className="flex items-center gap-2 w-full px-3 py-2 bg-rose-950/20 border border-rose-800/30 rounded-lg text-[10px] font-mono text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer"
           >
             <Unlink2 className="w-3.5 h-3.5" />
-            <span className="flex-1 text-left">
-              Unlink current objective
-            </span>
+            <span className="flex-1 text-left">Unlink current objective</span>
           </button>
         </div>
       )}
 
       {/* List */}
       <div className="space-y-1">
-        {typedObjectives.length === 0 ? (
+        {filteredObjectives.length === 0 ? (
           <div className="py-8 text-center text-stone-600">
             <Target className="w-6 h-6 mx-auto mb-2 text-stone-700" />
             <p className="text-xs font-sans">No active objectives</p>
@@ -78,14 +92,14 @@ export default function ObjectivePickerSheet({
             </p>
           </div>
         ) : (
-          typedObjectives.map((obj) => (
+          filteredObjectives.map((obj) => (
             <button
               key={obj.id}
               onClick={() => handleLink(obj.id)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all cursor-pointer text-left ${
                 currentObjectiveId === obj.id
-                  ? "bg-rose-500/10 border-rose-500/30 text-rose-300"
-                  : "bg-[#0a0a0a] border-stone-800 hover:border-stone-700 text-stone-300 hover:text-stone-100"
+                  ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                  : 'bg-[#0a0a0a] border-stone-800 hover:border-stone-700 text-stone-300 hover:text-stone-100'
               }`}
             >
               <div className="w-5 h-5 rounded-full border border-current flex items-center justify-center shrink-0">
@@ -94,14 +108,10 @@ export default function ObjectivePickerSheet({
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <span className="text-xs font-serif block truncate">
-                  {obj.title}
-                </span>
+                <span className="text-xs font-serif block truncate">{obj.title}</span>
                 <span
                   className={`text-[9px] font-mono flex items-center gap-1 ${
-                    currentObjectiveId === obj.id
-                      ? "text-rose-500/70"
-                      : "text-stone-600"
+                    currentObjectiveId === obj.id ? 'text-rose-500/70' : 'text-stone-600'
                   }`}
                 >
                   <Clock className="w-3 h-3" />
@@ -122,25 +132,13 @@ export default function ObjectivePickerSheet({
         (isMobile ? (
           /* BOTTOM SHEET FOR MOBILE */
           <div className="fixed inset-0 z-[999] flex items-end justify-center font-sans">
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={onClose}
-              className="absolute inset-0 bg-black/60 backdrop-blur-xs"
-            />
-            {/* Sheet container */}
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 220 }}
-              className="relative w-full max-h-[85vh] bg-[#121212] border-t border-stone-850 rounded-t-2xl shadow-2xl z-10 flex flex-col overflow-hidden pb-6"
-            >
-              {/* Drag Handle & Close header */}
-              <div className="flex-none flex flex-col items-center pt-3 pb-2 border-b border-stone-850/60 relative">
-                <div className="w-12 h-1 bg-stone-800 rounded-full mb-3" />
+            <div onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-xs" />
+            <div className="relative w-full max-h-[85vh] bg-[#121212] border-t border-stone-850 rounded-t-2xl shadow-2xl z-10 flex flex-col overflow-hidden pb-6 animate-slide-up">
+              <div className="flex-none flex flex-col items-center pt-3 pb-2 border-b border-stone-850/60">
+                <button
+                  onClick={onClose}
+                  className="w-12 h-1 bg-stone-700 hover:bg-stone-500 rounded-full mb-3 transition-colors cursor-pointer"
+                />
                 <div className="w-full px-5 flex justify-between items-center">
                   <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border text-rose-400 bg-rose-500/10 border-rose-500/20 flex items-center gap-1.5">
                     <Target className="w-3 h-3" />
@@ -148,18 +146,16 @@ export default function ObjectivePickerSheet({
                   </span>
                   <button
                     onClick={onClose}
-                    className="p-1 text-stone-500 hover:text-stone-300 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
+                    className="p-1 text-stone-500 hover:text-stone-300 rounded-lg transition-colors cursor-pointer"
                   >
                     <X className="w-5 h-5" />
                   </button>
                 </div>
               </div>
-
-              {/* Sheet content area */}
               <div className="flex-1 overflow-y-auto p-5 space-y-4 min-h-[200px]">
                 {renderContent()}
               </div>
-            </motion.div>
+            </div>
           </div>
         ) : (
           /* MODAL FOR DESKTOP */
@@ -189,9 +185,7 @@ export default function ObjectivePickerSheet({
               </div>
 
               {/* List */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-1">
-                {renderContent()}
-              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-1">{renderContent()}</div>
             </motion.div>
           </div>
         ))}

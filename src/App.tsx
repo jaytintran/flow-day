@@ -16,9 +16,12 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0a0a0a] text-stone-200 font-sans selection:bg-stone-800 selection:text-stone-100 relative select-none">
-      
       {/* ZONE 1 — HEADER (FIXED TOP) */}
-      <header className="flex-none relative z-40 bg-[#121212]" id="app-fixed-header" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+      <header
+        className="flex-none relative z-40 bg-[#121212]"
+        id="app-fixed-header"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      >
         {/* Task Timer Bar Row */}
         <TimerBar activeTaskId={activeTaskId} setActiveTaskId={setActiveTaskId} />
 
@@ -32,10 +35,13 @@ export default function App() {
       </header>
 
       {/* ZONE 2 — MAIN TIMELINE (SCROLLABLE AREA) */}
-      <main className="flex-1 overflow-hidden flex flex-col relative bg-[#0a0a0a]" id="app-scrollable-main">
+      <main
+        className="flex-1 overflow-hidden flex flex-col relative bg-[#0a0a0a]"
+        id="app-scrollable-main"
+      >
         {/* Subtle grid lines background overlay */}
         <div className="absolute inset-0 bg-[radial-gradient(#ffffff03_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
-        
+
         <Journal
           activeDate={activeDate}
           setActiveDate={setActiveDate}
@@ -46,7 +52,11 @@ export default function App() {
       </main>
 
       {/* ZONE 3 — INPUT BAR (FIXED BOTTOM) */}
-      <footer className="flex-none relative z-35 bg-[#121212]" id="app-fixed-input" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+      <footer
+        className="flex-none relative z-35 bg-[#121212]"
+        id="app-fixed-input"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
         <InputBar activeDate={activeDate} />
       </footer>
     </div>
