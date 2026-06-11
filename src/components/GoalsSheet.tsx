@@ -3,9 +3,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'motion/react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
 import { db } from '../db';
 import { Goal, Category } from '../types';
 import { formatDuration } from '../utils';
@@ -23,6 +38,7 @@ import {
 } from 'lucide-react';
 import CategoryStrip from './CategoryStrip';
 import CategoryManagementSheet from './CategoryManagementSheet';
+import SortableRow from './SortableRow';
 
 const colorDotMap: Record<string, string> = {
   emerald: 'bg-emerald-400',
@@ -83,6 +99,51 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
   const filteredActiveGoals = activeGoals.filter((g) => matchesFilter(g.category_ids));
   const filteredAchievedGoals = achievedGoals.filter((g) => matchesFilter(g.category_ids));
   const filteredArchivedGoals = archivedGoals.filter((g) => matchesFilter(g.category_ids));
+
+  // ── DnD reordering (active goals only) ────────────────────────────────────
+
+  const [optimisticGoals, setOptimisticGoals] = useState<Goal[] | null>(null);
+  const displayActive = optimisticGoals ?? filteredActiveGoals;
+  const sortedActiveGoals = [...displayActive].sort(
+    (a, b) =>
+      (a.sort_order ?? Date.parse(a.created_at.toString())) -
+      (b.sort_order ?? Date.parse(b.created_at.toString())),
+  );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      const ids = sortedActiveGoals.map((g) => g.id);
+      const oldIndex = ids.indexOf(active.id as string);
+      const newIndex = ids.indexOf(over.id as string);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      const reordered = arrayMove(ids, oldIndex, newIndex);
+
+      setOptimisticGoals((prev) => {
+        const base = prev ?? filteredActiveGoals;
+        const mapped = reordered.map((id, idx) => {
+          const g = base.find((x) => x.id === id)!;
+          return { ...g, sort_order: idx };
+        });
+        return mapped;
+      });
+
+      for (let i = 0; i < reordered.length; i++) {
+        await db.entries.update(reordered[i], { sort_order: i } as any);
+      }
+
+      setTimeout(() => setOptimisticGoals(null), 2000);
+    },
+    [filteredActiveGoals, sortedActiveGoals],
+  );
 
   // Close chip popover on outside click
   useEffect(() => {
@@ -370,7 +431,18 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
             </span>
           </div>
         )}
-        {filteredActiveGoals.map(renderGoalRow)}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext
+            items={sortedActiveGoals.map((g) => g.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {sortedActiveGoals.map((g) => (
+              <SortableRow key={g.id} id={g.id}>
+                {renderGoalRow(g)}
+              </SortableRow>
+            ))}
+          </SortableContext>
+        </DndContext>
 
         {filteredAchievedGoals.length > 0 && (
           <div className="pt-4 pb-1">

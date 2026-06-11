@@ -53,6 +53,32 @@ export class PersonalTimelineDB extends Dexie {
       habits: 'id, status',
       categories: 'id, name, scope, [scope+name]',
     });
+    this.version(10)
+      .stores({
+        entries:
+          'id, type, created_at, status, timestamp, start_at, end_at, title, carried_to, objective_id, goal_id, scheduled_at, habit_id, *category_ids, sort_order',
+        habits: 'id, status, sort_order',
+        categories: 'id, name, scope, [scope+name]',
+      })
+      .upgrade(async (tx) => {
+        // Assign sort_order to existing goals, objectives, and habits that lack it
+        const entries = await tx.table('entries').toArray();
+        const goals = entries.filter((e: any) => e.type === 'goal' && e.sort_order === undefined);
+        const objectives = entries.filter(
+          (e: any) => e.type === 'objective' && e.sort_order === undefined,
+        );
+        for (let i = 0; i < goals.length; i++) {
+          await tx.table('entries').update(goals[i].id, { sort_order: i });
+        }
+        for (let i = 0; i < objectives.length; i++) {
+          await tx.table('entries').update(objectives[i].id, { sort_order: i });
+        }
+        const habits = await tx.table('habits').toArray();
+        const unparented = habits.filter((h: any) => h.sort_order === undefined);
+        for (let i = 0; i < unparented.length; i++) {
+          await tx.table('habits').update(unparented[i].id, { sort_order: i });
+        }
+      });
   }
 }
 

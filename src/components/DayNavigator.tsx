@@ -46,9 +46,18 @@ export default function DayNavigator({
   // Load entries reactively
   const entries = useLiveQuery(() => db.entries.toArray()) || [];
 
-  // Habits for quick-tick strip
+  // Habits for quick-tick strip (sorted by sort_order)
   const activeHabits = (useLiveQuery(() => db.habits.where('status').equals('active').toArray()) ||
     []) as Habit[];
+  const sortedActiveHabits = React.useMemo(
+    () =>
+      [...activeHabits].sort(
+        (a, b) =>
+          (a.sort_order ?? Date.parse(a.created_at.toString())) -
+          (b.sort_order ?? Date.parse(b.created_at.toString())),
+      ),
+    [activeHabits],
+  );
   const habitLogs = (useLiveQuery(
     () => db.entries.where('type').equals('habit-log').toArray() as Promise<HabitLog[]>,
   ) || []) as HabitLog[];
@@ -373,9 +382,9 @@ export default function DayNavigator({
         </div>
 
         {/* Quick-tick Habit strip — only when active habits exist */}
-        {activeHabits.length > 0 && (
+        {sortedActiveHabits.length > 0 && (
           <div className="flex items-center gap-2 w-full overflow-x-auto pb-0.5 md:flex-wrap md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {activeHabits.map((habit) => {
+            {sortedActiveHabits.map((habit) => {
               const logsToday = habitLogs.filter(
                 (l) =>
                   l.habit_id === habit.id &&

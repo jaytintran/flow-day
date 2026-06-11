@@ -66,6 +66,7 @@ export interface Objective extends BaseEntry {
   completed_at?: Date;
   goal_id?: string; // link to a goal/project
   category_ids?: string[]; // links to categories
+  sort_order?: number; // display ordering
 }
 
 export interface Goal extends BaseEntry {
@@ -75,6 +76,7 @@ export interface Goal extends BaseEntry {
   status: 'active' | 'achieved' | 'archived';
   achieved_at?: Date;
   category_ids?: string[]; // links to categories
+  sort_order?: number; // display ordering
 }
 
 export type TimelineEntry = Task | Event | Note | TimeBlock | Objective | Goal | HabitLog;
@@ -86,6 +88,7 @@ export interface Habit {
   created_at: Date;
   status: 'active' | 'archived';
   color?: 'emerald' | 'sky' | 'violet' | 'rose' | 'amber';
+  sort_order?: number; // display ordering
 }
 
 // One log per tick — IS a TimelineEntry (appears in the daily timeline)

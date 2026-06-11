@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -18,10 +18,26 @@ import {
   RotateCcw,
   MoreHorizontal,
 } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
 import { db } from '../db';
 import { Habit, HabitLog } from '../types';
 import { toLocalDateString } from '../utils';
 import HabitConsistencyModal from './HabitConsistencyModal';
+import SortableRow from './SortableRow';
 
 interface HabitsSheetProps {
   open: boolean;
@@ -175,6 +191,55 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
     ) || [];
 
   const activeDateStr = toLocalDateString(activeDate);
+
+  // ── DnD reordering ───────────────────────────────────────────────────────
+
+  const [optimisticHabits, setOptimisticHabits] = useState<Habit[] | null>(null);
+  const displayActive = optimisticHabits ?? activeHabits;
+
+  // Sort by sort_order (or created_at as fallback)
+  const sortedActive = [...displayActive].sort(
+    (a, b) => (a.sort_order ?? Date.parse(a.created_at.toString())) - (b.sort_order ?? Date.parse(b.created_at.toString())),
+  );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      // Get the current sortable IDs (sorted)
+      const ids = sortedActive.map((h) => h.id);
+      const oldIndex = ids.indexOf(active.id as string);
+      const newIndex = ids.indexOf(over.id as string);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      const reordered = arrayMove(ids, oldIndex, newIndex);
+
+      // Optimistic update
+      setOptimisticHabits((prev) => {
+        const base = prev ?? activeHabits;
+        const mapped = reordered.map((id, idx) => {
+          const h = base.find((x) => x.id === id)!;
+          return { ...h, sort_order: idx };
+        });
+        return mapped;
+      });
+
+      // Persist
+      for (let i = 0; i < reordered.length; i++) {
+        await db.habits.update(reordered[i], { sort_order: i });
+      }
+
+      // Clear optimistic after a beat so future adds/refetches still work
+      setTimeout(() => setOptimisticHabits(null), 2000);
+    },
+    [activeHabits, sortedActive],
+  );
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -469,14 +534,22 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
 
       {/* List */}
       <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-1.5">
-        {activeHabits.length > 0 && (
+        {sortedActive.length > 0 && (
           <div className="pt-3 pb-1">
             <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-stone-500 px-1">
-              Active ({activeHabits.length})
+              Active ({sortedActive.length})
             </span>
           </div>
         )}
-        {activeHabits.map((h) => renderHabitRow(h, false))}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={sortedActive.map((h) => h.id)} strategy={verticalListSortingStrategy}>
+            {sortedActive.map((h) => (
+              <SortableRow key={h.id} id={h.id}>
+                {renderHabitRow(h, false)}
+              </SortableRow>
+            ))}
+          </SortableContext>
+        </DndContext>
 
         {/* Archived section */}
         {archivedHabits.length > 0 && (

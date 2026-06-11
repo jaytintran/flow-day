@@ -3,9 +3,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'motion/react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
 import { db } from '../db';
 import { Objective, Goal, Category } from '../types';
 import { formatDuration } from '../utils';
@@ -25,6 +40,7 @@ import {
 import GoalPickerSheet from './GoalPickerSheet';
 import CategoryStrip from './CategoryStrip';
 import CategoryManagementSheet from './CategoryManagementSheet';
+import SortableRow from './SortableRow';
 
 const colorDotMap: Record<string, string> = {
   emerald: 'bg-emerald-400',
@@ -110,6 +126,51 @@ export default function ObjectivesSheet({ open, onClose }: ObjectivesSheetProps)
   const filteredDoneObjectives = doneObjectives.filter((o) => matchesFilter(o.category_ids));
   const filteredArchivedObjectives = archivedObjectives.filter((o) =>
     matchesFilter(o.category_ids),
+  );
+
+  // ── DnD reordering (todo objectives only) ──────────────────────────────────
+
+  const [optimisticObjectives, setOptimisticObjectives] = useState<Objective[] | null>(null);
+  const displayTodo = optimisticObjectives ?? filteredTodoObjectives;
+  const sortedTodoObjectives = [...displayTodo].sort(
+    (a, b) =>
+      (a.sort_order ?? Date.parse(a.created_at.toString())) -
+      (b.sort_order ?? Date.parse(b.created_at.toString())),
+  );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      const ids = sortedTodoObjectives.map((o) => o.id);
+      const oldIndex = ids.indexOf(active.id as string);
+      const newIndex = ids.indexOf(over.id as string);
+      if (oldIndex === -1 || newIndex === -1) return;
+
+      const reordered = arrayMove(ids, oldIndex, newIndex);
+
+      setOptimisticObjectives((prev) => {
+        const base = prev ?? filteredTodoObjectives;
+        const mapped = reordered.map((id, idx) => {
+          const o = base.find((x) => x.id === id)!;
+          return { ...o, sort_order: idx };
+        });
+        return mapped;
+      });
+
+      for (let i = 0; i < reordered.length; i++) {
+        await db.entries.update(reordered[i], { sort_order: i } as any);
+      }
+
+      setTimeout(() => setOptimisticObjectives(null), 2000);
+    },
+    [filteredTodoObjectives, sortedTodoObjectives],
   );
 
   // Close chip popover on outside click
@@ -407,7 +468,18 @@ export default function ObjectivesSheet({ open, onClose }: ObjectivesSheetProps)
             </span>
           </div>
         )}
-        {filteredTodoObjectives.map(renderObjectiveRow)}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext
+            items={sortedTodoObjectives.map((o) => o.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {sortedTodoObjectives.map((o) => (
+              <SortableRow key={o.id} id={o.id}>
+                {renderObjectiveRow(o)}
+              </SortableRow>
+            ))}
+          </SortableContext>
+        </DndContext>
 
         {filteredDoneObjectives.length > 0 && (
           <div className="pt-4 pb-1">
