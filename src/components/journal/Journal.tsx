@@ -356,6 +356,24 @@ export default function Journal({
     } as any);
   };
 
+  // Time picker: persist updated time to DB
+  const handleTimePickerConfirm = async (entry: TimelineEntry, newDate: Date) => {
+    const id = entry.id;
+    switch (entry.type) {
+      case 'task': {
+        const task = entry as Task;
+        const field = task.status === 'done' ? 'completed_at' : 'scheduled_at';
+        await db.entries.update(id, { [field]: newDate } as any);
+        break;
+      }
+      case 'event':
+      case 'note':
+      case 'habit-log':
+        await db.entries.update(id, { timestamp: newDate } as any);
+        break;
+    }
+  };
+
   // Formats time strings to elegant short format (e.g. 10:45 AM)
   const formatTime = (dateInput: Date | string): string => {
     const d = new Date(dateInput);
@@ -379,11 +397,11 @@ export default function Journal({
     });
 
     if (isToday) return time;
-    if (isYesterday) return `-1d ${time}`;
+    // if (isYesterday) return `-1d ${time}`;
 
     const dd = String(d.getDate()).padStart(2, '0');
     const mm = String(d.getMonth() + 1).padStart(2, '0');
-    return `${dd}/${mm} ${time}`;
+    return `${dd}/${mm}\n${time}`;
   };
 
   // Group entries of a single day with nested timeblocks logic
@@ -526,6 +544,7 @@ export default function Journal({
             handleRevertCarry={handleRevertCarry}
             formatTime={formatTime}
             formatDateStringLabel={formatDateStringLabel}
+            onTimePickerConfirm={handleTimePickerConfirm}
           />
         ) : (
           <TimelineView
@@ -545,6 +564,7 @@ export default function Journal({
             handleRevertCarry={handleRevertCarry}
             formatTime={formatTime}
             formatDateStringLabel={formatDateStringLabel}
+            onTimePickerConfirm={handleTimePickerConfirm}
           />
         )}
       </div>

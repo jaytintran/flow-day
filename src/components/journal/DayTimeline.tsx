@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { TimelineEntry, Task, Event, Note, TimeBlock, HabitLog } from '../../types';
 import { formatDuration } from '../../utils';
+import TimePickerSheet from '../TimePickerSheet';
 
 export type RenderItem =
   | {
@@ -49,6 +50,7 @@ interface DayTimelineProps {
   handleRevertCarry: (taskId: string) => void;
   formatTime: (dateInput: Date | string) => string;
   formatDateStringLabel: (dayStr: string) => string;
+  onTimePickerConfirm: (entry: TimelineEntry, newDate: Date) => void;
 }
 
 export default function DayTimeline({
@@ -68,6 +70,7 @@ export default function DayTimeline({
   handleRevertCarry,
   formatTime,
   formatDateStringLabel,
+  onTimePickerConfirm,
 }: DayTimelineProps) {
   const isCollapsed = collapsedDays.has(labelString);
   const HABITS_COLLAPSE_KEY = `habits_collapsed_${labelString}`;
@@ -79,6 +82,21 @@ export default function DayTimeline({
       return true;
     }
   });
+  // Local state for time picker
+  const [pickerEntry, setPickerEntry] = useState<TimelineEntry | null>(null);
+
+  const getPickerInitialDate = (entry: TimelineEntry): Date => {
+    if (entry.type === 'task') {
+      const task = entry as Task;
+      if (task.status === 'done' && task.completed_at) return new Date(task.completed_at);
+      return new Date(task.scheduled_at || task.created_at);
+    }
+    if (entry.type === 'event') return new Date((entry as Event).timestamp);
+    if (entry.type === 'note') return new Date((entry as Note).timestamp);
+    if (entry.type === 'habit-log') return new Date((entry as HabitLog).timestamp);
+    return new Date(entry.created_at);
+  };
+
   // Render individual generic row with customized icons
   const renderStandaloneRow = (
     entry: TimelineEntry,
@@ -94,6 +112,7 @@ export default function DayTimeline({
     // Extract primary time to display in the gutter
     let primaryTime = '';
     let isCompletedTask = false;
+    let isScheduledTime = false;
     if (isTask) {
       const task = entry as Task;
       if (task.status === 'done' && task.completed_at) {
@@ -101,6 +120,7 @@ export default function DayTimeline({
         isCompletedTask = true;
       } else {
         primaryTime = formatTime(task.scheduled_at || task.created_at);
+        isScheduledTime = !!task.scheduled_at;
       }
     } else if (isEvent) {
       primaryTime = formatTime((entry as Event).timestamp);
@@ -122,8 +142,16 @@ export default function DayTimeline({
         {/* Left Column 1: Time Gutter */}
         <div className="w-12 pt-1.5 text-right shrink-0 select-none">
           <span
-            className={`text-[10px] font-mono font-medium tracking-tight ${
-              isCompletedTask || isHabitLog ? 'text-emerald-600 font-semibold' : 'text-stone-500'
+            onClick={(e) => {
+              e.stopPropagation();
+              setPickerEntry(entry);
+            }}
+            className={`text-[10px] font-mono font-medium tracking-tight cursor-pointer hover:text-amber-400 transition-colors ${
+              isCompletedTask || isHabitLog
+                ? 'text-emerald-600 font-semibold'
+                : isScheduledTime
+                  ? 'text-sky-500'
+                  : 'text-stone-500'
             }`}
           >
             {primaryTime}
@@ -184,13 +212,15 @@ export default function DayTimeline({
                   id={`task-title-${entry.id}`}
                   className={`text-sm font-serif break-words line-clamp-2 ${
                     (entry as Task).status === 'done'
-                      ? 'text-amber-400/80 line-through font-light'
+                      ? (entry as Task).achievements?.length
+                        ? 'text-amber-400/80 line-through font-medium'
+                        : 'text-stone-600 line-through font-medium'
                       : 'text-stone-200 font-medium tracking-wide'
                   }`}
                 >
-                  {(entry as Task).status === 'done' && (
+                  {(entry as Task).status === 'done' && (entry as Task).achievements?.length ? (
                     <span className="mr-1.5 not-italic">🏆</span>
-                  )}
+                  ) : null}
                   {(entry as Task).title}
                 </p>
               )}
@@ -284,7 +314,7 @@ export default function DayTimeline({
           </div>
 
           {/* Row 2: Custom info triggers */}
-          <div className="flex items-center gap-x-3 text-xs pb-1">
+          <div className="flex items-center gap-x-1.5 text-xs pb-1">
             {isTask && (
               <>
                 <span className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 rounded px-2 py-0.5 text-[10px]">
@@ -425,9 +455,6 @@ export default function DayTimeline({
 
   return (
     <div className="w-full relative" key={labelString}>
-      {/* Continuous background wire spine */}
-      <div className="max-sm:hidden absolute left-[36px] top-4 bottom-4 w-[2px] bg-stone-800 pointer-events-none" />
-
       {isFromTimelineView && (
         <div
           id={`spine-day-${labelString}`}
@@ -542,6 +569,17 @@ export default function DayTimeline({
             </p>
           </div>
         ))}
+
+      {/* Time Picker Sheet */}
+      <TimePickerSheet
+        open={pickerEntry !== null}
+        onClose={() => setPickerEntry(null)}
+        initialDate={pickerEntry ? getPickerInitialDate(pickerEntry) : new Date()}
+        onConfirm={(newDate) => {
+          if (pickerEntry) onTimePickerConfirm(pickerEntry, newDate);
+          setPickerEntry(null);
+        }}
+      />
     </div>
   );
 }

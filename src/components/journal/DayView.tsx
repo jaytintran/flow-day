@@ -23,6 +23,7 @@ interface DayViewProps {
   handleRevertCarry: (taskId: string) => void;
   formatTime: (dateInput: Date | string) => string;
   formatDateStringLabel: (dayStr: string) => string;
+  onTimePickerConfirm: (entry: TimelineEntry, newDate: Date) => void;
 }
 
 export default function DayView({
@@ -41,6 +42,7 @@ export default function DayView({
   handleRevertCarry,
   formatTime,
   formatDateStringLabel,
+  onTimePickerConfirm,
 }: DayViewProps) {
   return (
     <DayTimeline
@@ -60,6 +62,7 @@ export default function DayView({
       handleRevertCarry={handleRevertCarry}
       formatTime={formatTime}
       formatDateStringLabel={formatDateStringLabel}
+      onTimePickerConfirm={onTimePickerConfirm}
     />
   );
 }

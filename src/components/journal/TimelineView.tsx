@@ -25,6 +25,7 @@ interface TimelineViewProps {
   handleRevertCarry: (taskId: string) => void;
   formatTime: (dateInput: Date | string) => string;
   formatDateStringLabel: (dayStr: string) => string;
+  onTimePickerConfirm: (entry: TimelineEntry, newDate: Date) => void;
 }
 
 export default function TimelineView({
@@ -44,6 +45,7 @@ export default function TimelineView({
   handleRevertCarry,
   formatTime,
   formatDateStringLabel,
+  onTimePickerConfirm,
 }: TimelineViewProps) {
   if (sortedTimelineDays.length > 0) {
     return (
@@ -70,6 +72,7 @@ export default function TimelineView({
               handleRevertCarry={handleRevertCarry}
               formatTime={formatTime}
               formatDateStringLabel={formatDateStringLabel}
+              onTimePickerConfirm={onTimePickerConfirm}
             />
           );
         })}

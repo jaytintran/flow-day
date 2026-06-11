@@ -386,19 +386,19 @@ export default function DayNavigator({
               const colorMap: Record<string, string> = {
                 emerald: isTicked
                   ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                  : 'border-stone-700 text-stone-500 hover:border-emerald-500/40 hover:text-emerald-400',
+                  : 'border-emerald-500/40 text-emerald-400',
                 sky: isTicked
                   ? 'bg-sky-500/15 border-sky-500/40 text-sky-300'
-                  : 'border-stone-700 text-stone-500 hover:border-sky-500/40 hover:text-sky-400',
+                  : 'border-sky-500/40 text-sky-400',
                 violet: isTicked
                   ? 'bg-violet-500/15 border-violet-500/40 text-violet-300'
-                  : 'border-stone-700 text-stone-500 hover:border-violet-500/40 hover:text-violet-400',
+                  : 'border-violet-500/40 text-violet-400',
                 rose: isTicked
                   ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
-                  : 'border-stone-700 text-stone-500 hover:border-rose-500/40 hover:text-rose-400',
+                  : 'border-rose-500/40 text-rose-400',
                 amber: isTicked
                   ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-                  : 'border-stone-700 text-stone-500 hover:border-amber-500/40 hover:text-amber-400',
+                  : 'border-amber-500/40 text-amber-400',
               };
               const cls = colorMap[habit.color ?? 'emerald'] ?? colorMap.emerald;
               return (
