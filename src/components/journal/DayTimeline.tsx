@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ChevronRight,
   ChevronDown,
@@ -453,6 +453,28 @@ export default function DayTimeline({
     );
   };
 
+  // Build summary counts for the day header
+  const summaryCounts = React.useMemo(() => {
+    const counts = { tasks: 0, events: 0, notes: 0, habits: 0, timeBlocks: 0 };
+    items.forEach((item) => {
+      if (item.type === 'bracket') {
+        counts.timeBlocks++;
+        item.children.forEach((child) => {
+          if (child.type === 'task') counts.tasks++;
+          else if (child.type === 'event') counts.events++;
+          else if (child.type === 'note') counts.notes++;
+          else if (child.type === 'habit-log') counts.habits++;
+        });
+      } else {
+        if (item.entry.type === 'task') counts.tasks++;
+        else if (item.entry.type === 'event') counts.events++;
+        else if (item.entry.type === 'note') counts.notes++;
+        else if (item.entry.type === 'habit-log') counts.habits++;
+      }
+    });
+    return counts;
+  }, [items]);
+
   return (
     <div className="w-full relative" key={labelString}>
       {isFromTimelineView && (
@@ -477,10 +499,27 @@ export default function DayTimeline({
             className="text-xs uppercase font-mono font-bold tracking-widest hover:text-amber-500 text-stone-500 transition-colors cursor-pointer py-4 flex-1 text-left"
           >
             {formatDateStringLabel(labelString)}
-            <span className="ml-2 text-[10px] font-normal normal-case text-stone-600">
-              ({items.length} {items.length === 1 ? 'entry' : 'entries'})
+            <span className="ml-2 text-[10px] font-normal normal-case text-stone-500 hidden sm:inline">
+              {(summaryCounts.tasks > 0 || summaryCounts.events > 0 || summaryCounts.notes > 0 || summaryCounts.habits > 0 || summaryCounts.timeBlocks > 0) ? (
+                <>
+                  {summaryCounts.tasks > 0 && <span className="text-amber-400/80">{summaryCounts.tasks} task{summaryCounts.tasks !== 1 ? 's' : ''}</span>}
+                  {summaryCounts.events > 0 && <>{summaryCounts.tasks > 0 && <span className="text-stone-700"> · </span>}<span className="text-indigo-400/80">{summaryCounts.events} event{summaryCounts.events !== 1 ? 's' : ''}</span></>}
+                  {summaryCounts.notes > 0 && <>{(summaryCounts.tasks > 0 || summaryCounts.events > 0) && <span className="text-stone-700"> · </span>}<span className="text-blue-400/80">{summaryCounts.notes} note{summaryCounts.notes !== 1 ? 's' : ''}</span></>}
+                  {summaryCounts.habits > 0 && <>{(summaryCounts.tasks > 0 || summaryCounts.events > 0 || summaryCounts.notes > 0) && <span className="text-stone-700"> · </span>}<span className="text-emerald-400/80">{summaryCounts.habits} habit{summaryCounts.habits !== 1 ? 's' : ''}</span></>}
+                  {summaryCounts.timeBlocks > 0 && <>{(summaryCounts.tasks > 0 || summaryCounts.events > 0 || summaryCounts.notes > 0 || summaryCounts.habits > 0) && <span className="text-stone-700"> · </span>}<span className="text-stone-400/80">{summaryCounts.timeBlocks} block{summaryCounts.timeBlocks !== 1 ? 's' : ''}</span></>}
+                </>
+              ) : (
+                `${items.length} ${items.length === 1 ? 'entry' : 'entries'}`
+              )}
             </span>
           </button>
+        </div>
+      )}
+
+      {/* Timeline spine line — only in timeline mode, when expanded */}
+      {isFromTimelineView && !isCollapsed && (
+        <div className="absolute top-0 left-0 w-10 bottom-0 pointer-events-none z-0">
+          <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-stone-800/60" />
         </div>
       )}
 

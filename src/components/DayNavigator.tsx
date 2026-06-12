@@ -262,10 +262,13 @@ export default function DayNavigator({
                 <button
                   id="jump-today-btn"
                   onClick={handleJumpToToday}
-                  className="text-stone-100 hover:text-amber-500 text-sm font-mono tracking-widest uppercase cursor-pointer transition-colors text-center font-bold"
+                  className="text-stone-100 hover:text-amber-500 text-sm font-mono tracking-widest uppercase cursor-pointer transition-colors text-center font-bold flex items-center gap-2"
                   title="Back to Today"
                 >
                   {formatDateLabel(activeDate)}
+                  {isSameDay(activeDate, new Date()) && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_6px_#f59e0b]" />
+                  )}
                 </button>
 
                 <button
@@ -286,55 +289,55 @@ export default function DayNavigator({
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 hover:border-emerald-500/60 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 cursor-pointer max-w-xs truncate shrink-0"
                   title={`Carry over ${previousIncompleteTasksCount} incomplete tasks from previous days to this date`}
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-400 fill-current shrink-0" />
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400 fill-current shrink-0 animate-pulse" />
                   <span>Carry Over ({previousIncompleteTasksCount})</span>
                 </button>
               )}
 
               {/* 2. Icon button group: Goals / Objectives / Habits / Calendar */}
-              <div className="flex items-center gap-1 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 shrink-0">
+              <div className="flex items-center gap-0.5 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 shrink-0">
                 {/* Goals / Projects */}
                 <button
                   id="toggle-goals-btn"
                   onClick={() => setIsGoalsOpen(true)}
-                  className={`p-1.5 rounded active:scale-95 transition-all flex items-center justify-center cursor-pointer ${'text-stone-500 hover:text-sky-400 hover:bg-sky-950/20'}`}
+                  className="p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer text-stone-500 hover:text-sky-400 hover:bg-sky-950/30"
                   title="Goals / Projects"
                 >
-                  <Flag className="w-4 h-4" />
+                  <Flag className="w-[18px] h-[18px]" />
                 </button>
 
                 {/* Objectives */}
                 <button
                   id="toggle-objectives-btn"
                   onClick={() => setIsObjectivesOpen(true)}
-                  className={`p-1.5 rounded active:scale-95 transition-all flex items-center justify-center cursor-pointer ${'text-stone-500 hover:text-rose-400 hover:bg-rose-950/20'}`}
+                  className="p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer text-stone-500 hover:text-rose-400 hover:bg-rose-950/30"
                   title="Objectives"
                 >
-                  <Target className="w-4 h-4" />
+                  <Target className="w-[18px] h-[18px]" />
                 </button>
 
                 {/* Habits */}
                 <button
                   id="toggle-habits-btn"
                   onClick={() => setIsHabitsOpen(true)}
-                  className="p-1.5 rounded active:scale-95 transition-all flex items-center justify-center cursor-pointer text-stone-500 hover:text-emerald-400 hover:bg-emerald-950/20"
+                  className="p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer text-stone-500 hover:text-emerald-400 hover:bg-emerald-950/30"
                   title="Habits"
                 >
-                  <Repeat2 className="w-4 h-4" />
+                  <Repeat2 className="w-[18px] h-[18px]" />
                 </button>
 
                 {/* Calendar */}
                 <button
                   id="toggle-calendar-btn"
                   onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                  className={`p-1.5 rounded active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
+                  className={`p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
                     isCalendarOpen
                       ? 'bg-amber-500/10 text-amber-500'
                       : 'text-stone-500 hover:text-stone-300 hover:bg-stone-800/50'
                   }`}
                   title="Choose specific date"
                 >
-                  <Calendar className="w-4 h-4" />
+                  <Calendar className="w-[18px] h-[18px]" />
                 </button>
               </div>
             </div>
@@ -348,7 +351,7 @@ export default function DayNavigator({
             <button
               id="view-mode-day"
               onClick={() => setViewMode('day')}
-              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer ${
+              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer ${
                 viewMode === 'day'
                   ? 'bg-amber-500 text-black'
                   : 'text-stone-500 hover:text-stone-300'
@@ -359,7 +362,7 @@ export default function DayNavigator({
             <button
               id="view-mode-timeline"
               onClick={() => setViewMode('timeline')}
-              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer ${
+              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer ${
                 viewMode === 'timeline'
                   ? 'bg-amber-500 text-black'
                   : 'text-stone-500 hover:text-stone-300'
@@ -370,7 +373,7 @@ export default function DayNavigator({
             <button
               id="view-mode-records"
               onClick={() => setViewMode('records')}
-              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer ${
+              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer ${
                 viewMode === 'records'
                   ? 'bg-amber-500 text-black'
                   : 'text-stone-500 hover:text-stone-300'
@@ -507,31 +510,31 @@ export default function DayNavigator({
                       <span className="text-xs mt-1">{day}</span>
 
                       {hasStats ? (
-                        <div className="w-full flex flex-row justify-center gap-0.5 mb-0.5 text-[8px] select-none">
+                        <div className="w-full flex flex-row justify-center gap-1 mb-0.5 text-[9px] select-none leading-none">
                           {(stats.completedTasks > 0 || stats.incompleteTasks > 0) && (
-                            <div className="flex items-center gap-0.5 justify-center leading-none">
+                            <div className="flex items-center gap-0.5 justify-center">
                               {stats.completedTasks > 0 && (
                                 <span
                                   className={
                                     isCurrentDay
                                       ? 'text-stone-900 font-extrabold'
-                                      : 'text-emerald-500 font-extrabold'
+                                      : 'text-emerald-500 font-bold'
                                   }
                                   title={`${stats.completedTasks} tasks complete`}
                                 >
-                                  ✅ {stats.completedTasks}
+                                  <span className="mr-0.5">●</span>{stats.completedTasks}
                                 </span>
                               )}
                               {stats.incompleteTasks > 0 && (
                                 <span
                                   className={
                                     isCurrentDay
-                                      ? 'text-stone-800 font-bold'
+                                      ? 'text-stone-700 font-bold'
                                       : 'text-stone-500 font-bold'
                                   }
                                   title={`${stats.incompleteTasks} tasks incomplete`}
                                 >
-                                  ⬜ {stats.incompleteTasks}
+                                  <span className="mr-0.5">○</span>{stats.incompleteTasks}
                                 </span>
                               )}
                             </div>
@@ -545,7 +548,7 @@ export default function DayNavigator({
                               }
                               title={`${stats.recordsCount} events/notes`}
                             >
-                              📝 {stats.recordsCount}
+                              <span className="mr-0.5">◆</span>{stats.recordsCount}
                             </span>
                           )}
                         </div>

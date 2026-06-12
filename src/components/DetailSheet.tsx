@@ -79,7 +79,7 @@ export default function DetailSheet({
               </div>
 
               {/* Sheet content area */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-4 min-h-[300px]">{children}</div>
+              <div className="flex-1 overflow-y-auto p-5 flex flex-col">{children}</div>
             </motion.div>
           </div>
         ) : (
@@ -113,7 +113,7 @@ export default function DetailSheet({
               </div>
 
               {/* Content area */}
-              <div className="p-5 overflow-y-auto flex-1 min-h-[250px] space-y-4">{children}</div>
+              <div className="p-5 overflow-y-auto flex-1 flex flex-col">{children}</div>
             </motion.div>
           </div>
         ))}

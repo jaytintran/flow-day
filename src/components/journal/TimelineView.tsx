@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import DayTimeline, { RenderItem } from './DayTimeline';
 import { TimelineEntry, Task } from '../../types';
-import { Calendar } from 'lucide-react';
+import { Calendar, ArrowDown } from 'lucide-react';
+import { toLocalDateString } from '../../utils';
 
 interface TimelineViewProps {
   sortedTimelineDays: string[];
@@ -47,9 +48,36 @@ export default function TimelineView({
   formatDateStringLabel,
   onTimePickerConfirm,
 }: TimelineViewProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [showJumpToday, setShowJumpToday] = useState(false);
+  const todayStr = toLocalDateString(new Date());
+
+  // Show jump-to-today button when today's block is not in the viewport
+  useEffect(() => {
+    if (!sortedTimelineDays.includes(todayStr)) {
+      setShowJumpToday(true);
+      return;
+    }
+
+    const handleScroll = () => {
+      const todayEl = document.getElementById(`spine-day-${todayStr}`);
+      if (!todayEl) {
+        setShowJumpToday(true);
+        return;
+      }
+      const rect = todayEl.getBoundingClientRect();
+      // Show button if today's header is above the viewport or scrolled out
+      setShowJumpToday(rect.bottom < 0 || rect.top > window.innerHeight);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // initial check
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [sortedTimelineDays, todayStr]);
+
   if (sortedTimelineDays.length > 0) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-0" ref={containerRef}>
         {sortedTimelineDays.map((dayStr) => {
           const dayEntries = timelineDaysMap[dayStr];
           const dayItems = getDayRenderItems(dayEntries);
@@ -76,6 +104,29 @@ export default function TimelineView({
             />
           );
         })}
+
+        {/* Jump-to-today floating button */}
+        {showJumpToday && (
+          <button
+            onClick={() => {
+              const todayEl = document.getElementById(`spine-day-${todayStr}`);
+              if (todayEl) {
+                todayEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              } else {
+                setActiveDate(new Date());
+                setTimeout(() => {
+                  const el = document.getElementById(`spine-day-${todayStr}`);
+                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+              }
+            }}
+            className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-2.5 bg-amber-500/15 border border-amber-500/40 hover:bg-amber-500/25 hover:border-amber-500/60 text-amber-400 hover:text-amber-300 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider transition-all duration-200 shadow-lg shadow-amber-500/5 cursor-pointer active:scale-95"
+            title="Jump to today"
+          >
+            <ArrowDown className="w-3.5 h-3.5" />
+            <span>Today</span>
+          </button>
+        )}
       </div>
     );
   }

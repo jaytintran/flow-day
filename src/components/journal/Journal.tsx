@@ -480,7 +480,7 @@ export default function Journal({
   });
 
   const sortedTimelineDays = Object.keys(timelineDaysMap).sort(
-    (a, b) => new Date(a).getTime() - new Date(b).getTime(),
+    (a, b) => new Date(b).getTime() - new Date(a).getTime(),
   );
 
   // Scrolling into selected day separator in Timeline mode
@@ -499,15 +499,43 @@ export default function Journal({
     }
   }, [viewMode, activeDate]);
 
-  // Parse YYYY-MM-DD back to readable label
+  // Parse YYYY-MM-DD back to readable label with relative markers
   const formatDateStringLabel = (dayStr: string): string => {
     const parts = dayStr.split('-');
     const parsedDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    const tomorrow = new Date();
+    tomorrow.setDate(today.getDate() + 1);
+    const yearText = parsedDate.getFullYear() !== today.getFullYear()
+      ? `, ${parsedDate.getFullYear()}`
+      : '';
+
+    if (
+      parsedDate.getFullYear() === today.getFullYear() &&
+      parsedDate.getMonth() === today.getMonth() &&
+      parsedDate.getDate() === today.getDate()
+    ) {
+      return `Today · ${parsedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}${yearText}`;
+    } else if (
+      parsedDate.getFullYear() === yesterday.getFullYear() &&
+      parsedDate.getMonth() === yesterday.getMonth() &&
+      parsedDate.getDate() === yesterday.getDate()
+    ) {
+      return `Yesterday · ${parsedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}${yearText}`;
+    } else if (
+      parsedDate.getFullYear() === tomorrow.getFullYear() &&
+      parsedDate.getMonth() === tomorrow.getMonth() &&
+      parsedDate.getDate() === tomorrow.getDate()
+    ) {
+      return `Tomorrow · ${parsedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}${yearText}`;
+    }
     return parsedDate.toLocaleDateString('en-US', {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
-      year: 'numeric',
+      year: parsedDate.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
     });
   };
 
@@ -746,7 +774,7 @@ export default function Journal({
 
             {/* ── NOTE ── */}
             {selectedEntry.type === 'note' && (
-              <div className="space-y-3">
+              <div className="flex flex-col flex-1 space-y-3">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <EditableChip
                     label="Logged"
@@ -768,7 +796,7 @@ export default function Journal({
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                   placeholder="Tap to start typing your thoughts..."
-                  className="w-full bg-transparent text-stone-300 font-serif text-sm focus:outline-none resize-none leading-relaxed placeholder-stone-700 min-h-[200px]"
+                  className="w-full bg-transparent text-stone-300 font-serif text-sm focus:outline-none resize-none leading-relaxed placeholder-stone-700 flex-1"
                 />
               </div>
             )}
