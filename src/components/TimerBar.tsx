@@ -25,7 +25,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Settings from './Settings';
-import SyncIndicator from './SyncIndicator';
 import ObjectivePickerSheet from './ObjectivePickerSheet';
 import GoalPickerSheet from './GoalPickerSheet';
 
@@ -474,10 +473,7 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <SyncIndicator />
-                  <Settings />
-                </div>
+                <Settings />
               </div>
             </motion.div>
           ) : (

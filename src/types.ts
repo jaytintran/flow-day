@@ -16,7 +16,6 @@ export interface BaseEntry {
   id: string;
   type: EntryType;
   created_at: Date;
-  updated_at: Date;
   scheduled_at?: Date;
 }
 
@@ -87,7 +86,6 @@ export interface Habit {
   id: string;
   title: string;
   created_at: Date;
-  updated_at: Date;
   status: 'active' | 'archived';
   color?: 'emerald' | 'sky' | 'violet' | 'rose' | 'amber';
   sort_order?: number; // display ordering
@@ -110,7 +108,6 @@ export interface Category {
   color: 'emerald' | 'sky' | 'violet' | 'rose' | 'amber' | 'indigo' | 'teal' | 'orange';
   scope: CategoryScope;
   created_at: Date;
-  updated_at: Date;
 }
 
 export interface TimerState {

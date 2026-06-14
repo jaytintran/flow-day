@@ -6,7 +6,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../db';
 import { EntryType, TimelineEntry } from '../types';
-import { notifyLocalChange } from '../syncEngine';
 import {
   CheckSquare,
   Calendar,
@@ -439,7 +438,6 @@ export default function InputBar({ activeDate }: InputBarProps) {
 
     if (newEntry) {
       await db.entries.add(newEntry);
-      notifyLocalChange();
 
       // Reset text inputs
       setTitle('');
@@ -1240,7 +1238,6 @@ export default function InputBar({ activeDate }: InputBarProps) {
                   };
 
                   await db.entries.add(newEntry);
-                  notifyLocalChange();
 
                   // Reset states
                   setIsNoteModalOpen(false);
