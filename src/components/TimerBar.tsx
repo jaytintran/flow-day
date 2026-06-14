@@ -22,9 +22,14 @@ import {
   RotateCcw,
   Square,
   CheckIcon,
+  UploadCloud,
+  DownloadCloud,
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Settings from './Settings';
+import { useGistSync } from '../hooks/useGistSync';
 import ObjectivePickerSheet from './ObjectivePickerSheet';
 import GoalPickerSheet from './GoalPickerSheet';
 
@@ -62,6 +67,7 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
   const [isRunning, setIsRunning] = useState(false);
 
   const [achievementInput, setAchievementInput] = useState('');
+  const [isInputFocused, setIsInputFocused] = useState(false);
 
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isGoalPickerOpen, setIsGoalPickerOpen] = useState(false);
@@ -73,6 +79,30 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Gist sync — quick-access push/pull buttons in the search bar
+  const {
+    isConfigured: isSyncConfigured,
+    pushToCloud,
+    pullFromCloud,
+    status: syncStatus,
+    statusMsg: syncStatusMsg,
+  } = useGistSync();
+  const [isPullConfirming, setIsPullConfirming] = useState(false);
+
+  const handleQuickPush = async () => {
+    await pushToCloud();
+  };
+
+  const handleQuickPull = async () => {
+    if (!isPullConfirming) {
+      setIsPullConfirming(true);
+      setTimeout(() => setIsPullConfirming(false), 3500);
+      return;
+    }
+    setIsPullConfirming(false);
+    await pullFromCloud();
+  };
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const sessionStartRef = useRef<number | null>(null);
@@ -473,11 +503,59 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
                   )}
                 </div>
 
+                {/* Quick-access sync buttons — only shown when Gist credentials are configured */}
+                {isSyncConfigured && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    {/* Push button */}
+                    <button
+                      id="quick-push-btn"
+                      type="button"
+                      onClick={handleQuickPush}
+                      disabled={syncStatus === 'loading'}
+                      title="Push to Cloud (backup local data)"
+                      className="px-2 bg-transparent text-stone-400 hover:text-amber-400 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all h-[46px] flex items-center justify-center cursor-pointer shrink-0 select-none"
+                    >
+                      {syncStatus === 'loading' ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : syncStatus === 'success' ? (
+                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                      ) : syncStatus === 'error' ? (
+                        <AlertTriangle className="w-4 h-4 text-red-400" />
+                      ) : (
+                        <UploadCloud className="w-4 h-4 shrink-0" />
+                      )}
+                    </button>
+
+                    {/* Pull button — with inline "Sure?" confirmation */}
+                    {isPullConfirming ? (
+                      <button
+                        id="quick-pull-confirm-btn"
+                        type="button"
+                        onClick={handleQuickPull}
+                        title="Confirm: overwrite local data from cloud"
+                        className="px-2.5 h-[46px] flex items-center text-[10px] font-mono font-bold text-amber-400 hover:text-amber-300 border border-amber-500/30 bg-amber-500/10 rounded-lg animate-pulse transition-all cursor-pointer shrink-0 select-none"
+                      >
+                        Sure?
+                      </button>
+                    ) : (
+                      <button
+                        id="quick-pull-btn"
+                        type="button"
+                        onClick={handleQuickPull}
+                        disabled={syncStatus === 'loading'}
+                        title="Pull from Cloud (restore to this device)"
+                        className="px-2 bg-transparent text-stone-400 hover:text-sky-400 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all h-[46px] flex items-center justify-center cursor-pointer shrink-0 select-none"
+                      >
+                        <DownloadCloud className="w-4 h-4 shrink-0" />
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <Settings />
               </div>
             </motion.div>
           ) : (
-            /* ACTIVE RUNNING TIMER STATE */
             <motion.div
               key="timer-mode"
               initial={{ opacity: 0, y: 10 }}
@@ -487,7 +565,6 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
               className="w-full"
             >
               {isMobile ? (
-                /* MOBILE ACTIVE TIMER VIEW - Redesigned Premium 3-Row Layout */
                 <div className="w-full space-y-1 p-1">
                   {/* Row 1: Title & Live Clock */}
                   <div className="flex justify-between items-start gap-4">
@@ -642,63 +719,153 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
                   </div>
                 </div>
               ) : (
-                /* DESKTOP ACTIVE TIMER VIEW */
-                <div className="w-full flex items-stretch gap-6">
-                  {/* Left: Task info */}
-                  <div className="flex-1 min-w-0 flex items-center gap-4">
-                    <span
-                      className={`w-3 h-3 rounded-full shrink-0 ${isRunning ? 'bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]' : 'bg-stone-700'}`}
-                    />
-                    <div className="min-w-0">
-                      <h3
-                        className="text-stone-100 text-base font-serif font-bold leading-snug select-all"
-                        id="active-task-title"
-                      >
-                        {activeTask?.title || 'Unknown Task'}
-                      </h3>
-                      <div className="flex items-center gap-1.5 mt-1 text-[11px] font-mono text-stone-500 flex-wrap">
-                        {linkedObjective ? (
-                          <>
+                <div className="w-full flex flex-col gap-4 py-1.5">
+                  {/* Top Row: Task Info & Core Tracking Controls */}
+                  <div className="flex items-center justify-between gap-8">
+                    {/* Left: Task Info & Badges */}
+                    <div className="flex items-start gap-4 min-w-0 flex-1">
+                      <span
+                        className={`mt-1.5 w-2.5 h-2.5 rounded-full shrink-0 ${isRunning ? 'bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]' : 'bg-stone-700'}`}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <h3
+                          className="text-stone-100 text-base font-serif font-bold tracking-wide leading-snug select-all break-words line-clamp-2"
+                          id="active-task-title"
+                        >
+                          {activeTask?.title || 'Unknown Task'}
+                        </h3>
+                        {/* Compact timer below title */}
+                        <div
+                          className="font-mono text-sm font-light text-stone-400 tabular-nums select-none mt-0.5 flex items-center gap-0.5"
+                          id="live-timer-clock"
+                        >
+                          {(() => {
+                            const s = formatDuration(localTimeSpent);
+                            const p = s.split(':');
+                            if (p.length === 3)
+                              return (
+                                <>
+                                  <span>{p[0]}</span>
+                                  <span className="text-stone-600 px-0.5">:</span>
+                                  <span>{p[1]}</span>
+                                  <span className="text-stone-600 px-0.5">:</span>
+                                  <span className="text-amber-500">{p[2]}</span>
+                                </>
+                              );
+                            return s;
+                          })()}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1.5 text-[11px] font-mono text-stone-500 flex-wrap">
+                          {linkedObjective ? (
+                            <>
+                              <button
+                                onClick={() => setIsPickerOpen(true)}
+                                className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-450 hover:bg-rose-500/20 transition-all cursor-pointer font-semibold"
+                              >
+                                <Target className="w-3 h-3 text-rose-400" />
+                                <span className="max-w-[160px] truncate">
+                                  {linkedObjective.title}
+                                </span>
+                              </button>
+                              {linkedGoal ? (
+                                <button
+                                  onClick={() => setIsGoalPickerOpen(true)}
+                                  className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 hover:bg-sky-500/20 transition-all cursor-pointer font-semibold"
+                                >
+                                  <Flag className="w-3 h-3 text-sky-450" />
+                                  <span className="max-w-[160px] truncate">{linkedGoal.title}</span>
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => setIsGoalPickerOpen(true)}
+                                  className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-stone-900 border border-stone-850 text-stone-500 hover:text-sky-400 hover:border-sky-800 transition-all cursor-pointer"
+                                >
+                                  <Flag className="w-3 h-3" /> Link Goal
+                                </button>
+                              )}
+                            </>
+                          ) : (
                             <button
                               onClick={() => setIsPickerOpen(true)}
-                              className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400/80 hover:bg-rose-500/20 transition-colors cursor-pointer"
+                              className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-stone-900 border border-stone-850 text-stone-500 hover:text-rose-400 hover:border-rose-800 transition-all cursor-pointer"
                             >
-                              <Target className="w-3 h-3" />
-                              <span className="max-w-[140px] truncate">
-                                {linkedObjective.title}
-                              </span>
+                              <Target className="w-3 h-3" /> Link Objective
                             </button>
-                            {linkedGoal ? (
-                              <button
-                                onClick={() => setIsGoalPickerOpen(true)}
-                                className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-500/10 border border-sky-500/20 text-sky-400/80 hover:bg-sky-500/20 transition-colors cursor-pointer"
-                              >
-                                <Flag className="w-3 h-3" />
-                                <span className="max-w-[140px] truncate">{linkedGoal.title}</span>
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => setIsGoalPickerOpen(true)}
-                                className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-stone-900 border border-stone-800 text-stone-500 hover:text-sky-400 hover:border-sky-700/50 transition-colors cursor-pointer"
-                              >
-                                <Flag className="w-3 h-3" /> Link Goal
-                              </button>
-                            )}
-                          </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Main Controls */}
+                    <div className="flex items-center gap-5 shrink-0">
+                      {/* Primary Controls */}
+                      <div className="flex items-center gap-1.5 bg-stone-900/50 p-1 rounded-xl border border-stone-850/40">
+                        {isRunning ? (
+                          <button
+                            onClick={handlePause}
+                            className="p-2.5 bg-stone-900 hover:bg-stone-850 border border-stone-800 rounded-lg text-stone-300 hover:border-stone-700 transition-all cursor-pointer flex items-center justify-center w-10 h-10 shadow-sm"
+                            title="Pause Timer"
+                          >
+                            <Pause className="w-4 h-4 fill-stone-300" />
+                          </button>
                         ) : (
                           <button
-                            onClick={() => setIsPickerOpen(true)}
-                            className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-stone-900 border border-stone-800 text-stone-500 hover:text-rose-400 hover:border-rose-700/50 transition-colors cursor-pointer"
+                            onClick={handlePlay}
+                            className="p-2.5 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 rounded-lg text-amber-500 transition-all cursor-pointer flex items-center justify-center w-10 h-10 shadow-sm"
+                            title="Resume Timer"
                           >
-                            <Target className="w-3 h-3" /> Link Objective
+                            <Play className="w-4 h-4 fill-amber-500" />
+                          </button>
+                        )}
+                        <button
+                          onClick={handleStop}
+                          className="p-2.5 bg-stone-900 hover:bg-stone-850 border border-stone-800 rounded-lg text-stone-400 hover:text-stone-200 transition-all cursor-pointer w-10 h-10 flex items-center justify-center shadow-sm"
+                          title="Stop Timer"
+                        >
+                          <Square className="w-3.5 h-3.5 fill-red-500 text-red-500" />
+                        </button>
+                        <button
+                          onClick={handleFinish}
+                          className="p-2.5 bg-amber-500 hover:bg-amber-450 hover:scale-[1.02] active:scale-[0.98] text-stone-950 rounded-lg transition-all cursor-pointer w-10 h-10 flex items-center justify-center shadow-md shadow-amber-500/10"
+                          title="Finish Task"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={handleResetTime}
+                          className="p-2.5 bg-stone-900 hover:bg-stone-850 border border-stone-850 rounded-lg text-stone-450 hover:text-stone-200 transition-all cursor-pointer w-10 h-10 flex items-center justify-center shadow-sm"
+                          title="Reset elapsed time"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </button>
+                        
+                        <div className="w-px h-6 bg-stone-850/60 mx-1" />
+
+                        {isDeletingActiveTask ? (
+                          <button
+                            onClick={handleDelete}
+                            className="px-2.5 text-[10px] bg-red-950/80 border border-red-800/80 rounded-lg text-red-400 font-mono font-bold hover:bg-red-900 cursor-pointer h-10 flex items-center justify-center animate-pulse"
+                          >
+                            Sure?
+                          </button>
+                        ) : (
+                          <button
+                            onClick={handleDelete}
+                            className="p-2.5 border border-transparent hover:border-red-950/30 hover:bg-red-950/10 text-stone-600 hover:text-red-400 rounded-lg transition-all cursor-pointer w-10 h-10 flex items-center justify-center"
+                            title="Delete active task"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Achievement quick-log */}
-                  <div className="flex items-center gap-2 w-56 shrink-0">
+                  {/* Horizontal Divider Line */}
+                  <div className="w-full h-px bg-gradient-to-r from-stone-850/20 via-stone-800/40 to-stone-850/20" />
+
+                  {/* Bottom Row: Achievement Input */}
+                  <div className="w-full flex items-center gap-2">
                     <input
                       type="text"
                       value={achievementInput}
@@ -706,93 +873,22 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleLogAchievement();
                       }}
-                      placeholder="Log achievement..."
-                      className="flex-1 bg-[#0a0a0a] border border-stone-800 rounded-lg px-3 py-2 text-xs text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/30 transition-colors font-mono h-10"
+                      onFocus={() => setIsInputFocused(true)}
+                      onBlur={() => setIsInputFocused(false)}
+                      placeholder="What have you achieved in this session? (Press Enter to log)"
+                      className="flex-1 bg-[#0a0a0a] border border-stone-850 rounded-xl px-4 py-2 text-xs text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/35 focus:bg-stone-950 focus:ring-2 focus:ring-amber-500/20 transition-all font-mono h-10"
                     />
                     <button
                       onClick={handleLogAchievement}
-                      className="p-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 rounded-lg transition-all cursor-pointer shrink-0 h-10 w-10 flex items-center justify-center"
+                      className={`px-4 bg-amber-500/10 border text-amber-500 hover:bg-amber-500/20 rounded-xl transition-all cursor-pointer font-mono text-[10px] font-bold uppercase tracking-wider h-10 flex items-center gap-1.5 ${
+                        isInputFocused
+                          ? 'border-amber-500/35 ring-2 ring-amber-500/20'
+                          : 'border-amber-500/20'
+                      }`}
                     >
                       <Plus className="w-3.5 h-3.5" />
+                      Log
                     </button>
-                  </div>
-
-                  {/* Right: clock + controls */}
-                  <div className="flex items-center gap-4 shrink-0">
-                    <div
-                      className="font-mono text-2xl font-light text-stone-100 tracking-tighter tabular-nums select-none"
-                      id="live-timer-clock"
-                    >
-                      {(() => {
-                        const s = formatDuration(localTimeSpent);
-                        const p = s.split(':');
-                        if (p.length === 3)
-                          return (
-                            <>
-                              <span>{p[0]}</span>
-                              <span className="text-stone-600 px-0.5">:</span>
-                              <span>{p[1]}</span>
-                              <span className="text-stone-600 px-0.5">:</span>
-                              <span className="text-amber-500 font-normal">{p[2]}</span>
-                            </>
-                          );
-                        return s;
-                      })()}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {isRunning ? (
-                        <button
-                          onClick={handlePause}
-                          className="p-2.5 bg-stone-900 border border-stone-800 rounded-xl text-stone-300 hover:border-stone-700 transition-colors cursor-pointer flex items-center justify-center w-10 h-10"
-                        >
-                          <Pause className="w-4 h-4 fill-stone-300" />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={handlePlay}
-                          className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-500 hover:bg-amber-500/20 transition-colors cursor-pointer flex items-center justify-center w-10 h-10"
-                        >
-                          <Play className="w-4 h-4 fill-amber-500" />
-                        </button>
-                      )}
-                      <button
-                        onClick={handleStop}
-                        className="px-4 py-2.5 bg-stone-900 border border-stone-800 rounded-xl text-stone-400 text-[10px] font-mono uppercase font-bold tracking-widest hover:text-stone-200 transition-colors cursor-pointer h-10"
-                      >
-                        Stop
-                      </button>
-                      <button
-                        onClick={handleFinish}
-                        className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-stone-950 text-[10px] font-mono font-bold uppercase tracking-widest rounded-xl transition-colors cursor-pointer h-10 flex items-center gap-1.5"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                        Finish
-                      </button>
-                      <button
-                        onClick={handleResetTime}
-                        className="p-2.5 border border-stone-800 rounded-xl text-stone-500 hover:text-stone-300 hover:border-stone-700 transition-colors cursor-pointer w-10 h-10 flex items-center justify-center"
-                        title="Reset timer"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                      </button>
-                      <div className="w-px h-6 bg-stone-800/60 shrink-0" />
-                      {isDeletingActiveTask ? (
-                        <button
-                          onClick={handleDelete}
-                          className="px-3 py-2 text-[10px] bg-red-950/80 border border-red-800/80 rounded-xl text-red-400 font-mono font-bold hover:bg-red-900 cursor-pointer h-10"
-                        >
-                          Sure?
-                        </button>
-                      ) : (
-                        <button
-                          onClick={handleDelete}
-                          className="p-2.5 border border-transparent hover:border-red-950/60 hover:bg-red-950/25 text-stone-600 hover:text-red-400 rounded-xl transition-colors cursor-pointer w-10 h-10 flex items-center justify-center"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
                   </div>
                 </div>
               )}

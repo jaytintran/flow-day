@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Settings as SettingsIcon,
   X,
@@ -16,252 +16,37 @@ import {
   CheckCircle,
   AlertTriangle,
   Info,
-  Check,
-  ClipboardList,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { db } from '../db';
-
-const STORAGE_KEYS = {
-  PAT: 'flow_day_github_pat',
-  GIST_ID: 'flow_day_gist_id',
-  LAST_SYNC: 'flow_day_last_sync',
-};
+import { useGistSync } from '../hooks/useGistSync';
 
 export default function Settings() {
   const [isOpen, setIsOpen] = useState(false);
-  const [pat, setPat] = useState('');
-  const [gistId, setGistId] = useState('');
   const [showPat, setShowPat] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [lastSync, setLastSync] = useState<string | null>(null);
-
-  // Status management
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [statusMsg, setStatusMsg] = useState('');
   const [confirmAction, setConfirmAction] = useState<'push' | 'pull' | null>(null);
 
-  // Load credentials on mount
-  useEffect(() => {
-    setPat(localStorage.getItem(STORAGE_KEYS.PAT) || '');
-    setGistId(localStorage.getItem(STORAGE_KEYS.GIST_ID) || '');
-    setLastSync(localStorage.getItem(STORAGE_KEYS.LAST_SYNC) || null);
-  }, [isOpen]);
+  const {
+    pat,
+    setPat,
+    gistId,
+    setGistId,
+    lastSync,
+    status,
+    statusMsg,
+    isConfigured,
+    reload,
+    pushToCloud,
+    pullFromCloud,
+    testConnection,
+    handleAutoCreateGist,
+    handleSaveCredentials,
+  } = useGistSync();
 
-  const handleSaveCredentials = () => {
-    localStorage.setItem(STORAGE_KEYS.PAT, pat.trim());
-    localStorage.setItem(STORAGE_KEYS.GIST_ID, gistId.trim());
-    showToast('Credentials saved!', 'success');
-  };
-
-  const showToast = (msg: string, type: 'success' | 'error' | 'loading' | 'idle' = 'success') => {
-    setStatus(type);
-    setStatusMsg(msg);
-    if (type !== 'loading') {
-      setTimeout(() => {
-        setStatus('idle');
-        setStatusMsg('');
-      }, 4000);
-    }
-  };
-
-  // Helper to fetch Gist or perform operations
-  const fetchGist = async (token: string, id: string) => {
-    const res = await fetch(`https://api.github.com/gists/${id}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-      },
-    });
-    if (!res.ok) {
-      throw new Error(`Failed to fetch Gist (${res.status})`);
-    }
-    return await res.json();
-  };
-
-  const testConnection = async () => {
-    if (!pat.trim() || !gistId.trim()) {
-      showToast('Please enter both PAT and Gist ID', 'error');
-      return;
-    }
-    showToast('Testing connection...', 'loading');
-    try {
-      await fetchGist(pat.trim(), gistId.trim());
-      showToast('Connection successful!', 'success');
-    } catch (err: any) {
-      showToast(err.message || 'Failed to connect to Gist', 'error');
-    }
-  };
-
-  const handleAutoCreateGist = async () => {
-    if (!pat.trim()) {
-      showToast('Personal Access Token (PAT) is required first', 'error');
-      return;
-    }
-    showToast('Creating Gist...', 'loading');
-
-    try {
-      // Export current data as initial content
-      const payload = await exportDatabase();
-      const body = {
-        description: 'FlowDay Sync Data (Private)',
-        public: false,
-        files: {
-          'flow-day-backup.json': {
-            content: JSON.stringify(payload, null, 2),
-          },
-        },
-      };
-
-      const res = await fetch('https://api.github.com/gists', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${pat.trim()}`,
-          Accept: 'application/vnd.github+json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Failed to create gist (${res.status})`);
-      }
-
-      const gist = await res.json();
-      setGistId(gist.id);
-      localStorage.setItem(STORAGE_KEYS.PAT, pat.trim());
-      localStorage.setItem(STORAGE_KEYS.GIST_ID, gist.id);
-      showToast('Private Gist created and saved!', 'success');
-    } catch (err: any) {
-      showToast(err.message || 'Failed to auto-create Gist', 'error');
-    }
-  };
-
-  const exportDatabase = async () => {
-    const entries = await db.entries.toArray();
-    const habits = await db.habits.toArray();
-    const categories = await db.categories.toArray();
-    return {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      entries,
-      habits,
-      categories,
-    };
-  };
-
-  const pushToCloud = async () => {
-    if (!pat.trim() || !gistId.trim()) {
-      showToast('PAT and Gist ID are required to sync', 'error');
-      return;
-    }
-    setConfirmAction(null);
-    showToast('Uploading to cloud...', 'loading');
-
-    try {
-      const payload = await exportDatabase();
-      const body = {
-        files: {
-          'flow-day-backup.json': {
-            content: JSON.stringify(payload, null, 2),
-          },
-        },
-      };
-
-      const res = await fetch(`https://api.github.com/gists/${gistId.trim()}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${pat.trim()}`,
-          Accept: 'application/vnd.github+json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Upload failed (${res.status})`);
-      }
-
-      const nowStr = new Date().toLocaleString();
-      setLastSync(nowStr);
-      localStorage.setItem(STORAGE_KEYS.LAST_SYNC, nowStr);
-      showToast('Successfully backed up to cloud!', 'success');
-    } catch (err: any) {
-      showToast(err.message || 'Sync upload failed', 'error');
-    }
-  };
-
-  const pullFromCloud = async () => {
-    if (!pat.trim() || !gistId.trim()) {
-      showToast('PAT and Gist ID are required to sync', 'error');
-      return;
-    }
-    setConfirmAction(null);
-    showToast('Downloading from cloud...', 'loading');
-
-    try {
-      const gist = await fetchGist(pat.trim(), gistId.trim());
-      const file = gist.files['flow-day-backup.json'];
-      if (!file) {
-        throw new Error('FlowDay backup file not found inside Gist');
-      }
-
-      const backupData = JSON.parse(file.content);
-      await importDatabase(backupData);
-
-      const nowStr = new Date().toLocaleString();
-      setLastSync(nowStr);
-      localStorage.setItem(STORAGE_KEYS.LAST_SYNC, nowStr);
-      showToast('Successfully restored from cloud!', 'success');
-    } catch (err: any) {
-      showToast(err.message || 'Sync restore failed', 'error');
-    }
-  };
-
-  const importDatabase = async (data: any) => {
-    if (
-      !data ||
-      !Array.isArray(data.entries) ||
-      !Array.isArray(data.habits) ||
-      !Array.isArray(data.categories)
-    ) {
-      throw new Error('Invalid Gist backup payload');
-    }
-
-    const parseEntryDates = (e: any) => {
-      if (e.created_at) e.created_at = new Date(e.created_at);
-      if (e.carried_to) e.carried_to = new Date(e.carried_to);
-      if (e.scheduled_at) e.scheduled_at = new Date(e.scheduled_at);
-      if (e.timestamp) e.timestamp = new Date(e.timestamp);
-      if (e.start_at) e.start_at = new Date(e.start_at);
-      if (e.end_at) e.end_at = new Date(e.end_at);
-      if (e.completed_at) e.completed_at = new Date(e.completed_at);
-      return e;
-    };
-
-    const parseHabitDates = (h: any) => {
-      if (h.created_at) h.created_at = new Date(h.created_at);
-      return h;
-    };
-
-    const parseCategoryDates = (c: any) => {
-      if (c.created_at) c.created_at = new Date(c.created_at);
-      return c;
-    };
-
-    const parsedEntries = data.entries.map(parseEntryDates);
-    const parsedHabits = data.habits.map(parseHabitDates);
-    const parsedCategories = data.categories.map(parseCategoryDates);
-
-    await db.transaction('rw', [db.entries, db.habits, db.categories], async () => {
-      await db.entries.clear();
-      await db.habits.clear();
-      await db.categories.clear();
-
-      if (parsedEntries.length > 0) await db.entries.bulkAdd(parsedEntries);
-      if (parsedHabits.length > 0) await db.habits.bulkAdd(parsedHabits);
-      if (parsedCategories.length > 0) await db.categories.bulkAdd(parsedCategories);
-    });
+  // Reload credentials whenever the modal opens
+  const handleOpen = () => {
+    reload();
+    setIsOpen(true);
   };
 
   return (
@@ -269,7 +54,7 @@ export default function Settings() {
       <button
         id="settings-btn"
         type="button"
-        onClick={() => setIsOpen(true)}
+        onClick={handleOpen}
         className="px-2 bg-transparent text-stone-400 hover:text-stone-200 active:scale-95 transition-all h-[46px] flex items-center justify-center cursor-pointer shrink-0 select-none"
         title="Open Settings"
       >
@@ -367,7 +152,7 @@ export default function Settings() {
                           current local database.
                         </li>
                         <li>
-                          On your other device (mobile/web), enter the same PAT & Gist ID, and click{' '}
+                          On your other device (mobile/web), enter the same PAT &amp; Gist ID, and click{' '}
                           <strong className="text-stone-300">Pull from Cloud</strong> to load your
                           data.
                         </li>
@@ -483,7 +268,7 @@ export default function Settings() {
                   )}
 
                   {/* Sync Push/Pull Panel */}
-                  {pat.trim() && gistId.trim() && (
+                  {isConfigured && (
                     <div className="border-t border-stone-850 pt-4 mt-2">
                       <div className="grid grid-cols-2 gap-3">
                         <button
