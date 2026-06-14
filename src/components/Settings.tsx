@@ -21,6 +21,15 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../db';
+import {
+  getSyncState,
+  subscribeSyncState,
+  syncNow,
+  isAutoSyncEnabled,
+  setAutoSync,
+  initSync,
+  SyncState,
+} from '../syncEngine';
 
 const STORAGE_KEYS = {
   PAT: 'flow_day_github_pat',
@@ -48,9 +57,25 @@ export default function Settings() {
     setLastSync(localStorage.getItem(STORAGE_KEYS.LAST_SYNC) || null);
   }, [isOpen]);
 
+  const [syncState, setSyncState] = useState<SyncState>(getSyncState());
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(isAutoSyncEnabled());
+
+  useEffect(() => {
+    if (isOpen) {
+      setAutoSyncEnabled(isAutoSyncEnabled());
+      return subscribeSyncState((state) => {
+        setSyncState(state);
+        setLastSync(localStorage.getItem('flow_day_last_sync') || null);
+      });
+    }
+  }, [isOpen]);
+
   const handleSaveCredentials = () => {
-    localStorage.setItem(STORAGE_KEYS.PAT, pat.trim());
-    localStorage.setItem(STORAGE_KEYS.GIST_ID, gistId.trim());
+    const trimmedPat = pat.trim();
+    const trimmedGistId = gistId.trim();
+    localStorage.setItem(STORAGE_KEYS.PAT, trimmedPat);
+    localStorage.setItem(STORAGE_KEYS.GIST_ID, trimmedGistId);
+    initSync(); // refresh engine status
     showToast('Credentials saved!', 'success');
   };
 
@@ -131,6 +156,7 @@ export default function Settings() {
       setGistId(gist.id);
       localStorage.setItem(STORAGE_KEYS.PAT, pat.trim());
       localStorage.setItem(STORAGE_KEYS.GIST_ID, gist.id);
+      initSync(); // refresh engine status
       showToast('Private Gist created and saved!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Failed to auto-create Gist', 'error');
@@ -150,72 +176,24 @@ export default function Settings() {
     };
   };
 
-  const pushToCloud = async () => {
-    if (!pat.trim() || !gistId.trim()) {
-      showToast('PAT and Gist ID are required to sync', 'error');
-      return;
-    }
+  const handleManualSync = async () => {
     setConfirmAction(null);
-    showToast('Uploading to cloud...', 'loading');
-
+    showToast('Syncing with cloud...', 'loading');
     try {
-      const payload = await exportDatabase();
-      const body = {
-        files: {
-          'flow-day-backup.json': {
-            content: JSON.stringify(payload, null, 2),
-          },
-        },
-      };
-
-      const res = await fetch(`https://api.github.com/gists/${gistId.trim()}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${pat.trim()}`,
-          Accept: 'application/vnd.github+json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Upload failed (${res.status})`);
+      await syncNow();
+      if (getSyncState().status === 'error') {
+        throw new Error(getSyncState().error || 'Sync failed');
       }
-
-      const nowStr = new Date().toLocaleString();
-      setLastSync(nowStr);
-      localStorage.setItem(STORAGE_KEYS.LAST_SYNC, nowStr);
-      showToast('Successfully backed up to cloud!', 'success');
+      showToast('Sync complete!', 'success');
     } catch (err: any) {
-      showToast(err.message || 'Sync upload failed', 'error');
+      showToast(err.message || 'Manual sync failed', 'error');
     }
   };
 
-  const pullFromCloud = async () => {
-    if (!pat.trim() || !gistId.trim()) {
-      showToast('PAT and Gist ID are required to sync', 'error');
-      return;
-    }
-    setConfirmAction(null);
-    showToast('Downloading from cloud...', 'loading');
-
-    try {
-      const gist = await fetchGist(pat.trim(), gistId.trim());
-      const file = gist.files['flow-day-backup.json'];
-      if (!file) {
-        throw new Error('FlowDay backup file not found inside Gist');
-      }
-
-      const backupData = JSON.parse(file.content);
-      await importDatabase(backupData);
-
-      const nowStr = new Date().toLocaleString();
-      setLastSync(nowStr);
-      localStorage.setItem(STORAGE_KEYS.LAST_SYNC, nowStr);
-      showToast('Successfully restored from cloud!', 'success');
-    } catch (err: any) {
-      showToast(err.message || 'Sync restore failed', 'error');
-    }
+  const handleToggleAutoSync = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const enabled = e.target.checked;
+    setAutoSyncEnabled(enabled);
+    setAutoSync(enabled);
   };
 
   const importDatabase = async (data: any) => {
@@ -482,35 +460,64 @@ export default function Settings() {
                     </motion.div>
                   )}
 
+                  {/* Auto-Sync Toggle Option */}
+                  {pat.trim() && gistId.trim() && (
+                    <div className="flex items-center justify-between border-t border-stone-850 pt-4 mt-2">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-mono font-bold text-stone-300">Automatic Sync</span>
+                        <span className="text-[10px] text-stone-500 font-mono">Sync changes automatically in the background</span>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={autoSyncEnabled}
+                          onChange={handleToggleAutoSync}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-stone-900 border border-stone-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-stone-500 peer-checked:after:bg-amber-500 after:border-stone-800 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-amber-500/10 peer-checked:border-amber-500/30"></div>
+                      </label>
+                    </div>
+                  )}
+
                   {/* Sync Push/Pull Panel */}
                   {pat.trim() && gistId.trim() && (
                     <div className="border-t border-stone-850 pt-4 mt-2">
                       <div className="grid grid-cols-2 gap-3">
                         <button
                           type="button"
+                          disabled={syncState.status === 'synced' || syncState.status === 'syncing'}
                           onClick={() => setConfirmAction('push')}
-                          className="flex flex-col items-center justify-center p-3.5 bg-stone-900 border border-stone-800/80 hover:border-amber-500/25 hover:bg-stone-900/60 rounded-xl transition-all cursor-pointer group active:scale-[0.98]"
+                          className={`flex flex-col items-center justify-center p-3.5 bg-stone-900 border border-stone-800/80 rounded-xl transition-all select-none ${
+                            syncState.status === 'synced' || syncState.status === 'syncing'
+                              ? 'opacity-40 cursor-not-allowed'
+                              : 'hover:border-amber-500/25 hover:bg-stone-900/60 cursor-pointer group active:scale-[0.98]'
+                          }`}
                         >
-                          <UploadCloud className="w-5 h-5 text-stone-500 group-hover:text-amber-500 transition-colors mb-1.5" />
+                          <UploadCloud className={`w-5 h-5 text-stone-500 transition-colors mb-1.5 ${syncState.status !== 'synced' && syncState.status !== 'syncing' ? 'group-hover:text-amber-500' : ''}`} />
                           <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-stone-300">
                             Push to Cloud
                           </span>
-                          <span className="text-[8px] font-mono text-stone-600 group-hover:text-stone-500 transition-colors mt-0.5">
-                            Backup local data
+                          <span className="text-[8px] font-mono text-stone-600 mt-0.5">
+                            {syncState.status === 'synced' ? 'Up to date' : 'Backup local data'}
                           </span>
                         </button>
 
                         <button
                           type="button"
+                          disabled={syncState.status === 'synced' || syncState.status === 'syncing'}
                           onClick={() => setConfirmAction('pull')}
-                          className="flex flex-col items-center justify-center p-3.5 bg-stone-900 border border-stone-800/80 hover:border-amber-500/25 hover:bg-stone-900/60 rounded-xl transition-all cursor-pointer group active:scale-[0.98]"
+                          className={`flex flex-col items-center justify-center p-3.5 bg-stone-900 border border-stone-800/80 rounded-xl transition-all select-none ${
+                            syncState.status === 'synced' || syncState.status === 'syncing'
+                              ? 'opacity-40 cursor-not-allowed'
+                              : 'hover:border-amber-500/25 hover:bg-stone-900/60 cursor-pointer group active:scale-[0.98]'
+                          }`}
                         >
-                          <DownloadCloud className="w-5 h-5 text-stone-500 group-hover:text-amber-500 transition-colors mb-1.5" />
+                          <DownloadCloud className={`w-5 h-5 text-stone-500 transition-colors mb-1.5 ${syncState.status !== 'synced' && syncState.status !== 'syncing' ? 'group-hover:text-amber-500' : ''}`} />
                           <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-stone-300">
                             Pull from Cloud
                           </span>
-                          <span className="text-[8px] font-mono text-stone-600 group-hover:text-stone-500 transition-colors mt-0.5">
-                            Restore to this device
+                          <span className="text-[8px] font-mono text-stone-600 mt-0.5">
+                            {syncState.status === 'synced' ? 'Up to date' : 'Restore to this device'}
                           </span>
                         </button>
                       </div>
@@ -532,13 +539,13 @@ export default function Settings() {
                         </div>
                         <p className="text-stone-400 leading-relaxed">
                           {confirmAction === 'push'
-                            ? 'This will OVERWRITE the cloud backup with your current local data. Your other devices will pull this version next time.'
-                            : 'This will OVERWRITE all local data on this device with the version stored in the cloud. Your unsaved local edits will be lost.'}
+                            ? 'This will trigger a full merge/update of the cloud database using your local data. Changes since your last sync will be sent.'
+                            : 'This will pull all changes from the cloud Gist database and merge them with this device.'}
                         </p>
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={confirmAction === 'push' ? pushToCloud : pullFromCloud}
+                            onClick={handleManualSync}
                             className="px-3.5 py-1.5 bg-amber-500 text-stone-950 rounded-lg text-[9px] font-mono font-bold uppercase tracking-wider hover:bg-amber-400 active:scale-95 cursor-pointer"
                           >
                             Yes, proceed
