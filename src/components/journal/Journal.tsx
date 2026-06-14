@@ -12,11 +12,12 @@ import DetailSheet from '../DetailSheet';
 import DayView from './DayView';
 import TimelineView from './TimelineView';
 import RecordsView from './RecordsView';
+import TasksView from './TasksView';
 
 interface JournalProps {
   activeDate: Date;
   setActiveDate: (date: Date) => void;
-  viewMode: 'day' | 'timeline' | 'records';
+  viewMode: 'day' | 'timeline' | 'records' | 'tasks';
   activeTaskId: string | null;
   setActiveTaskId: (id: string | null) => void;
 }
@@ -61,26 +62,77 @@ function formatDurationEditable(ms: number): string {
 
 interface EditableChipProps {
   label: string;
-  value: string; // display string shown on chip
+  value: Date; // the raw Date for datetime mode
+  displayValue: string; // human-readable string shown on chip
   mode: 'datetime' | 'duration';
+  durationValue?: number; // ms for duration mode
   chipClass?: string;
-  onSave: (raw: string) => Promise<void>;
+  onSave: (d: Date) => Promise<void>; // datetime mode
+  onSaveDuration?: (raw: string) => Promise<void>; // duration mode
 }
 
-function EditableChip({ label, value, mode, chipClass = '', onSave }: EditableChipProps) {
+// Human-readable date display: relative for today/yesterday, short format otherwise
+function formatChipDate(d: Date): string {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86400000);
+  const targetDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+  if (targetDay.getTime() === today.getTime()) return `Today ${time}`;
+  if (targetDay.getTime() === yesterday.getTime()) return `Yesterday ${time}`;
+
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm} ${time}`;
+}
+
+function EditableChip({
+  label,
+  value,
+  displayValue,
+  mode,
+  durationValue,
+  chipClass = '',
+  onSave,
+  onSaveDuration,
+}: EditableChipProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [draft, setDraft] = useState('');
+  const [draftDate, setDraftDate] = useState('');
+  const [draftTime, setDraftTime] = useState('');
+  const [draftDuration, setDraftDuration] = useState('');
   const [invalid, setInvalid] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const dateRef = useRef<HTMLInputElement>(null);
+  const timeRef = useRef<HTMLInputElement>(null);
+  const durationRef = useRef<HTMLInputElement>(null);
+
+  const toDateInput = (d: Date) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const toTimeInput = (d: Date) => {
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    return `${hh}:${mi}`;
+  };
 
   const open = () => {
-    setDraft(value);
-    setInvalid(false);
-    setIsEditing(true);
-    setTimeout(() => {
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }, 0);
+    if (mode === 'datetime') {
+      setDraftDate(toDateInput(value));
+      setDraftTime(toTimeInput(value));
+      setInvalid(false);
+      setIsEditing(true);
+      setTimeout(() => dateRef.current?.focus(), 0);
+    } else {
+      setDraftDuration(formatDurationEditable(durationValue ?? 0));
+      setInvalid(false);
+      setIsEditing(true);
+      setTimeout(() => durationRef.current?.focus(), 0);
+    }
   };
 
   const cancel = () => {
@@ -88,17 +140,28 @@ function EditableChip({ label, value, mode, chipClass = '', onSave }: EditableCh
     setInvalid(false);
   };
 
-  const validate = (raw: string): boolean => {
-    if (mode === 'duration') return parseDuration(raw) !== null;
-    return !!raw;
-  };
-
-  const commit = async () => {
-    if (!validate(draft)) {
+  const commitDatetime = async () => {
+    if (!draftDate || !draftTime) {
       setInvalid(true);
       return;
     }
-    await onSave(draft);
+    const d = new Date(`${draftDate}T${draftTime}:00`);
+    if (isNaN(d.getTime())) {
+      setInvalid(true);
+      return;
+    }
+    await onSave(d);
+    setIsEditing(false);
+    setInvalid(false);
+  };
+
+  const commitDuration = async () => {
+    if (!onSaveDuration) return;
+    if (parseDuration(draftDuration) === null) {
+      setInvalid(true);
+      return;
+    }
+    await onSaveDuration(draftDuration);
     setIsEditing(false);
     setInvalid(false);
   };
@@ -107,40 +170,99 @@ function EditableChip({ label, value, mode, chipClass = '', onSave }: EditableCh
     return (
       <button
         onClick={open}
-        className={`flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-mono border transition-colors hover:border-amber-500/40 hover:text-amber-400 cursor-pointer ${chipClass}`}
+        className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-mono border transition-colors hover:border-amber-500/40 hover:text-amber-400 cursor-pointer ${chipClass}`}
       >
-        {label}: {value}
+        <span className="text-stone-500 font-medium">{label}</span>
+        <span>{displayValue}</span>
       </button>
     );
   }
 
+  // ── DATE + TIME SPLIT EDIT (datetime mode) ──
+  if (mode === 'datetime') {
+    return (
+      <div className="flex items-center gap-1.5">
+        <input
+          ref={dateRef}
+          type="date"
+          value={draftDate}
+          onChange={(e) => setDraftDate(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') cancel();
+          }}
+          onBlur={() => {
+            // Commit only if the other field isn't focused
+            setTimeout(() => {
+              if (document.activeElement !== timeRef.current) commitDatetime();
+            }, 100);
+          }}
+          className={`bg-[#0a0a0a] border rounded px-2 py-1 text-xs font-mono focus:outline-none transition-colors ${
+            invalid
+              ? 'border-red-500/70 text-red-400 focus:border-red-500'
+              : 'border-amber-500/40 text-amber-300 focus:border-amber-500'
+          }`}
+        />
+        <input
+          ref={timeRef}
+          type="time"
+          value={draftTime}
+          onChange={(e) => setDraftTime(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commitDatetime();
+            if (e.key === 'Escape') cancel();
+          }}
+          onBlur={() => {
+            setTimeout(() => {
+              if (document.activeElement !== dateRef.current) commitDatetime();
+            }, 100);
+          }}
+          className={`bg-[#0a0a0a] border rounded px-2 py-1 text-xs font-mono focus:outline-none transition-colors ${
+            invalid
+              ? 'border-red-500/70 text-red-400 focus:border-red-500'
+              : 'border-amber-500/40 text-amber-300 focus:border-amber-500'
+          }`}
+        />
+        <button
+          onMouseDown={(e) => {
+            e.preventDefault();
+            cancel();
+          }}
+          className="text-xs font-mono text-stone-500 hover:text-stone-300 px-1 cursor-pointer"
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  // ── DURATION EDIT ──
   return (
     <div className="flex items-center gap-1">
       <input
-        ref={inputRef}
-        type={mode === 'datetime' ? 'datetime-local' : 'text'}
-        value={draft}
+        ref={durationRef}
+        type="text"
+        value={draftDuration}
         onChange={(e) => {
-          setDraft(e.target.value);
-          setInvalid(mode === 'duration' ? parseDuration(e.target.value) === null : false);
+          setDraftDuration(e.target.value);
+          setInvalid(parseDuration(e.target.value) === null);
         }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') commit();
+          if (e.key === 'Enter') commitDuration();
           if (e.key === 'Escape') cancel();
         }}
-        onBlur={commit}
-        className={`bg-[#0a0a0a] border rounded px-2 py-0.5 text-[10px] font-mono focus:outline-none transition-colors ${
+        onBlur={commitDuration}
+        className={`bg-[#0a0a0a] border rounded px-2 py-1 text-xs font-mono focus:outline-none transition-colors w-24 ${
           invalid
             ? 'border-red-500/70 text-red-400 focus:border-red-500'
             : 'border-amber-500/40 text-amber-300 focus:border-amber-500'
-        } ${mode === 'datetime' ? 'w-44' : 'w-28'}`}
+        }`}
       />
       <button
         onMouseDown={(e) => {
           e.preventDefault();
           cancel();
         }}
-        className="text-[10px] font-mono text-stone-500 hover:text-stone-300 px-1 cursor-pointer"
+        className="text-xs font-mono text-stone-500 hover:text-stone-300 px-1 cursor-pointer"
       >
         ✕
       </button>
@@ -309,10 +431,61 @@ export default function Journal({
     return getEffectiveDate(e).getTime();
   };
 
+  // Strike sounds
+  function playStrikeSound() {
+    const ctx = new AudioContext();
+    const duration = 0.35;
+    const sampleRate = ctx.sampleRate;
+    const buffer = ctx.createBuffer(1, sampleRate * duration, sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < data.length; i++) {
+      const t = i / data.length;
+      // Slow attack, long sustain, tail fade
+      const envelope = Math.pow(t, 0.15) * Math.pow(1 - t, 1.5);
+      // Layered noise: fast + slow modulation = pencil texture
+      const noise = Math.random() * 2 - 1;
+      const scrape = Math.sin(t * 800) * 0.15; // subtle periodic scrape texture
+      data[i] = (noise + scrape) * envelope;
+    }
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+
+    // Bandpass centered on pencil scratch frequencies
+    const filter1 = ctx.createBiquadFilter();
+    filter1.type = 'bandpass';
+    filter1.frequency.value = 4000;
+    filter1.Q.value = 0.6;
+
+    // Second filter for that papery hiss on top
+    const filter2 = ctx.createBiquadFilter();
+    filter2.type = 'highpass';
+    filter2.frequency.value = 2500;
+
+    // Frequency sweep: starts lower, rises as pencil drags across
+    filter1.frequency.setValueAtTime(2000, ctx.currentTime);
+    filter1.frequency.linearRampToValueAtTime(5500, ctx.currentTime + 0.35);
+
+    const gain = ctx.createGain();
+    gain.gain.value = 0.5;
+
+    source.connect(filter1);
+    filter1.connect(filter2);
+    filter2.connect(gain);
+    gain.connect(ctx.destination);
+
+    source.start();
+    source.onended = () => ctx.close();
+  }
+
   // Toggles status of Task
   const handleToggleTaskStatus = async (task: Task) => {
     const isDone = task.status === 'done';
     const nextStatus = isDone ? 'todo' : 'done';
+
+    if (nextStatus === 'done') playStrikeSound();
+
     await db.entries.update(task.id, {
       status: nextStatus,
       completed_at: nextStatus === 'done' ? new Date() : undefined,
@@ -342,18 +515,62 @@ export default function Journal({
     setActiveTaskId(taskId);
   };
 
-  // Carry a task to a new date (soft move via carried_to)
+  // Carry a task to a new date (by updating scheduled_at)
   const handleCarryTask = async (taskId: string, targetDate: Date) => {
     await db.entries.update(taskId, {
-      carried_to: targetDate,
+      scheduled_at: targetDate,
+      carried_to: undefined,
     } as any);
   };
 
-  // Revert a carried task back to its original date
-  const handleRevertCarry = async (taskId: string) => {
-    await db.entries.update(taskId, {
-      carried_to: undefined,
-    } as any);
+  // Find overdue tasks (todo status, and effective date is prior to activeDate)
+  const activeDayStr = toLocalDateString(activeDate);
+  const overdueTasks = React.useMemo(() => {
+    return entries.filter((e) => {
+      if (e.type !== 'task' || e.status !== 'todo') return false;
+      const taskDayStr = toLocalDateString(getEffectiveDate(e));
+      return taskDayStr < activeDayStr;
+    }) as Task[];
+  }, [entries, activeDayStr]);
+
+  const handleImportAllOverdue = async () => {
+    if (overdueTasks.length === 0) return;
+    await db.transaction('rw', db.entries, async () => {
+      for (const t of overdueTasks) {
+        const oldD = getEffectiveDate(t);
+        const newD = new Date(activeDate);
+        newD.setHours(
+          oldD.getHours(),
+          oldD.getMinutes(),
+          oldD.getSeconds(),
+          oldD.getMilliseconds(),
+        );
+        await db.entries.update(t.id, {
+          scheduled_at: newD,
+          carried_to: undefined,
+        });
+      }
+    });
+  };
+
+  const handleRescheduleAllOverdue = async (targetDate: Date) => {
+    if (overdueTasks.length === 0) return;
+    await db.transaction('rw', db.entries, async () => {
+      for (const t of overdueTasks) {
+        const oldD = getEffectiveDate(t);
+        const newD = new Date(targetDate);
+        newD.setHours(
+          oldD.getHours(),
+          oldD.getMinutes(),
+          oldD.getSeconds(),
+          oldD.getMilliseconds(),
+        );
+        await db.entries.update(t.id, {
+          scheduled_at: newD,
+          carried_to: undefined,
+        });
+      }
+    });
   };
 
   // Time picker: persist updated time to DB
@@ -508,9 +725,8 @@ export default function Journal({
     yesterday.setDate(today.getDate() - 1);
     const tomorrow = new Date();
     tomorrow.setDate(today.getDate() + 1);
-    const yearText = parsedDate.getFullYear() !== today.getFullYear()
-      ? `, ${parsedDate.getFullYear()}`
-      : '';
+    const yearText =
+      parsedDate.getFullYear() !== today.getFullYear() ? `, ${parsedDate.getFullYear()}` : '';
 
     if (
       parsedDate.getFullYear() === today.getFullYear() &&
@@ -541,7 +757,7 @@ export default function Journal({
 
   return (
     <div
-      className="flex-1 overflow-y-auto px-2 md:px-6 py-4 md:py-6"
+      className={`flex-1 overflow-y-auto px-2 md:px-6 pb-4 md:pb-6 ${viewMode === 'records' ? 'pt-0' : 'pt-4 md:pt-6'}`}
       id="timeline-journal-scrollable"
       ref={containerRef}
     >
@@ -552,6 +768,20 @@ export default function Journal({
             deletingId={deletingId}
             onDeleteEntry={handleDeleteEntry}
             onOpenDetail={handleOpenDetail}
+            formatTime={formatTime}
+            formatDateStringLabel={formatDateStringLabel}
+          />
+        ) : viewMode === 'tasks' ? (
+          <TasksView
+            entries={entries}
+            deletingId={deletingId}
+            activeTaskId={activeTaskId}
+            setActiveDate={setActiveDate}
+            onDeleteEntry={handleDeleteEntry}
+            onOpenDetail={handleOpenDetail}
+            onToggleTaskStatus={handleToggleTaskStatus}
+            onActivateTask={handleActivateTask}
+            onCarryTask={handleCarryTask}
             formatTime={formatTime}
             formatDateStringLabel={formatDateStringLabel}
           />
@@ -569,10 +799,12 @@ export default function Journal({
             handleToggleTaskStatus={handleToggleTaskStatus}
             handleActivateTask={handleActivateTask}
             handleCarryTask={handleCarryTask}
-            handleRevertCarry={handleRevertCarry}
             formatTime={formatTime}
             formatDateStringLabel={formatDateStringLabel}
             onTimePickerConfirm={handleTimePickerConfirm}
+            overdueTasks={overdueTasks}
+            handleImportAllOverdue={handleImportAllOverdue}
+            handleRescheduleAllOverdue={handleRescheduleAllOverdue}
           />
         ) : (
           <TimelineView
@@ -589,7 +821,6 @@ export default function Journal({
             handleToggleTaskStatus={handleToggleTaskStatus}
             handleActivateTask={handleActivateTask}
             handleCarryTask={handleCarryTask}
-            handleRevertCarry={handleRevertCarry}
             formatTime={formatTime}
             formatDateStringLabel={formatDateStringLabel}
             onTimePickerConfirm={handleTimePickerConfirm}
@@ -628,8 +859,7 @@ export default function Journal({
         {selectedEntry && (
           <>
             {/* Title field */}
-            <input
-              type="text"
+            <textarea
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
               placeholder={
@@ -641,134 +871,131 @@ export default function Journal({
                       ? 'Time Block Title'
                       : 'Note Title'
               }
-              className="w-full bg-transparent text-stone-100 font-serif font-bold text-xl focus:outline-none placeholder-stone-700 pb-2 border-b border-stone-900/60"
+              className="w-full bg-transparent text-stone-100 font-serif font-bold text-xl focus:outline-none placeholder-stone-700 pb-2 border-b border-stone-900/60 resize-none overflow-hidden"
+              onInput={(e) => {
+                const el = e.currentTarget;
+                el.style.height = 'auto';
+                el.style.height = el.scrollHeight + 'px';
+              }}
             />
 
             {/* ── TASK ── */}
             {selectedEntry.type === 'task' && (
-              <div className="space-y-2">
+              <div className="flex flex-col flex-1 space-y-3">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <EditableChip
                     label="Created"
-                    value={(() => {
-                      const d = new Date((selectedEntry as Task).created_at);
-                      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-                    })()}
+                    value={new Date((selectedEntry as Task).created_at)}
+                    displayValue={formatChipDate(new Date((selectedEntry as Task).created_at))}
                     mode="datetime"
                     chipClass="bg-[#121212] border-stone-800 text-stone-400"
-                    onSave={async (raw) => {
+                    onSave={async (d) => {
                       await db.entries.update(selectedEntry.id, {
-                        created_at: new Date(raw),
+                        created_at: d,
                       } as any);
-                      setSelectedEntry({ ...selectedEntry, created_at: new Date(raw) } as Task);
+                      setSelectedEntry({ ...selectedEntry, created_at: d } as Task);
                     }}
                   />
 
                   <EditableChip
                     label="Spent"
-                    value={formatDurationEditable((selectedEntry as Task).time_spent)}
+                    value={new Date()} // unused for duration
+                    displayValue={formatDurationEditable((selectedEntry as Task).time_spent)}
                     mode="duration"
+                    durationValue={(selectedEntry as Task).time_spent}
                     chipClass="bg-[#121212] border-stone-800 text-stone-400"
-                    onSave={async (raw) => {
+                    onSaveDuration={async (raw) => {
                       const ms = parseDuration(raw)!;
                       await db.entries.update(selectedEntry.id, { time_spent: ms } as any);
                       setSelectedEntry({ ...selectedEntry, time_spent: ms } as Task);
                     }}
+                    onSave={async () => {}}
                   />
 
                   {(selectedEntry as Task).scheduled_at && (
                     <EditableChip
                       label="Scheduled"
-                      value={(() => {
-                        const d = new Date((selectedEntry as Task).scheduled_at!);
-                        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-                      })()}
+                      value={new Date((selectedEntry as Task).scheduled_at!)}
+                      displayValue={formatChipDate(new Date((selectedEntry as Task).scheduled_at!))}
                       mode="datetime"
                       chipClass="bg-[#121212] border-indigo-800/40 text-indigo-400"
-                      onSave={async (raw) => {
+                      onSave={async (d) => {
                         await db.entries.update(selectedEntry.id, {
-                          scheduled_at: new Date(raw),
+                          scheduled_at: d,
                         } as any);
-                        setSelectedEntry({ ...selectedEntry, scheduled_at: new Date(raw) } as Task);
+                        setSelectedEntry({ ...selectedEntry, scheduled_at: d } as Task);
                       }}
                     />
                   )}
-
-                  <span className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 rounded px-2 py-0.5 text-[10px] font-mono">
-                    {(selectedEntry as Task).status === 'done' ? '✓ Done' : '○ To Do'}
-                  </span>
                 </div>
 
                 {(selectedEntry as Task).completed_at && (
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <EditableChip
                       label="Completed"
-                      value={(() => {
-                        const d = new Date((selectedEntry as Task).completed_at!);
-                        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-                      })()}
+                      value={new Date((selectedEntry as Task).completed_at!)}
+                      displayValue={formatChipDate(new Date((selectedEntry as Task).completed_at!))}
                       mode="datetime"
                       chipClass="bg-[#121212] border-emerald-800/40 text-emerald-500"
-                      onSave={async (raw) => {
+                      onSave={async (d) => {
                         await db.entries.update(selectedEntry.id, {
-                          completed_at: new Date(raw),
+                          completed_at: d,
                         } as any);
-                        setSelectedEntry({ ...selectedEntry, completed_at: new Date(raw) } as Task);
+                        setSelectedEntry({ ...selectedEntry, completed_at: d } as Task);
                       }}
                     />
                   </div>
                 )}
 
+                {/* Achievements */}
+                {(selectedEntry as Task).achievements &&
+                  (selectedEntry as Task).achievements!.length > 0 && (
+                    <div className="space-y-1.5">
+                      {((selectedEntry as Task).achievements ?? []).map((a) => (
+                        <div
+                          key={a.id}
+                          className="flex items-start gap-2 text-xs font-mono text-stone-300 bg-stone-900/60 border border-stone-800 rounded-lg px-3 py-2"
+                        >
+                          <span className="text-amber-500 mt-0.5 shrink-0">🏆</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="break-words">{a.text}</p>
+                            <p className="text-[9px] text-stone-600 mt-0.5">
+                              {formatTime(new Date(a.created_at))}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Add achievement..."
+                    className="flex-1 bg-[#0a0a0a] border border-stone-800 rounded-lg px-3 py-2 text-xs text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/30 transition-colors font-mono"
+                    onKeyDown={async (e) => {
+                      if (e.key !== 'Enter' || !e.currentTarget.value.trim()) return;
+                      const text = e.currentTarget.value.trim();
+                      const task = selectedEntry as Task;
+                      const entry: TaskAchievement = {
+                        id: crypto.randomUUID(),
+                        text,
+                        created_at: new Date(),
+                      };
+                      const updated = [...(task.achievements ?? []), entry];
+                      await db.entries.update(task.id, { achievements: updated } as any);
+                      setSelectedEntry({ ...task, achievements: updated });
+                      e.currentTarget.value = '';
+                    }}
+                  />
+                </div>
+
                 <textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                   placeholder="Add context, links, notes about this task..."
-                  className="w-full bg-transparent text-stone-300 font-serif text-sm focus:outline-none resize-none leading-relaxed placeholder-stone-700 min-h-[80px] border-t border-stone-900 pt-3"
+                  className="w-full bg-transparent text-stone-300 font-serif text-sm focus:outline-none resize-none leading-relaxed placeholder-stone-700 flex-1 border-t border-stone-900 pt-3"
                 />
-
-                {/* Achievements */}
-                <div className="space-y-2 pt-2 border-t border-stone-900">
-                  <span className="text-[10px] font-mono text-stone-500 uppercase tracking-wider">
-                    Achievements ({(selectedEntry as Task).achievements?.length ?? 0})
-                  </span>
-                  <div className="space-y-1.5">
-                    {((selectedEntry as Task).achievements ?? []).map((a) => (
-                      <div
-                        key={a.id}
-                        className="flex items-start gap-2 text-xs font-mono text-stone-300 bg-stone-900/60 border border-stone-800 rounded-lg px-3 py-2"
-                      >
-                        <span className="text-amber-500 mt-0.5 shrink-0">🏆</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="break-words">{a.text}</p>
-                          <p className="text-[9px] text-stone-600 mt-0.5">
-                            {formatTime(new Date(a.created_at))}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-2 pt-1">
-                    <input
-                      type="text"
-                      placeholder="Add achievement..."
-                      className="flex-1 bg-[#0a0a0a] border border-stone-800 rounded-lg px-3 py-2 text-xs text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/30 transition-colors font-mono"
-                      onKeyDown={async (e) => {
-                        if (e.key !== 'Enter' || !e.currentTarget.value.trim()) return;
-                        const text = e.currentTarget.value.trim();
-                        const task = selectedEntry as Task;
-                        const entry: TaskAchievement = {
-                          id: crypto.randomUUID(),
-                          text,
-                          created_at: new Date(),
-                        };
-                        const updated = [...(task.achievements ?? []), entry];
-                        await db.entries.update(task.id, { achievements: updated } as any);
-                        setSelectedEntry({ ...task, achievements: updated });
-                        e.currentTarget.value = '';
-                      }}
-                    />
-                  </div>
-                </div>
               </div>
             )}
 
@@ -778,17 +1005,16 @@ export default function Journal({
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <EditableChip
                     label="Logged"
-                    value={(() => {
-                      const d = new Date((selectedEntry as Note).timestamp);
-                      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-                    })()}
+                    value={new Date((selectedEntry as Note).timestamp)}
+                    displayValue={formatChipDate(new Date((selectedEntry as Note).timestamp))}
                     mode="datetime"
                     chipClass="bg-[#121212] border-stone-800 text-stone-400"
-                    onSave={async (raw) => {
-                      const d = new Date(raw);
+                    onSave={async (d) => {
                       await db.entries.update(selectedEntry.id, { timestamp: d } as any);
                       setSelectedEntry({ ...selectedEntry, timestamp: d } as Note);
-                      setEditTimestamp(raw);
+                      setEditTimestamp(
+                        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+                      );
                     }}
                   />
                 </div>
@@ -803,21 +1029,20 @@ export default function Journal({
 
             {/* ── EVENT ── */}
             {selectedEntry.type === 'event' && (
-              <div className="space-y-3">
+              <div className="flex flex-col flex-1 space-y-3">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <EditableChip
                     label="At"
-                    value={(() => {
-                      const d = new Date((selectedEntry as Event).timestamp);
-                      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-                    })()}
+                    value={new Date((selectedEntry as Event).timestamp)}
+                    displayValue={formatChipDate(new Date((selectedEntry as Event).timestamp))}
                     mode="datetime"
                     chipClass="bg-[#121212] border-indigo-800/40 text-indigo-400"
-                    onSave={async (raw) => {
-                      const d = new Date(raw);
+                    onSave={async (d) => {
                       await db.entries.update(selectedEntry.id, { timestamp: d } as any);
                       setSelectedEntry({ ...selectedEntry, timestamp: d } as Event);
-                      setEditTimestamp(raw);
+                      setEditTimestamp(
+                        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+                      );
                     }}
                   />
                 </div>
@@ -825,7 +1050,7 @@ export default function Journal({
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                   placeholder="Event description, notes, or details..."
-                  className="w-full bg-transparent text-stone-300 font-serif text-sm focus:outline-none resize-none leading-relaxed placeholder-stone-700 min-h-[200px]"
+                  className="w-full bg-transparent text-stone-300 font-serif text-sm focus:outline-none resize-none leading-relaxed placeholder-stone-700 flex-1"
                 />
               </div>
             )}
@@ -835,32 +1060,30 @@ export default function Journal({
               <div className="flex items-center gap-1.5 flex-wrap">
                 <EditableChip
                   label="Start"
-                  value={(() => {
-                    const d = new Date((selectedEntry as TimeBlock).start_at);
-                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-                  })()}
+                  value={new Date((selectedEntry as TimeBlock).start_at)}
+                  displayValue={formatChipDate(new Date((selectedEntry as TimeBlock).start_at))}
                   mode="datetime"
                   chipClass="bg-[#121212] border-amber-800/40 text-amber-400"
-                  onSave={async (raw) => {
-                    const d = new Date(raw);
+                  onSave={async (d) => {
                     await db.entries.update(selectedEntry.id, { start_at: d } as any);
                     setSelectedEntry({ ...selectedEntry, start_at: d } as TimeBlock);
-                    setEditStartAt(raw);
+                    setEditStartAt(
+                      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+                    );
                   }}
                 />
                 <EditableChip
                   label="End"
-                  value={(() => {
-                    const d = new Date((selectedEntry as TimeBlock).end_at);
-                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-                  })()}
+                  value={new Date((selectedEntry as TimeBlock).end_at)}
+                  displayValue={formatChipDate(new Date((selectedEntry as TimeBlock).end_at))}
                   mode="datetime"
                   chipClass="bg-[#121212] border-amber-800/40 text-amber-400"
-                  onSave={async (raw) => {
-                    const d = new Date(raw);
+                  onSave={async (d) => {
                     await db.entries.update(selectedEntry.id, { end_at: d } as any);
                     setSelectedEntry({ ...selectedEntry, end_at: d } as TimeBlock);
-                    setEditEndAt(raw);
+                    setEditEndAt(
+                      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+                    );
                   }}
                 />
               </div>

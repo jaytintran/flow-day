@@ -719,7 +719,7 @@ export default function InputBar({ activeDate }: InputBarProps) {
         </AnimatePresence>
 
         {/* Unified Premium Entry Panel Container */}
-        <div className="bg-[#141414] border border-stone-800/80 rounded-2xl shadow-2xl p-4 md:p-5 relative overflow-visible transition-all duration-300 focus-within:border-stone-700/80">
+        <div className="bg-[#141414] border border-stone-800/80 rounded-b-2xl shadow-2xl p-4 md:p-5 relative overflow-visible transition-all duration-300 focus-within:border-stone-700/80">
           {/* Subtle Ambient Accent Border depending on activeType */}
           <div
             className={`absolute top-0 left-0 right-0 h-[2px] transition-all duration-300 ${

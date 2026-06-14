@@ -23,7 +23,6 @@ interface TimelineViewProps {
   handleToggleTaskStatus: (task: Task) => void;
   handleActivateTask: (taskId: string) => void;
   handleCarryTask: (taskId: string, targetDate: Date) => void;
-  handleRevertCarry: (taskId: string) => void;
   formatTime: (dateInput: Date | string) => string;
   formatDateStringLabel: (dayStr: string) => string;
   onTimePickerConfirm: (entry: TimelineEntry, newDate: Date) => void;
@@ -43,7 +42,6 @@ export default function TimelineView({
   handleToggleTaskStatus,
   handleActivateTask,
   handleCarryTask,
-  handleRevertCarry,
   formatTime,
   formatDateStringLabel,
   onTimePickerConfirm,
@@ -97,7 +95,6 @@ export default function TimelineView({
               handleToggleTaskStatus={handleToggleTaskStatus}
               handleActivateTask={handleActivateTask}
               handleCarryTask={handleCarryTask}
-              handleRevertCarry={handleRevertCarry}
               formatTime={formatTime}
               formatDateStringLabel={formatDateStringLabel}
               onTimePickerConfirm={onTimePickerConfirm}

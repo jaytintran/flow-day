@@ -16,7 +16,6 @@ export interface BaseEntry {
   id: string;
   type: EntryType;
   created_at: Date;
-  carried_to?: Date; // when set, this entry is displayed under this date instead of created_at
   scheduled_at?: Date;
 }
 
@@ -35,6 +34,7 @@ export interface Task extends BaseEntry {
   objective_id?: string; // link to an objective
   achievements?: TaskAchievement[];
   content?: string;
+  sort_order?: number; // display ordering (used by TasksView DnD)
 }
 
 export interface Event extends BaseEntry {

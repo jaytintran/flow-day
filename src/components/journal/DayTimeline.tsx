@@ -19,6 +19,7 @@ import {
   CalendarArrowUp,
   Undo2,
   Repeat2,
+  Hourglass,
 } from 'lucide-react';
 import { TimelineEntry, Task, Event, Note, TimeBlock, HabitLog } from '../../types';
 import { formatDuration } from '../../utils';
@@ -47,7 +48,6 @@ interface DayTimelineProps {
   handleToggleTaskStatus: (task: Task) => void;
   handleActivateTask: (taskId: string) => void;
   handleCarryTask: (taskId: string, targetDate: Date) => void;
-  handleRevertCarry: (taskId: string) => void;
   formatTime: (dateInput: Date | string) => string;
   formatDateStringLabel: (dayStr: string) => string;
   onTimePickerConfirm: (entry: TimelineEntry, newDate: Date) => void;
@@ -67,7 +67,6 @@ export default function DayTimeline({
   handleToggleTaskStatus,
   handleActivateTask,
   handleCarryTask,
-  handleRevertCarry,
   formatTime,
   formatDateStringLabel,
   onTimePickerConfirm,
@@ -135,12 +134,12 @@ export default function DayTimeline({
         key={entry.id}
         id={`entry-${entry.id}`}
         onClick={() => !isHabitLog && handleOpenDetail(entry)}
-        className={`group relative flex items-start gap-2.5 py-2 rounded px-2 md:px-3 transition-colors border-b border-stone-900/50 last:border-b-0 ${
+        className={`group relative flex items-center gap-2.5 py-2 rounded md:px-3 transition-colors border-stone-900/50 last:border-b-0 ${
           isHabitLog ? '' : 'hover:bg-stone-900/40 cursor-pointer'
         }`}
       >
         {/* Left Column 1: Time Gutter */}
-        <div className="w-12 pt-1.5 text-right shrink-0 select-none">
+        <div className="w-10 text-right shrink-0 select-none">
           <span
             onClick={(e) => {
               e.stopPropagation();
@@ -159,7 +158,7 @@ export default function DayTimeline({
         </div>
 
         {/* Left Column 2: Icon Dot */}
-        <div className="w-8 h-8 flex items-center justify-center relative shrink-0 z-10">
+        <div className="w-5 h-5 flex items-center justify-center relative shrink-0 z-10">
           {isTask && (
             <button
               id={`task-status-btn-${entry.id}`}
@@ -210,12 +209,12 @@ export default function DayTimeline({
               {isTask && (
                 <p
                   id={`task-title-${entry.id}`}
-                  className={`text-sm font-serif break-words line-clamp-2 ${
+                  className={`text-xs font-sans break-words line-clamp-1 ${
                     (entry as Task).status === 'done'
                       ? (entry as Task).achievements?.length
-                        ? 'text-amber-400/80 line-through font-medium'
-                        : 'text-stone-600 line-through font-medium'
-                      : 'text-stone-200 font-medium tracking-wide'
+                        ? 'text-amber-400/80 line-through font-semibold'
+                        : 'text-stone-600 line-through font-semibold'
+                      : 'text-stone-200 font-semibold'
                   }`}
                 >
                   {(entry as Task).status === 'done' && (entry as Task).achievements?.length ? (
@@ -228,7 +227,7 @@ export default function DayTimeline({
               {isEvent && (
                 <p
                   id={`event-title-${entry.id}`}
-                  className="text-sm font-sans font-semibold tracking-wide text-stone-200 break-words line-clamp-2"
+                  className="text-xs font-sans font-semibold text-stone-200 break-words line-clamp-1"
                 >
                   {(entry as Event).title}
                 </p>
@@ -238,7 +237,7 @@ export default function DayTimeline({
                 <div className="flex items-center gap-2.5">
                   <span
                     id={`note-title-${entry.id}`}
-                    className="text-sm font-sans font-medium text-stone-100 tracking-wide break-words line-clamp-2"
+                    className="text-xs font-sans font-semibold text-stone-200 break-words line-clamp-1"
                   >
                     {(entry as Note).title || 'Untitled Note'}
                   </span>
@@ -248,7 +247,7 @@ export default function DayTimeline({
               {isHabitLog && (
                 <p
                   id={`habitlog-title-${entry.id}`}
-                  className="text-sm font-serif text-emerald-300/90 font-medium tracking-wide"
+                  className="text-xs font-sans text-emerald-300/90 font-semibold"
                 >
                   {(entry as HabitLog).title}
                 </p>
@@ -268,20 +267,6 @@ export default function DayTimeline({
                   title="Activate as Working Task"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
-                </button>
-              )}
-
-              {isTask && entry.carried_to && (
-                <button
-                  id={`revert-carry-btn-${entry.id}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRevertCarry(entry.id);
-                  }}
-                  className="p-1.5 bg-transparent rounded border border-stone-800 hover:bg-stone-800 text-stone-500 hover:text-stone-300 transition-colors cursor-pointer"
-                  title="Revert to original date"
-                >
-                  <Undo2 className="w-3.5 h-3.5" />
                 </button>
               )}
 
@@ -317,29 +302,22 @@ export default function DayTimeline({
           <div className="flex items-center gap-x-1.5 text-xs pb-1">
             {isTask && (
               <>
-                <span className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 rounded px-2 py-0.5 text-[10px]">
+                <span className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 rounded px-2 py-0.5 text-[8px]">
                   <Clock className="w-3 h-3 inline-block text-stone-500" />
-                  Created: {formatTime(entry.created_at)}
-                </span>
-
-                <span className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 rounded px-2 py-0.5 text-[10px]">
-                  <Clock className="w-3 h-3 inline-block" />
-                  Spent: {formatDuration((entry as Task).time_spent)}
+                  {formatTime(entry.created_at)}
                 </span>
 
                 {(entry as Task).completed_at && (
-                  <span className="flex items-center gap-1 bg-[emerald-900] text-emerald-600 border border-emerald-600 rounded px-2 py-0.5 text-[10px]">
+                  <span className="flex items-center gap-1 bg-[emerald-900] text-emerald-600/90 border border-emerald-600/30 rounded px-2 py-0.5 text-[8px]">
                     <CheckCircle className="w-3 h-3 inline-block" />
-                    At: {formatTime((entry as Task).completed_at!)}
+                    {formatTime((entry as Task).completed_at!)}
                   </span>
                 )}
 
-                {entry.carried_to && (
-                  <span className="flex items-center gap-1 bg-amber-950/40 text-amber-500 border border-amber-700/40 rounded px-2 py-0.5 text-[10px]">
-                    <CalendarArrowUp className="w-3 h-3 inline-block" />
-                    Carried from {formatTime(entry.created_at)}
-                  </span>
-                )}
+                <span className="flex items-center gap-1 bg-[#121212] border border-blue-800/30 text-blue-400/90 rounded px-2 py-0.5 text-[8px]">
+                  <Hourglass className="w-3 h-3 inline-block" />
+                  {formatDuration((entry as Task).time_spent)}
+                </span>
               </>
             )}
 
@@ -478,10 +456,7 @@ export default function DayTimeline({
   return (
     <div className="w-full relative" key={labelString}>
       {isFromTimelineView && (
-        <div
-          id={`spine-day-${labelString}`}
-          className="flex items-center gap-0 bg-[#0a0a0a] border-b border-stone-900/60"
-        >
+        <div id={`spine-day-${labelString}`} className="flex items-center gap-0 bg-[#0a0a0a]">
           <button
             onClick={() => toggleDayCollapse(labelString)}
             className="w-10 flex items-center justify-center shrink-0 py-4 text-stone-600 hover:text-amber-500 transition-colors cursor-pointer"
@@ -500,13 +475,56 @@ export default function DayTimeline({
           >
             {formatDateStringLabel(labelString)}
             <span className="ml-2 text-[10px] font-normal normal-case text-stone-500 hidden sm:inline">
-              {(summaryCounts.tasks > 0 || summaryCounts.events > 0 || summaryCounts.notes > 0 || summaryCounts.habits > 0 || summaryCounts.timeBlocks > 0) ? (
+              {summaryCounts.tasks > 0 ||
+              summaryCounts.events > 0 ||
+              summaryCounts.notes > 0 ||
+              summaryCounts.habits > 0 ||
+              summaryCounts.timeBlocks > 0 ? (
                 <>
-                  {summaryCounts.tasks > 0 && <span className="text-amber-400/80">{summaryCounts.tasks} task{summaryCounts.tasks !== 1 ? 's' : ''}</span>}
-                  {summaryCounts.events > 0 && <>{summaryCounts.tasks > 0 && <span className="text-stone-700"> · </span>}<span className="text-indigo-400/80">{summaryCounts.events} event{summaryCounts.events !== 1 ? 's' : ''}</span></>}
-                  {summaryCounts.notes > 0 && <>{(summaryCounts.tasks > 0 || summaryCounts.events > 0) && <span className="text-stone-700"> · </span>}<span className="text-blue-400/80">{summaryCounts.notes} note{summaryCounts.notes !== 1 ? 's' : ''}</span></>}
-                  {summaryCounts.habits > 0 && <>{(summaryCounts.tasks > 0 || summaryCounts.events > 0 || summaryCounts.notes > 0) && <span className="text-stone-700"> · </span>}<span className="text-emerald-400/80">{summaryCounts.habits} habit{summaryCounts.habits !== 1 ? 's' : ''}</span></>}
-                  {summaryCounts.timeBlocks > 0 && <>{(summaryCounts.tasks > 0 || summaryCounts.events > 0 || summaryCounts.notes > 0 || summaryCounts.habits > 0) && <span className="text-stone-700"> · </span>}<span className="text-stone-400/80">{summaryCounts.timeBlocks} block{summaryCounts.timeBlocks !== 1 ? 's' : ''}</span></>}
+                  {summaryCounts.tasks > 0 && (
+                    <span className="text-amber-400/80">
+                      {summaryCounts.tasks} task{summaryCounts.tasks !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                  {summaryCounts.events > 0 && (
+                    <>
+                      {summaryCounts.tasks > 0 && <span className="text-stone-700"> · </span>}
+                      <span className="text-indigo-400/80">
+                        {summaryCounts.events} event{summaryCounts.events !== 1 ? 's' : ''}
+                      </span>
+                    </>
+                  )}
+                  {summaryCounts.notes > 0 && (
+                    <>
+                      {(summaryCounts.tasks > 0 || summaryCounts.events > 0) && (
+                        <span className="text-stone-700"> · </span>
+                      )}
+                      <span className="text-blue-400/80">
+                        {summaryCounts.notes} note{summaryCounts.notes !== 1 ? 's' : ''}
+                      </span>
+                    </>
+                  )}
+                  {summaryCounts.habits > 0 && (
+                    <>
+                      {(summaryCounts.tasks > 0 ||
+                        summaryCounts.events > 0 ||
+                        summaryCounts.notes > 0) && <span className="text-stone-700"> · </span>}
+                      <span className="text-emerald-400/80">
+                        {summaryCounts.habits} habit{summaryCounts.habits !== 1 ? 's' : ''}
+                      </span>
+                    </>
+                  )}
+                  {summaryCounts.timeBlocks > 0 && (
+                    <>
+                      {(summaryCounts.tasks > 0 ||
+                        summaryCounts.events > 0 ||
+                        summaryCounts.notes > 0 ||
+                        summaryCounts.habits > 0) && <span className="text-stone-700"> · </span>}
+                      <span className="text-stone-400/80">
+                        {summaryCounts.timeBlocks} block{summaryCounts.timeBlocks !== 1 ? 's' : ''}
+                      </span>
+                    </>
+                  )}
                 </>
               ) : (
                 `${items.length} ${items.length === 1 ? 'entry' : 'entries'}`
@@ -546,8 +564,8 @@ export default function DayTimeline({
               if (habitItems.length === 0) return null;
 
               return (
-                <div className="border-t border-stone-900/60 mt-1">
-                  <div className="flex items-center gap-3 px-3 py-2">
+                <>
+                  <div className="flex items-start gap-3 px-3 py-2">
                     <div className="flex-1 h-px bg-stone-900" />
                     <button
                       onClick={() =>
@@ -559,7 +577,7 @@ export default function DayTimeline({
                           return next;
                         })
                       }
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/40 border border-emerald-800/30 text-[10px] font-mono text-emerald-600 hover:text-emerald-400 hover:border-emerald-700/50 transition-colors cursor-pointer shrink-0"
+                      className="flex items-start gap-1.5 px-2.5 py-1 border-b border-emerald-800/30 text-[10px] text-emerald-600 hover:text-emerald-400 hover:border-emerald-700/50 transition-colors cursor-pointer shrink-0"
                     >
                       <Repeat2 className="w-3 h-3" />
                       <span>
@@ -592,7 +610,7 @@ export default function DayTimeline({
                       )}
                     </div>
                   )}
-                </div>
+                </>
               );
             })()}
           </div>

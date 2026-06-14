@@ -11,7 +11,7 @@ import InputBar from './components/InputBar';
 
 export default function App() {
   const [activeDate, setActiveDate] = useState<Date>(new Date());
-  const [viewMode, setViewMode] = useState<'day' | 'timeline' | 'records'>('day');
+  const [viewMode, setViewMode] = useState<'day' | 'timeline' | 'records' | 'tasks'>('day');
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
   return (

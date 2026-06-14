@@ -13,12 +13,13 @@ import {
   Flag,
   Repeat2,
   Check,
+  ListTodo,
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../db';
 import { Task, Habit, HabitLog } from '../types';
-import { formatDateLabel, isSameDay, toLocalDateString } from '../utils';
+import { formatDateLabel, isSameDay, toLocalDateString, getEffectiveDate } from '../utils';
 import ObjectivesSheet from './ObjectivesSheet';
 import GoalsSheet from './GoalsSheet';
 import HabitsSheet from './HabitsSheet';
@@ -26,8 +27,8 @@ import HabitsSheet from './HabitsSheet';
 interface DayNavigatorProps {
   activeDate: Date;
   setActiveDate: (date: Date) => void;
-  viewMode: 'day' | 'timeline' | 'records';
-  setViewMode: (mode: 'day' | 'timeline' | 'records') => void;
+  viewMode: 'day' | 'timeline' | 'records' | 'tasks';
+  setViewMode: (mode: 'day' | 'timeline' | 'records' | 'tasks') => void;
 }
 
 export default function DayNavigator({
@@ -125,39 +126,6 @@ export default function DayNavigator({
 
   const activeDayStr = toLocalDateString(activeDate);
 
-  // Previous incomplete tasks count
-  const previousIncompleteTasksCount = React.useMemo(() => {
-    return entries.filter((e) => {
-      if (e.type !== 'task' || e.status !== 'todo') return false;
-      const taskDayStr = toLocalDateString(new Date(e.created_at));
-      return taskDayStr < activeDayStr;
-    }).length;
-  }, [entries, activeDayStr]);
-
-  const handleTransferTasks = async () => {
-    const previousTasks = entries.filter((e) => {
-      if (e.type !== 'task' || e.status !== 'todo') return false;
-      const taskDayStr = toLocalDateString(new Date(e.created_at));
-      return taskDayStr < activeDayStr;
-    }) as Task[];
-
-    if (previousTasks.length === 0) return;
-
-    await db.transaction('rw', db.entries, async () => {
-      for (const t of previousTasks) {
-        const oldD = new Date(t.created_at);
-        const newD = new Date(activeDate);
-        newD.setHours(
-          oldD.getHours(),
-          oldD.getMinutes(),
-          oldD.getSeconds(),
-          oldD.getMilliseconds(),
-        );
-        await db.entries.update(t.id, { created_at: newD });
-      }
-    });
-  };
-
   // Sync displayed month with active date when calendar is opened
   useEffect(() => {
     if (isCalendarOpen) {
@@ -230,6 +198,47 @@ export default function DayNavigator({
     year: 'numeric',
   });
 
+  const iconButtonGroup = (
+    <div className="flex items-center gap-0.5 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 shrink-0">
+      <button
+        id="toggle-goals-btn"
+        onClick={() => setIsGoalsOpen(true)}
+        className="p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer text-stone-500 hover:text-sky-400 hover:bg-sky-950/30"
+        title="Goals / Projects"
+      >
+        <Flag className="w-[18px] h-[18px]" />
+      </button>
+      <button
+        id="toggle-objectives-btn"
+        onClick={() => setIsObjectivesOpen(true)}
+        className="p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer text-stone-500 hover:text-rose-400 hover:bg-rose-950/30"
+        title="Objectives"
+      >
+        <Target className="w-[18px] h-[18px]" />
+      </button>
+      <button
+        id="toggle-habits-btn"
+        onClick={() => setIsHabitsOpen(true)}
+        className="p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer text-stone-500 hover:text-emerald-400 hover:bg-emerald-950/30"
+        title="Habits"
+      >
+        <Repeat2 className="w-[18px] h-[18px]" />
+      </button>
+      <button
+        id="toggle-calendar-btn"
+        onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+        className={`p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
+          isCalendarOpen
+            ? 'bg-amber-500/10 text-amber-500'
+            : 'text-stone-500 hover:text-stone-300 hover:bg-stone-800/50'
+        }`}
+        title="Choose specific date"
+      >
+        <Calendar className="w-[18px] h-[18px]" />
+      </button>
+    </div>
+  );
+
   return (
     <div className="w-full border-t border-stone-800 bg-[#121212] text-sm" ref={containerRef}>
       <div
@@ -238,14 +247,26 @@ export default function DayNavigator({
       >
         <div className="flex md:flex-row flex-col items-center justify-between gap-4 w-full">
           {/* 1. Day Navigator Controls / Records Catalog Title */}
-          {viewMode === 'records' ? (
+          {viewMode === 'records' || viewMode === 'tasks' ? (
             <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
               <div className="flex items-center gap-4">
                 <span className="py-1.5 text-stone-100 text-sm font-mono tracking-widest uppercase text-center font-bold flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]" />
-                  Personal Catalog Index
+                  {viewMode === 'records' ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]" />
+                      Personal Catalog Index
+                    </>
+                  ) : viewMode === 'tasks' ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]" />
+                      All Active Tasks
+                    </>
+                  ) : null}
                 </span>
               </div>
+
+              {/* 2. Icon button group: Goals / Objectives / Habits / Calendar */}
+              {iconButtonGroup}
             </div>
           ) : (
             <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
@@ -266,9 +287,9 @@ export default function DayNavigator({
                   title="Back to Today"
                 >
                   {formatDateLabel(activeDate)}
-                  {isSameDay(activeDate, new Date()) && (
+                  {/* {isSameDay(activeDate, new Date()) && (
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_6px_#f59e0b]" />
-                  )}
+                  )} */}
                 </button>
 
                 <button
@@ -281,65 +302,8 @@ export default function DayNavigator({
                 </button>
               </div>
 
-              {/* 3. Carry Over Incomplete Tasks Button */}
-              {previousIncompleteTasksCount > 0 && (
-                <button
-                  id="transfer-tasks-btn"
-                  onClick={handleTransferTasks}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 hover:border-emerald-500/60 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 cursor-pointer max-w-xs truncate shrink-0"
-                  title={`Carry over ${previousIncompleteTasksCount} incomplete tasks from previous days to this date`}
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-400 fill-current shrink-0 animate-pulse" />
-                  <span>Carry Over ({previousIncompleteTasksCount})</span>
-                </button>
-              )}
-
               {/* 2. Icon button group: Goals / Objectives / Habits / Calendar */}
-              <div className="flex items-center gap-0.5 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 shrink-0">
-                {/* Goals / Projects */}
-                <button
-                  id="toggle-goals-btn"
-                  onClick={() => setIsGoalsOpen(true)}
-                  className="p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer text-stone-500 hover:text-sky-400 hover:bg-sky-950/30"
-                  title="Goals / Projects"
-                >
-                  <Flag className="w-[18px] h-[18px]" />
-                </button>
-
-                {/* Objectives */}
-                <button
-                  id="toggle-objectives-btn"
-                  onClick={() => setIsObjectivesOpen(true)}
-                  className="p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer text-stone-500 hover:text-rose-400 hover:bg-rose-950/30"
-                  title="Objectives"
-                >
-                  <Target className="w-[18px] h-[18px]" />
-                </button>
-
-                {/* Habits */}
-                <button
-                  id="toggle-habits-btn"
-                  onClick={() => setIsHabitsOpen(true)}
-                  className="p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer text-stone-500 hover:text-emerald-400 hover:bg-emerald-950/30"
-                  title="Habits"
-                >
-                  <Repeat2 className="w-[18px] h-[18px]" />
-                </button>
-
-                {/* Calendar */}
-                <button
-                  id="toggle-calendar-btn"
-                  onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                  className={`p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
-                    isCalendarOpen
-                      ? 'bg-amber-500/10 text-amber-500'
-                      : 'text-stone-500 hover:text-stone-300 hover:bg-stone-800/50'
-                  }`}
-                  title="Choose specific date"
-                >
-                  <Calendar className="w-[18px] h-[18px]" />
-                </button>
-              </div>
+              {iconButtonGroup}
             </div>
           )}
 
@@ -380,6 +344,17 @@ export default function DayNavigator({
               }`}
             >
               Records
+            </button>
+            <button
+              id="view-mode-tasks"
+              onClick={() => setViewMode('tasks')}
+              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer ${
+                viewMode === 'tasks'
+                  ? 'bg-emerald-500 text-black'
+                  : 'text-stone-500 hover:text-stone-300'
+              }`}
+            >
+              Tasks
             </button>
           </div>
         </div>
@@ -522,7 +497,8 @@ export default function DayNavigator({
                                   }
                                   title={`${stats.completedTasks} tasks complete`}
                                 >
-                                  <span className="mr-0.5">●</span>{stats.completedTasks}
+                                  <span className="mr-0.5">●</span>
+                                  {stats.completedTasks}
                                 </span>
                               )}
                               {stats.incompleteTasks > 0 && (
@@ -534,7 +510,8 @@ export default function DayNavigator({
                                   }
                                   title={`${stats.incompleteTasks} tasks incomplete`}
                                 >
-                                  <span className="mr-0.5">○</span>{stats.incompleteTasks}
+                                  <span className="mr-0.5">○</span>
+                                  {stats.incompleteTasks}
                                 </span>
                               )}
                             </div>
@@ -548,7 +525,8 @@ export default function DayNavigator({
                               }
                               title={`${stats.recordsCount} events/notes`}
                             >
-                              <span className="mr-0.5">◆</span>{stats.recordsCount}
+                              <span className="mr-0.5">◆</span>
+                              {stats.recordsCount}
                             </span>
                           )}
                         </div>

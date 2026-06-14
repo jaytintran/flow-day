@@ -163,72 +163,52 @@ export default function RecordsView({
 
   return (
     <div className="space-y-5" id="records-view-dashboard">
-      {/* Title view boundary header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-stone-900 pb-3">
-        <div>
-          <h3 className="text-sm uppercase font-mono font-bold tracking-widest text-stone-400 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-stone-500" />
-            {filterType === 'all'
-              ? 'All Notes & Events'
-              : filterType === 'event'
-                ? 'Events'
-                : 'Notes'}
-          </h3>
-          <p className="text-xs text-stone-500 font-sans mt-0.5">
-            {filterType === 'all'
-              ? 'Browse all notes and events ever created across all dates.'
-              : filterType === 'event'
-                ? 'Browse all scheduled events.'
-                : 'Browse all recorded notes.'}
-          </p>
+      {/* Sticky search and filter control header */}
+      <div className="sticky top-0 z-20 bg-[#0a0a0a] py-3 border-b border-stone-900/60 flex items-center justify-between gap-3">
+        {/* Search Bar */}
+        <div className="relative flex items-center flex-1 max-w-[200px] sm:max-w-xs">
+          <Search className="absolute left-2.5 w-3.5 h-3.5 text-stone-500 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search..."
+            className="w-full sm:w-64 pl-7 pr-2.5 py-1.5 text-[11px] font-mono bg-[#0a0a0a] border border-stone-800 rounded-lg text-stone-300 placeholder-stone-600 focus:outline-none focus:border-stone-600 transition-colors"
+          />
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Search Bar */}
-          <div className="relative flex items-center">
-            <Search className="absolute left-2.5 w-3.5 h-3.5 text-stone-500 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search events & notes..."
-              className="w-48 pl-7 pr-2.5 py-1.5 text-[11px] font-mono bg-[#0a0a0a] border border-stone-800 rounded-lg text-stone-300 placeholder-stone-600 focus:outline-none focus:border-stone-600 transition-colors"
-            />
-          </div>
-
-          {/* Type Filter Switcher */}
-          <div className="flex items-center gap-1 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 w-fit">
-            <button
-              onClick={() => setFilterType('all')}
-              className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-                filterType === 'all'
-                  ? 'bg-stone-800 text-stone-200 shadow-sm'
-                  : 'text-stone-500 hover:text-stone-300'
-              }`}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setFilterType('event')}
-              className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-                filterType === 'event'
-                  ? 'bg-indigo-900/60 text-indigo-300 shadow-sm'
-                  : 'text-stone-500 hover:text-stone-300'
-              }`}
-            >
-              Events
-            </button>
-            <button
-              onClick={() => setFilterType('note')}
-              className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-                filterType === 'note'
-                  ? 'bg-blue-900/60 text-blue-300 shadow-sm'
-                  : 'text-stone-500 hover:text-stone-300'
-              }`}
-            >
-              Notes
-            </button>
-          </div>
+        {/* Type Filter Switcher */}
+        <div className="flex items-center gap-1 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 w-fit">
+          <button
+            onClick={() => setFilterType('all')}
+            className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
+              filterType === 'all'
+                ? 'bg-stone-800 text-stone-200 shadow-sm'
+                : 'text-stone-500 hover:text-stone-300'
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setFilterType('event')}
+            className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
+              filterType === 'event'
+                ? 'bg-indigo-900/60 text-indigo-300 shadow-sm'
+                : 'text-stone-500 hover:text-stone-300'
+            }`}
+          >
+            Events
+          </button>
+          <button
+            onClick={() => setFilterType('note')}
+            className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
+              filterType === 'note'
+                ? 'bg-blue-900/60 text-blue-300 shadow-sm'
+                : 'text-stone-500 hover:text-stone-300'
+            }`}
+          >
+            Notes
+          </button>
         </div>
       </div>
 

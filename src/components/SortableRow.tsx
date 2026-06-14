@@ -39,15 +39,15 @@ export default function SortableRow({ id, children, disabled = false }: Sortable
 
   return (
     <div ref={setNodeRef} style={style} className="group/sortable">
-      <div className="flex items-start gap-0">
+      <div className="flex items-center gap-0">
         {/* Drag handle — visible always on mobile, hover-only on desktop */}
         <button
           {...attributes}
           {...listeners}
-          className="mt-3.5 -ml-1 p-0.5 rounded text-stone-600 hover:text-stone-400 hover:bg-stone-800/60 transition-colors cursor-grab active:cursor-grabbing touch-none shrink-0 opacity-100 md:opacity-0 md:group-hover/sortable:opacity-100"
+          className="-ml-1 p-0.5 rounded text-stone-600 hover:text-stone-400 hover:bg-stone-800/60 transition-colors cursor-grab active:cursor-grabbing touch-none shrink-0 opacity-100 md:opacity-0 md:group-hover/sortable:opacity-100"
           title="Drag to reorder"
         >
-          <GripVertical className="w-3.5 h-3.5" />
+          <GripVertical className="w-5 h-3.5" />
         </button>
         <div className="flex-1 min-w-0">{children}</div>
       </div>

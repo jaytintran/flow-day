@@ -75,11 +75,10 @@ export function isSameDay(d1: Date, d2: Date): boolean {
 
 /**
  * Get the effective date for a timeline entry.
- * For tasks: uses `carried_to ?? scheduled_at ?? created_at`.
- * For other types: always uses their natural timestamp (carried_to ignored).
+ * For tasks: uses `scheduled_at ?? created_at`.
+ * For other types: always uses their natural timestamp.
  */
 export function getEffectiveDate(entry: TimelineEntry): Date {
-  if (entry.type === 'task' && entry.carried_to) return new Date(entry.carried_to);
   return getPrimaryDate(entry);
 }
 
