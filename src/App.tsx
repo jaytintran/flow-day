@@ -11,8 +11,9 @@ import InputBar from './components/InputBar';
 
 export default function App() {
   const [activeDate, setActiveDate] = useState<Date>(new Date());
-  const [viewMode, setViewMode] = useState<'day' | 'timeline' | 'records' | 'tasks'>('day');
+  const [viewMode, setViewMode] = useState<'day' | 'timeline' | 'records' | 'tasks' | 'hub'>('day');
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [activeHubTab, setActiveHubTab] = useState<'goals' | 'objectives' | 'habits'>('goals');
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0a0a0a] text-stone-200 font-sans selection:bg-stone-800 selection:text-stone-100 relative select-none">
@@ -31,6 +32,8 @@ export default function App() {
           setActiveDate={setActiveDate}
           viewMode={viewMode}
           setViewMode={setViewMode}
+          activeHubTab={activeHubTab}
+          setActiveHubTab={setActiveHubTab}
         />
       </header>
 
@@ -48,17 +51,21 @@ export default function App() {
           viewMode={viewMode}
           activeTaskId={activeTaskId}
           setActiveTaskId={setActiveTaskId}
+          activeHubTab={activeHubTab}
+          setActiveHubTab={setActiveHubTab}
         />
       </main>
 
       {/* ZONE 3 — INPUT BAR (FIXED BOTTOM) */}
-      <footer
-        className="flex-none relative z-35 bg-[#121212]"
-        id="app-fixed-input"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-      >
-        <InputBar activeDate={activeDate} />
-      </footer>
+      {viewMode !== 'hub' && (
+        <footer
+          className="flex-none relative z-35 bg-[#121212]"
+          id="app-fixed-input"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        >
+          <InputBar activeDate={activeDate} />
+        </footer>
+      )}
     </div>
   );
 }

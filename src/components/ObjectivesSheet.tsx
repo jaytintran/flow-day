@@ -54,13 +54,34 @@ const colorDotMap: Record<string, string> = {
 };
 
 interface ObjectivesSheetProps {
-  open: boolean;
-  onClose: () => void;
+  open?: boolean;
+  onClose?: () => void;
+  isInline?: boolean;
 }
 
-export default function ObjectivesSheet({ open, onClose }: ObjectivesSheetProps) {
+export default function ObjectivesSheet({
+  open = false,
+  onClose = () => {},
+  isInline = false,
+}: ObjectivesSheetProps) {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+
+  const startEdit = (obj: Objective) => {
+    setEditingId(obj.id);
+    setEditTitle(obj.title);
+  };
+
+  const commitEdit = async (obj: Objective) => {
+    const t = editTitle.trim();
+    if (t && t !== obj.title) {
+      await db.entries.update(obj.id, { title: t } as any);
+    }
+    setEditingId(null);
+  };
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -261,13 +282,32 @@ export default function ObjectivesSheet({ open, onClose }: ObjectivesSheetProps)
           </button>
 
           {/* Title */}
-          <span
-            className={`flex-1 text-sm font-serif min-w-0 truncate ${
-              obj.status === 'done' ? 'line-through text-stone-500' : 'text-stone-200'
-            }`}
-          >
-            {obj.title}
-          </span>
+          {editingId === obj.id ? (
+            <input
+              autoFocus
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitEdit(obj);
+                if (e.key === 'Escape') setEditingId(null);
+              }}
+              onBlur={() => commitEdit(obj)}
+              className="flex-1 bg-transparent text-sm font-serif text-stone-100 border-b border-stone-600 focus:outline-none focus:border-stone-400 pb-0.5 min-w-0"
+            />
+          ) : (
+            <button
+              onClick={() => obj.status === 'todo' && startEdit(obj)}
+              className={`flex-1 text-sm font-serif min-w-0 truncate text-left ${
+                obj.status === 'done'
+                  ? 'line-through text-stone-500 cursor-default'
+                  : obj.status === 'archived'
+                    ? 'text-stone-600 cursor-default'
+                    : 'text-stone-200 hover:text-white transition-colors cursor-pointer'
+              }`}
+            >
+              {obj.title}
+            </button>
+          )}
 
           <button
             onClick={(e) => {
@@ -436,20 +476,22 @@ export default function ObjectivesSheet({ open, onClose }: ObjectivesSheetProps)
   };
 
   const content = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-[#121212]">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-stone-800/60 px-4 py-3.5">
-        <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border text-rose-400 bg-rose-500/10 border-rose-500/20 flex items-center gap-1.5">
-          <Target className="w-3 h-3" />
-          Objectives
-        </span>
-        <button
-          onClick={onClose}
-          className="p-1 text-stone-500 hover:text-stone-300 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
+      {!isInline && (
+        <div className="flex items-center justify-between border-b border-stone-800/60 px-4 py-3.5">
+          <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border text-rose-400 bg-rose-500/10 border-rose-500/20 flex items-center gap-1.5">
+            <Target className="w-3 h-3" />
+            Objectives
+          </span>
+          <button
+            onClick={onClose}
+            className="p-1 text-stone-500 hover:text-stone-300 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
 
       {/* Category strip – full width */}
       <CategoryStrip
@@ -523,7 +565,7 @@ export default function ObjectivesSheet({ open, onClose }: ObjectivesSheetProps)
             <Target className="w-8 h-8 mx-auto mb-2 text-stone-700" />
             <p className="text-xs font-sans">No objectives yet</p>
             <p className="text-[10px] font-sans text-stone-700 mt-1">
-              Create your first objective above. Objectives are long-running goals that span
+              Create your first objective below. Objectives are long-running goals that span
               multiple days.
             </p>
           </div>
@@ -531,8 +573,8 @@ export default function ObjectivesSheet({ open, onClose }: ObjectivesSheetProps)
       </div>
 
       {/* Create input */}
-      <div className="flex-none px-4 py-3 border-t border-stone-800/60">
-        <div className="flex items-center gap-2">
+      <div className="flex-none p-3 border-t border-stone-850 bg-[#121212] relative z-10">
+        <div className="flex items-stretch gap-3">
           <input
             ref={inputRef}
             type="text"
@@ -541,19 +583,41 @@ export default function ObjectivesSheet({ open, onClose }: ObjectivesSheetProps)
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleCreate();
             }}
-            placeholder="New objective..."
-            className="flex-1 bg-[#0a0a0a] text-stone-100 border border-stone-800 rounded-lg px-3 py-2 text-sm placeholder-stone-600 focus:outline-none focus:border-rose-500/40 transition-colors"
+            placeholder="Capture new medium-term objective..."
+            className="flex-1 bg-[#0a0a0a] text-stone-100 hover:bg-[#080808]/50 border border-stone-850 rounded-xl px-4 py-3 text-sm placeholder-stone-600 focus:outline-none focus:border-rose-500/50 focus:bg-stone-950 transition-all shadow-inner animate-none"
           />
           <button
             onClick={handleCreate}
-            className="p-2 bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 rounded-lg transition-all cursor-pointer"
+            className="px-5 bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/35 text-rose-400 hover:text-rose-300 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span className="md:hidden xl:inline">Objective</span>
           </button>
         </div>
       </div>
     </div>
   );
+
+  if (isInline) {
+    return (
+      <div className="h-full w-full flex flex-col relative bg-[#121212] border border-stone-800 rounded-2xl overflow-hidden shadow-xl">
+        {content}
+        <CategoryManagementSheet
+          open={isCategoryManagerOpen}
+          onClose={() => setIsCategoryManagerOpen(false)}
+          scope="objective"
+        />
+
+        <GoalPickerSheet
+          open={goalPickerTarget !== null}
+          onClose={() => setGoalPickerTarget(null)}
+          currentGoalId={goalPickerTarget?.goal_id}
+          onSelect={handleGoalSelect}
+          isMobile={isMobile}
+        />
+      </div>
+    );
+  }
 
   return (
     <AnimatePresence>

@@ -13,13 +13,18 @@ import DayView from './DayView';
 import TimelineView from './TimelineView';
 import RecordsView from './RecordsView';
 import TasksView from './TasksView';
+import GoalsSheet from '../GoalsSheet';
+import ObjectivesSheet from '../ObjectivesSheet';
+import HabitsSheet from '../HabitsSheet';
 
 interface JournalProps {
   activeDate: Date;
   setActiveDate: (date: Date) => void;
-  viewMode: 'day' | 'timeline' | 'records' | 'tasks';
+  viewMode: 'day' | 'timeline' | 'records' | 'tasks' | 'hub';
   activeTaskId: string | null;
   setActiveTaskId: (id: string | null) => void;
+  activeHubTab?: 'goals' | 'objectives' | 'habits';
+  setActiveHubTab?: (tab: 'goals' | 'objectives' | 'habits') => void;
 }
 
 // ─── EditableChip ───────────────────────────────────────────────────────────
@@ -276,6 +281,8 @@ export default function Journal({
   viewMode,
   activeTaskId,
   setActiveTaskId,
+  activeHubTab,
+  setActiveHubTab,
 }: JournalProps) {
   const [highlightedDay, setHighlightedDay] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -548,7 +555,7 @@ export default function Journal({
         await db.entries.update(t.id, {
           scheduled_at: newD,
           carried_to: undefined,
-        });
+        } as any);
       }
     });
   };
@@ -568,7 +575,7 @@ export default function Journal({
         await db.entries.update(t.id, {
           scheduled_at: newD,
           carried_to: undefined,
-        });
+        } as any);
       }
     });
   };
@@ -758,11 +765,17 @@ export default function Journal({
 
   return (
     <div
-      className={`flex-1 overflow-y-auto px-2 md:px-6 pb-4 md:pb-6 ${viewMode === 'records' ? 'pt-0' : 'pt-4 md:pt-6'}`}
+      className={`flex-1 px-2 md:px-6 pb-4 md:pb-6 ${
+        viewMode === 'hub'
+          ? 'overflow-hidden pt-3 flex flex-col h-full'
+          : 'overflow-y-auto pt-4 md:pt-6'
+      } ${viewMode === 'records' ? 'pt-0' : ''}`}
       id="timeline-journal-scrollable"
       ref={containerRef}
     >
-      <div className="w-full md:max-w-4xl md:mx-auto space-y-8">
+      <div
+        className={`w-full md:mx-auto ${viewMode === 'hub' ? 'h-full md:max-w-9xl flex flex-col' : 'md:max-w-4xl space-y-8'}`}
+      >
         {viewMode === 'records' ? (
           <RecordsView
             entries={entries}
@@ -807,6 +820,22 @@ export default function Journal({
             handleImportAllOverdue={handleImportAllOverdue}
             handleRescheduleAllOverdue={handleRescheduleAllOverdue}
           />
+        ) : viewMode === 'hub' ? (
+          <div className="w-full flex-1 min-h-0 flex flex-col">
+            {/* Desktop 3-column Layout */}
+            <div className="hidden md:grid grid-cols-3 gap-6 h-full items-stretch pt-2">
+              <GoalsSheet isInline={true} />
+              <ObjectivesSheet isInline={true} />
+              <HabitsSheet isInline={true} activeDate={activeDate} />
+            </div>
+
+            {/* Mobile Single-column Switchable Layout */}
+            <div className="md:hidden h-full flex flex-col pb-2">
+              {activeHubTab === 'goals' && <GoalsSheet isInline={true} />}
+              {activeHubTab === 'objectives' && <ObjectivesSheet isInline={true} />}
+              {activeHubTab === 'habits' && <HabitsSheet isInline={true} activeDate={activeDate} />}
+            </div>
+          </div>
         ) : (
           <TimelineView
             sortedTimelineDays={sortedTimelineDays}

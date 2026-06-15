@@ -40,10 +40,11 @@ import HabitConsistencyModal from './HabitConsistencyModal';
 import SortableRow from './SortableRow';
 
 interface HabitsSheetProps {
-  open: boolean;
-  onClose: () => void;
+  open?: boolean;
+  onClose?: () => void;
   /** The currently active date in the navigator — used for tick/check operations */
   activeDate: Date;
+  isInline?: boolean;
 }
 
 // ─── Color palette ────────────────────────────────────────────────────────────
@@ -105,9 +106,10 @@ interface MiniStripProps {
   logs: HabitLog[];
   colorDot: string;
   colorFilled: string;
+  onToggle: (date: Date) => void;
 }
 
-function MiniStrip({ habitId, activeDate, logs, colorDot, colorFilled }: MiniStripProps) {
+function MiniStrip({ habitId, activeDate, logs, colorDot, colorFilled, onToggle }: MiniStripProps) {
   const days: Date[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(activeDate);
@@ -133,13 +135,17 @@ function MiniStrip({ habitId, activeDate, logs, colorDot, colorFilled }: MiniStr
         const dayStr = toLocalDateString(day);
         const isLogged = loggedDays.has(dayStr);
         const isToday = dayStr === todayStr;
-        const label = day.toLocaleString('default', { weekday: 'narrow' });
+
+        // Custom label mapping
+        const weekdayIndex = day.getDay();
+        const label = ['S', 'M', 'T', 'W', 'T', 'F', 'S'][weekdayIndex];
 
         return (
-          <div key={dayStr} className="flex flex-col items-center gap-0.5">
+          <div key={dayStr} className="flex flex-col items-center gap-0.5 select-none scale-[0.9]">
             <span className="text-[8px] font-mono text-stone-600 uppercase">{label}</span>
-            <div
-              className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
+            <button
+              onClick={() => onToggle(day)}
+              className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${
                 isLogged
                   ? `${colorFilled} border`
                   : isToday
@@ -147,8 +153,8 @@ function MiniStrip({ habitId, activeDate, logs, colorDot, colorFilled }: MiniStr
                     : 'border-stone-800 bg-transparent'
               }`}
             >
-              {isLogged && <span className={`w-1.5 h-1.5 rounded-full ${colorDot}`} />}
-            </div>
+              {isLogged && <span className={`w-3 h-3 rounded-full ${colorDot}`} />}
+            </button>
           </div>
         );
       })}
@@ -158,7 +164,12 @@ function MiniStrip({ habitId, activeDate, logs, colorDot, colorFilled }: MiniStr
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetProps) {
+export default function HabitsSheet({
+  open = false,
+  onClose = () => {},
+  activeDate,
+  isInline = false,
+}: HabitsSheetProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newColor, setNewColor] = useState<Habit['color']>('emerald');
@@ -199,7 +210,9 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
 
   // Sort by sort_order (or created_at as fallback)
   const sortedActive = [...displayActive].sort(
-    (a, b) => (a.sort_order ?? Date.parse(a.created_at.toString())) - (b.sort_order ?? Date.parse(b.created_at.toString())),
+    (a, b) =>
+      (a.sort_order ?? Date.parse(a.created_at.toString())) -
+      (b.sort_order ?? Date.parse(b.created_at.toString())),
   );
 
   const sensors = useSensors(
@@ -258,28 +271,39 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
     inputRef.current?.focus();
   };
 
-  /** Check / uncheck a habit for the active date */
-  const handleToggleTick = async (habit: Habit) => {
-    // Find existing log(s) for this habit on the active date
-    const todayLogs = allLogs.filter(
-      (l) => l.habit_id === habit.id && toLocalDateString(new Date(l.timestamp)) === activeDateStr,
+  // Generic toggle for any date — replaces the inline handleToggleTick logic
+  const handleToggleForDate = async (habit: Habit, date: Date) => {
+    const dateStr = toLocalDateString(date);
+    const logsForDate = allLogs.filter(
+      (l) => l.habit_id === habit.id && toLocalDateString(new Date(l.timestamp)) === dateStr,
     );
-    if (todayLogs.length > 0) {
-      // Already ticked → remove the most recent one
-      await db.entries.delete(todayLogs[todayLogs.length - 1].id);
+
+    if (logsForDate.length > 0) {
+      await db.entries.delete(logsForDate[logsForDate.length - 1].id);
     } else {
-      // Not ticked → add a log
+      const logTimestamp = new Date(date);
+      const now = new Date();
+      logTimestamp.setHours(
+        now.getHours(),
+        now.getMinutes(),
+        now.getSeconds(),
+        now.getMilliseconds(),
+      );
+
       const log: HabitLog = {
         id: crypto.randomUUID(),
         type: 'habit-log',
         habit_id: habit.id,
         title: habit.title,
-        timestamp: new Date(),
+        timestamp: logTimestamp,
         created_at: new Date(),
       };
       await db.entries.add(log as any);
     }
   };
+
+  /** Check / uncheck a habit for the active date */
+  const handleToggleTick = (habit: Habit) => handleToggleForDate(habit, activeDate);
 
   const startEdit = (habit: Habit) => {
     setEditingId(habit.id);
@@ -355,17 +379,6 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
           <div className="flex-1 min-w-0">
             {isEditing ? (
               <div className="space-y-2">
-                <input
-                  autoFocus
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') commitEdit(habit);
-                    if (e.key === 'Escape') setEditingId(null);
-                  }}
-                  onBlur={() => commitEdit(habit)}
-                  className="w-full bg-transparent text-sm text-stone-100 border-b border-stone-600 focus:outline-none focus:border-stone-400 font-serif pb-0.5"
-                />
                 {/* Inline color picker */}
                 <div className="flex items-center gap-1.5">
                   <div className="flex gap-1">
@@ -384,6 +397,17 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
                     ))}
                   </div>
                 </div>
+                <input
+                  autoFocus
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitEdit(habit);
+                    if (e.key === 'Escape') setEditingId(null);
+                  }}
+                  onBlur={() => commitEdit(habit)}
+                  className="w-full bg-transparent text-sm text-stone-100 border-b border-stone-600 focus:outline-none focus:border-stone-400 font-serif pb-0.5"
+                />
               </div>
             ) : (
               <button
@@ -507,6 +531,7 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
               logs={allLogs}
               colorDot={cs.dot}
               colorFilled={cs.filled}
+              onToggle={(date) => handleToggleForDate(habit, date)}
             />
           </div>
         )}
@@ -517,20 +542,22 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
   // ── Sheet content ─────────────────────────────────────────────────────────
 
   const content = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-[#121212]">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-stone-800/60 px-4 py-3.5">
-        <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border text-emerald-400 bg-emerald-500/10 border-emerald-500/20 flex items-center gap-1.5">
-          <Repeat2 className="w-3 h-3" />
-          Habits
-        </span>
-        <button
-          onClick={onClose}
-          className="p-1 text-stone-500 hover:text-stone-300 hover:bg-stone-800 rounded-lg transition-colors cursor-pointer"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
+      {!isInline && (
+        <div className="flex items-center justify-between border-b border-stone-800/60 px-4 py-3.5">
+          <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border text-emerald-400 bg-emerald-500/10 border-emerald-500/20 flex items-center gap-1.5">
+            <Repeat2 className="w-3 h-3" />
+            Habits
+          </span>
+          <button
+            onClick={onClose}
+            className="p-1 text-stone-500 hover:text-stone-300 hover:bg-stone-800 rounded-lg transition-colors cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
 
       {/* List */}
       <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-1.5">
@@ -542,7 +569,10 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
           </div>
         )}
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={sortedActive.map((h) => h.id)} strategy={verticalListSortingStrategy}>
+          <SortableContext
+            items={sortedActive.map((h) => h.id)}
+            strategy={verticalListSortingStrategy}
+          >
             {sortedActive.map((h) => (
               <SortableRow key={h.id} id={h.id}>
                 {renderHabitRow(h, false)}
@@ -580,62 +610,79 @@ export default function HabitsSheet({ open, onClose, activeDate }: HabitsSheetPr
           </>
         )}
 
-        {/* Create new habit */}
-        <div className="px-4 pt-4 pb-2 border-b border-stone-800/40">
-          <div className="flex items-center gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreate();
-              }}
-              placeholder="New habit..."
-              className="flex-1 bg-[#0a0a0a] text-stone-100 border border-stone-800 rounded-lg px-3 py-2 text-sm placeholder-stone-600 focus:outline-none focus:border-emerald-500/40 transition-colors"
-            />
-            <button
-              onClick={handleCreate}
-              className="p-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 rounded-lg transition-all cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Color picker */}
-          <div className="flex items-center gap-2 mt-2.5 px-0.5">
-            <span className="text-[9px] font-mono text-stone-600 uppercase tracking-widest">
-              Color:
-            </span>
-            <div className="flex gap-1.5">
-              {COLORS.map((c) => (
-                <button
-                  key={c.key}
-                  onClick={() => setNewColor(c.key)}
-                  className={`w-4 h-4 rounded-full ${c.dot} transition-all cursor-pointer ${
-                    newColor === c.key
-                      ? `ring-2 ring-offset-1 ring-offset-[#131313] ${c.ring}`
-                      : 'opacity-40 hover:opacity-70'
-                  }`}
-                  title={c.key}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-
         {habits.length === 0 && (
           <div className="py-12 text-center text-stone-600">
             <Repeat2 className="w-8 h-8 mx-auto mb-2 text-stone-700" />
             <p className="text-xs font-sans">No habits yet</p>
             <p className="text-[10px] font-sans text-stone-700 mt-1">
-              Create a habit above and tick it off daily to build consistency.
+              Create a habit below and tick it off daily to build consistency.
             </p>
           </div>
         )}
       </div>
+
+      {/* Create input */}
+      <div className="flex-none p-3 border-t border-stone-850 bg-[#121212] relative z-10 flex flex-col gap-2">
+        {/* Color picker */}
+        <div className="flex items-center gap-2 px-1 py-0.5">
+          <span className="text-[9px] font-mono text-stone-600 uppercase tracking-widest">
+            Color Theme:
+          </span>
+          <div className="flex gap-1.5">
+            {COLORS.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                onClick={() => setNewColor(c.key)}
+                className={`w-4 h-4 rounded-full ${c.dot} transition-all cursor-pointer ${
+                  newColor === c.key
+                    ? `ring-2 ring-offset-2 ring-offset-[#121212] ${c.ring} scale-110`
+                    : 'opacity-40 hover:opacity-75'
+                }`}
+                title={c.key}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Input */}
+        <div className="flex items-stretch gap-3">
+          <input
+            ref={inputRef}
+            type="text"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleCreate();
+            }}
+            placeholder="Capture new daily habit..."
+            className="flex-1 bg-[#0a0a0a] text-stone-100 hover:bg-[#080808]/50 border border-stone-850 rounded-xl px-4 py-3 text-sm placeholder-stone-600 focus:outline-none focus:border-emerald-500/50 focus:bg-stone-950 transition-all shadow-inner animate-none"
+          />
+          <button
+            onClick={handleCreate}
+            className="px-5 bg-emerald-500/10 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-400 hover:text-emerald-300 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span className="md:hidden xl:inline">Habit</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
+
+  if (isInline) {
+    return (
+      <div className="h-full w-full flex flex-col relative bg-[#121212] border border-stone-800 rounded-2xl overflow-hidden shadow-xl">
+        {content}
+        {consistencyHabit && (
+          <HabitConsistencyModal
+            habit={consistencyHabit}
+            onClose={() => setConsistencyHabit(null)}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <>

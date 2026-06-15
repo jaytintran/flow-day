@@ -27,8 +27,10 @@ import HabitsSheet from './HabitsSheet';
 interface DayNavigatorProps {
   activeDate: Date;
   setActiveDate: (date: Date) => void;
-  viewMode: 'day' | 'timeline' | 'records' | 'tasks';
-  setViewMode: (mode: 'day' | 'timeline' | 'records' | 'tasks') => void;
+  viewMode: 'day' | 'timeline' | 'records' | 'tasks' | 'hub';
+  setViewMode: (mode: 'day' | 'timeline' | 'records' | 'tasks' | 'hub') => void;
+  activeHubTab?: 'goals' | 'objectives' | 'habits';
+  setActiveHubTab?: (tab: 'goals' | 'objectives' | 'habits') => void;
 }
 
 export default function DayNavigator({
@@ -36,11 +38,10 @@ export default function DayNavigator({
   setActiveDate,
   viewMode,
   setViewMode,
+  activeHubTab,
+  setActiveHubTab,
 }: DayNavigatorProps) {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [isObjectivesOpen, setIsObjectivesOpen] = useState(false);
-  const [isGoalsOpen, setIsGoalsOpen] = useState(false);
-  const [isHabitsOpen, setIsHabitsOpen] = useState(false);
   const [displayedMonth, setDisplayedMonth] = useState<Date>(new Date(activeDate));
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -201,30 +202,6 @@ export default function DayNavigator({
   const iconButtonGroup = (
     <div className="flex items-center gap-0.5 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 shrink-0">
       <button
-        id="toggle-goals-btn"
-        onClick={() => setIsGoalsOpen(true)}
-        className="p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer text-stone-500 hover:text-sky-400 hover:bg-sky-950/30"
-        title="Goals / Projects"
-      >
-        <Flag className="w-[18px] h-[18px]" />
-      </button>
-      <button
-        id="toggle-objectives-btn"
-        onClick={() => setIsObjectivesOpen(true)}
-        className="p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer text-stone-500 hover:text-rose-400 hover:bg-rose-950/30"
-        title="Objectives"
-      >
-        <Target className="w-[18px] h-[18px]" />
-      </button>
-      <button
-        id="toggle-habits-btn"
-        onClick={() => setIsHabitsOpen(true)}
-        className="p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer text-stone-500 hover:text-emerald-400 hover:bg-emerald-950/30"
-        title="Habits"
-      >
-        <Repeat2 className="w-[18px] h-[18px]" />
-      </button>
-      <button
         id="toggle-calendar-btn"
         onClick={() => setIsCalendarOpen(!isCalendarOpen)}
         className={`p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
@@ -242,12 +219,12 @@ export default function DayNavigator({
   return (
     <div className="w-full border-t border-stone-800 bg-[#121212] text-sm" ref={containerRef}>
       <div
-        className="max-w-4xl mx-auto px-5 md:px-6 py-3 flex flex-col gap-3 w-full"
-        id="day-navigator-container"
+        className={`${viewMode === 'hub' ? 'md:max-w-9xl' : 'max-w-4xl'} mx-auto px-5 md:px-6 py-3 flex flex-col gap-3 w-full"
+        id="day-navigator-container`}
       >
         <div className="flex md:flex-row flex-col items-center justify-between gap-4 w-full">
           {/* 1. Day Navigator Controls / Records Catalog Title */}
-          {viewMode === 'records' || viewMode === 'tasks' ? (
+          {viewMode === 'records' || viewMode === 'tasks' || viewMode === 'hub' ? (
             <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
               <div className="flex items-center gap-4">
                 <span className="py-1.5 text-stone-100 text-sm font-mono tracking-widest uppercase text-center font-bold flex items-center gap-2">
@@ -261,11 +238,16 @@ export default function DayNavigator({
                       <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]" />
                       All Active Tasks
                     </>
+                  ) : viewMode === 'hub' ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]" />
+                      System Hub
+                    </>
                   ) : null}
                 </span>
               </div>
 
-              {/* 2. Icon button group: Goals / Objectives / Habits / Calendar */}
+              {/* 2. Icon button group: Calendar only */}
               {iconButtonGroup}
             </div>
           ) : (
@@ -287,9 +269,6 @@ export default function DayNavigator({
                   title="Back to Today"
                 >
                   {formatDateLabel(activeDate)}
-                  {/* {isSameDay(activeDate, new Date()) && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_6px_#f59e0b]" />
-                  )} */}
                 </button>
 
                 <button
@@ -302,20 +281,20 @@ export default function DayNavigator({
                 </button>
               </div>
 
-              {/* 2. Icon button group: Goals / Objectives / Habits / Calendar */}
+              {/* 2. Icon button group: Calendar only */}
               {iconButtonGroup}
             </div>
           )}
 
           {/* 3. View Mode Switcher pill style */}
           <div
-            className="flex gap-1 bg-stone-900 border border-stone-800 rounded-full p-1 w-full md:w-auto"
+            className="flex gap-1 bg-stone-900 border border-stone-800 rounded-full p-1 w-full md:w-auto overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
             id="view-mode-switcher"
           >
             <button
               id="view-mode-day"
               onClick={() => setViewMode('day')}
-              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer ${
+              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer whitespace-nowrap ${
                 viewMode === 'day'
                   ? 'bg-amber-500 text-black'
                   : 'text-stone-500 hover:text-stone-300'
@@ -326,7 +305,7 @@ export default function DayNavigator({
             <button
               id="view-mode-timeline"
               onClick={() => setViewMode('timeline')}
-              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer ${
+              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer whitespace-nowrap ${
                 viewMode === 'timeline'
                   ? 'bg-amber-500 text-black'
                   : 'text-stone-500 hover:text-stone-300'
@@ -337,7 +316,7 @@ export default function DayNavigator({
             <button
               id="view-mode-records"
               onClick={() => setViewMode('records')}
-              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer ${
+              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer whitespace-nowrap ${
                 viewMode === 'records'
                   ? 'bg-amber-500 text-black'
                   : 'text-stone-500 hover:text-stone-300'
@@ -348,13 +327,24 @@ export default function DayNavigator({
             <button
               id="view-mode-tasks"
               onClick={() => setViewMode('tasks')}
-              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer ${
+              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer whitespace-nowrap ${
                 viewMode === 'tasks'
                   ? 'bg-emerald-500 text-black'
                   : 'text-stone-500 hover:text-stone-300'
               }`}
             >
               Tasks
+            </button>
+            <button
+              id="view-mode-hub"
+              onClick={() => setViewMode('hub')}
+              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer whitespace-nowrap ${
+                viewMode === 'hub'
+                  ? 'bg-amber-500 text-black'
+                  : 'text-stone-500 hover:text-stone-300'
+              }`}
+            >
+              Hub
             </button>
           </div>
         </div>
@@ -401,6 +391,42 @@ export default function DayNavigator({
                 </button>
               );
             })}
+          </div>
+        )}
+
+        {/* Mobile sub-tab switcher for Hub */}
+        {viewMode === 'hub' && (
+          <div className="md:hidden flex gap-1 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 w-full">
+            <button
+              onClick={() => setActiveHubTab?.('goals')}
+              className={`flex-1 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all ${
+                activeHubTab === 'goals'
+                  ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
+                  : 'text-stone-500 border border-transparent hover:text-stone-400'
+              }`}
+            >
+              Goals
+            </button>
+            <button
+              onClick={() => setActiveHubTab?.('objectives')}
+              className={`flex-1 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all ${
+                activeHubTab === 'objectives'
+                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                  : 'text-stone-500 border border-transparent hover:text-stone-400'
+              }`}
+            >
+              Objectives
+            </button>
+            <button
+              onClick={() => setActiveHubTab?.('habits')}
+              className={`flex-1 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all ${
+                activeHubTab === 'habits'
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                  : 'text-stone-500 border border-transparent hover:text-stone-400'
+              }`}
+            >
+              Habits
+            </button>
           </div>
         )}
       </div>
@@ -543,18 +569,6 @@ export default function DayNavigator({
           </motion.div>
         )}
       </AnimatePresence>
-      {/* GOALS / PROJECTS SHEET */}
-      <GoalsSheet open={isGoalsOpen} onClose={() => setIsGoalsOpen(false)} />
-
-      {/* OBJECTIVES SHEET */}
-      <ObjectivesSheet open={isObjectivesOpen} onClose={() => setIsObjectivesOpen(false)} />
-
-      {/* HABITS SHEET */}
-      <HabitsSheet
-        open={isHabitsOpen}
-        onClose={() => setIsHabitsOpen(false)}
-        activeDate={activeDate}
-      />
     </div>
   );
 }

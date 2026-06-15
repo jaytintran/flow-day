@@ -52,11 +52,16 @@ const colorDotMap: Record<string, string> = {
 };
 
 interface GoalsSheetProps {
-  open: boolean;
-  onClose: () => void;
+  open?: boolean;
+  onClose?: () => void;
+  isInline?: boolean;
 }
 
-export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
+export default function GoalsSheet({
+  open = false,
+  onClose = () => {},
+  isInline = false,
+}: GoalsSheetProps) {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
@@ -81,6 +86,9 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
   const [chipOpenId, setChipOpenId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const chipRef = useRef<HTMLDivElement>(null);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
 
   const categories =
     useLiveQuery(() => db.categories.where('scope').equals('goal').toArray()) || [];
@@ -114,6 +122,19 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+
+  const startEdit = (goal: Goal) => {
+    setEditingId(goal.id);
+    setEditTitle(goal.title);
+  };
+
+  const commitEdit = async (goal: Goal) => {
+    const t = editTitle.trim();
+    if (t && t !== goal.title) {
+      await db.entries.update(goal.id, { title: t } as any);
+    }
+    setEditingId(null);
+  };
 
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
@@ -247,13 +268,32 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
             {obj.status === 'achieved' && <Check className="w-3 h-3 stroke-[3]" />}
           </button>
 
-          <span
-            className={`flex-1 text-sm font-serif min-w-0 truncate ${
-              obj.status === 'achieved' ? 'line-through text-stone-500' : 'text-stone-200'
-            }`}
-          >
-            {obj.title}
-          </span>
+          {editingId === obj.id ? (
+            <input
+              autoFocus
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitEdit(obj);
+                if (e.key === 'Escape') setEditingId(null);
+              }}
+              onBlur={() => commitEdit(obj)}
+              className="flex-1 bg-transparent text-sm font-serif text-stone-100 border-b border-stone-600 focus:outline-none focus:border-stone-400 pb-0.5 min-w-0"
+            />
+          ) : (
+            <button
+              onClick={() => obj.status !== 'archived' && startEdit(obj)}
+              className={`flex-1 text-sm font-serif min-w-0 truncate text-left ${
+                obj.status === 'achieved'
+                  ? 'line-through text-stone-500 cursor-default'
+                  : obj.status === 'archived'
+                    ? 'text-stone-600 cursor-default'
+                    : 'text-stone-200 hover:text-white transition-colors cursor-pointer'
+              }`}
+            >
+              {obj.title}
+            </button>
+          )}
 
           <button
             onClick={(e) => {
@@ -400,20 +440,22 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
   };
 
   const content = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-[#121212]">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-stone-800/60 px-4 py-3.5">
-        <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border text-sky-400 bg-sky-500/10 border-sky-500/20 flex items-center gap-1.5">
-          <Flag className="w-3 h-3" />
-          Goals / Projects
-        </span>
-        <button
-          onClick={onClose}
-          className="p-1 text-stone-500 hover:text-stone-300 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
+      {!isInline && (
+        <div className="flex items-center justify-between border-b border-stone-800/60 px-4 py-3.5">
+          <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border text-sky-400 bg-sky-500/10 border-sky-500/20 flex items-center gap-1.5">
+            <Flag className="w-3 h-3" />
+            Goals / Projects
+          </span>
+          <button
+            onClick={onClose}
+            className="p-1 text-stone-500 hover:text-stone-300 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
       {/* Category strip – full width */}
       <CategoryStrip
         categories={categories}
@@ -486,7 +528,7 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
             <Flag className="w-8 h-8 mx-auto mb-2 text-stone-700" />
             <p className="text-xs font-sans">No goals or projects yet</p>
             <p className="text-[10px] font-sans text-stone-700 mt-1">
-              Create your first goal above. A goal (or project) is a high-level ambition that groups
+              Create your first goal below. A goal (or project) is a high-level ambition that groups
               multiple objectives together.
             </p>
           </div>
@@ -494,8 +536,8 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
       </div>
 
       {/* Create input */}
-      <div className="flex-none px-4 py-3 border-t border-stone-800/60">
-        <div className="flex items-center gap-2">
+      <div className="flex-none p-3 border-t border-stone-850 bg-[#121212] relative z-10">
+        <div className="flex items-stretch gap-3">
           <input
             ref={inputRef}
             type="text"
@@ -504,19 +546,33 @@ export default function GoalsSheet({ open, onClose }: GoalsSheetProps) {
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleCreate();
             }}
-            placeholder="New goal or project..."
-            className="flex-1 bg-[#0a0a0a] text-stone-100 border border-stone-800 rounded-lg px-3 py-2 text-sm placeholder-stone-600 focus:outline-none focus:border-sky-500/40 transition-colors"
+            placeholder="Capture new high-level goal or project..."
+            className="flex-1 bg-[#0a0a0a] text-stone-100 hover:bg-[#080808]/50 border border-stone-850 rounded-xl px-4 py-3 text-sm placeholder-stone-600 focus:outline-none focus:border-sky-500/50 focus:bg-stone-950 transition-all shadow-inner animate-none"
           />
           <button
             onClick={handleCreate}
-            className="p-2 bg-sky-500/10 border border-sky-500/30 text-sky-400 hover:bg-sky-500/20 rounded-lg transition-all cursor-pointer"
+            className="px-5 bg-sky-500/10 hover:bg-sky-500/25 border border-sky-500/35 text-sky-400 hover:text-sky-300 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span className="md:hidden xl:inline">Goal</span>
           </button>
         </div>
       </div>
     </div>
   );
+
+  if (isInline) {
+    return (
+      <div className="h-full w-full flex flex-col relative bg-[#121212] border border-stone-800 rounded-2xl overflow-hidden shadow-xl">
+        {content}
+        <CategoryManagementSheet
+          open={isCategoryManagerOpen}
+          onClose={() => setIsCategoryManagerOpen(false)}
+          scope="goal"
+        />
+      </div>
+    );
+  }
 
   return (
     <AnimatePresence>
