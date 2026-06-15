@@ -10,6 +10,7 @@ export const GIST_STORAGE_KEYS = {
   PAT: 'flow_day_github_pat',
   GIST_ID: 'flow_day_gist_id',
   LAST_SYNC: 'flow_day_last_sync',
+  DIRTY: 'flow_day_dirty',
 };
 
 export type SyncStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -62,6 +63,12 @@ export function useGistSync() {
   const [status, setStatus] = useState<SyncStatus>('idle');
   const [statusMsg, setStatusMsg] = useState('');
 
+  // Dirty flag: true whenever local DB has changes that haven't been pushed yet.
+  // Initialized from localStorage so it survives page refreshes.
+  const [isDirty, setIsDirty] = useState<boolean>(
+    () => localStorage.getItem(GIST_STORAGE_KEYS.DIRTY) === '1',
+  );
+
   const isConfigured = pat.trim() !== '' && gistId.trim() !== '';
 
   /** Re-read credentials from localStorage (call this when the modal opens). */
@@ -74,6 +81,37 @@ export function useGistSync() {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  // Auto-detect local changes: hook into every Dexie write across all tables.
+  // Uses Dexie's low-level table hooks so no manual wiring through components is needed.
+  useEffect(() => {
+    const onWrite = () => {
+      localStorage.setItem(GIST_STORAGE_KEYS.DIRTY, '1');
+      setIsDirty(true);
+    };
+
+    db.entries.hook('creating', onWrite);
+    db.entries.hook('updating', onWrite);
+    db.entries.hook('deleting', onWrite);
+    db.habits.hook('creating', onWrite);
+    db.habits.hook('updating', onWrite);
+    db.habits.hook('deleting', onWrite);
+    db.categories.hook('creating', onWrite);
+    db.categories.hook('updating', onWrite);
+    db.categories.hook('deleting', onWrite);
+
+    return () => {
+      db.entries.hook('creating').unsubscribe(onWrite);
+      db.entries.hook('updating').unsubscribe(onWrite);
+      db.entries.hook('deleting').unsubscribe(onWrite);
+      db.habits.hook('creating').unsubscribe(onWrite);
+      db.habits.hook('updating').unsubscribe(onWrite);
+      db.habits.hook('deleting').unsubscribe(onWrite);
+      db.categories.hook('creating').unsubscribe(onWrite);
+      db.categories.hook('updating').unsubscribe(onWrite);
+      db.categories.hook('deleting').unsubscribe(onWrite);
+    };
+  }, []);
 
   const showToast = useCallback(
     (msg: string, type: SyncStatus = 'success') => {
@@ -198,6 +236,9 @@ export function useGistSync() {
       const nowStr = new Date().toLocaleString();
       setLastSync(nowStr);
       localStorage.setItem(GIST_STORAGE_KEYS.LAST_SYNC, nowStr);
+      // Clear the dirty flag — local data is now in sync with the cloud
+      localStorage.removeItem(GIST_STORAGE_KEYS.DIRTY);
+      setIsDirty(false);
       showToast('Successfully backed up to cloud!', 'success');
       return true;
     } catch (err: any) {
@@ -318,6 +359,7 @@ export function useGistSync() {
     statusMsg,
     showToast,
     isConfigured,
+    isDirty,
     reload,
     pushToCloud,
     pullFromCloud,

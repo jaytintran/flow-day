@@ -87,6 +87,7 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
     pullFromCloud,
     status: syncStatus,
     statusMsg: syncStatusMsg,
+    isDirty: isSyncDirty,
   } = useGistSync();
   const [isPullConfirming, setIsPullConfirming] = useState(false);
 
@@ -506,14 +507,23 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
                 {/* Quick-access sync buttons — only shown when Gist credentials are configured */}
                 {isSyncConfigured && (
                   <div className="flex items-center gap-1 shrink-0">
-                    {/* Push button */}
+                    {/* Push button — glows amber when local changes are unpushed */}
                     <button
                       id="quick-push-btn"
                       type="button"
                       onClick={handleQuickPush}
                       disabled={syncStatus === 'loading'}
-                      title="Push to Cloud (backup local data)"
-                      className="px-2 bg-transparent text-stone-400 hover:text-amber-400 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all h-[46px] flex items-center justify-center cursor-pointer shrink-0 select-none"
+                      title={
+                        isSyncDirty
+                          ? 'You have unpushed changes — click to back up'
+                          : 'Push to Cloud (backup local data)'
+                      }
+                      className={
+                        `px-2 bg-transparent active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all h-[46px] flex items-center justify-center cursor-pointer shrink-0 select-none ` +
+                        (syncStatus === 'idle' && isSyncDirty
+                          ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.55)] hover:text-amber-300'
+                          : 'text-stone-400 hover:text-amber-400')
+                      }
                     >
                       {syncStatus === 'loading' ? (
                         <RefreshCw className="w-4 h-4 animate-spin" />
@@ -522,7 +532,12 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
                       ) : syncStatus === 'error' ? (
                         <AlertTriangle className="w-4 h-4 text-red-400" />
                       ) : (
-                        <UploadCloud className="w-4 h-4 shrink-0" />
+                        <UploadCloud
+                          className={
+                            `w-4 h-4 shrink-0 transition-transform ` +
+                            (isSyncDirty ? 'animate-bounce' : '')
+                          }
+                        />
                       )}
                     </button>
 
