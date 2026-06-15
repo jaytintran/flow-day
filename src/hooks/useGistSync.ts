@@ -14,6 +14,47 @@ export const GIST_STORAGE_KEYS = {
 
 export type SyncStatus = 'idle' | 'loading' | 'success' | 'error';
 
+// ---------------------------------------------------------------------------
+// Compression helpers (gzip via built-in CompressionStream API)
+// ---------------------------------------------------------------------------
+
+/**
+ * Gzip-compress a string and return it as a base64-encoded string.
+ * Uses a loop instead of spread to avoid call-stack overflow on large payloads.
+ */
+async function compressToBase64(str: string): Promise<string> {
+  const stream = new CompressionStream('gzip');
+  const writer = stream.writable.getWriter();
+  writer.write(new TextEncoder().encode(str));
+  writer.close();
+  const buf = await new Response(stream.readable).arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+/**
+ * Decompress a base64-encoded gzip blob back to a plain string.
+ */
+async function decompressFromBase64(base64: string): Promise<string> {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  const stream = new DecompressionStream('gzip');
+  const writer = stream.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  const buf = await new Response(stream.readable).arrayBuffer();
+  return new TextDecoder().decode(buf);
+}
+
+// ---------------------------------------------------------------------------
+
 export function useGistSync() {
   const [pat, setPat] = useState('');
   const [gistId, setGistId] = useState('');
@@ -123,10 +164,24 @@ export function useGistSync() {
     showToast('Uploading to cloud...', 'loading');
     try {
       const payload = await exportDatabase();
+
+      // Serialize without whitespace, then compress if the browser supports it.
+      // The file is wrapped in a small JSON envelope so the pull side can
+      // detect the format and stay backward-compatible with old plain-JSON backups.
+      const jsonStr = JSON.stringify(payload);
+      let fileContent: string;
+      if (typeof CompressionStream !== 'undefined') {
+        const compressed = await compressToBase64(jsonStr);
+        fileContent = JSON.stringify({ fmt: 'gzip-b64', v: 2, data: compressed });
+      } else {
+        // Fallback: browser lacks CompressionStream — store compact plain JSON
+        fileContent = jsonStr;
+      }
+
       const body = {
         files: {
           'flow-day-backup.json': {
-            content: JSON.stringify(payload, null, 2),
+            content: fileContent,
           },
         },
       };
@@ -161,7 +216,21 @@ export function useGistSync() {
       const gist = await fetchGist(pat.trim(), gistId.trim());
       const file = gist.files['flow-day-backup.json'];
       if (!file) throw new Error('FlowDay backup file not found inside Gist');
-      const backupData = JSON.parse(file.content);
+
+      // Auto-detect format: compressed envelope vs. legacy plain JSON.
+      // This ensures old backups (pushed before compression was added) still
+      // restore correctly on any device, regardless of app version.
+      let backupData: any;
+      const envelope = JSON.parse(file.content);
+      if (envelope && envelope.fmt === 'gzip-b64' && typeof envelope.data === 'string') {
+        // New compressed format — decompress then parse the inner JSON
+        const jsonStr = await decompressFromBase64(envelope.data);
+        backupData = JSON.parse(jsonStr);
+      } else {
+        // Legacy plain-JSON format (v1) — envelope IS the backup payload
+        backupData = envelope;
+      }
+
       await importDatabase(backupData);
       const nowStr = new Date().toLocaleString();
       setLastSync(nowStr);
@@ -196,12 +265,20 @@ export function useGistSync() {
     showToast('Creating Gist...', 'loading');
     try {
       const payload = await exportDatabase();
+      const jsonStr = JSON.stringify(payload);
+      let fileContent: string;
+      if (typeof CompressionStream !== 'undefined') {
+        const compressed = await compressToBase64(jsonStr);
+        fileContent = JSON.stringify({ fmt: 'gzip-b64', v: 2, data: compressed });
+      } else {
+        fileContent = jsonStr;
+      }
       const body = {
         description: 'FlowDay Sync Data (Private)',
         public: false,
         files: {
           'flow-day-backup.json': {
-            content: JSON.stringify(payload, null, 2),
+            content: fileContent,
           },
         },
       };
