@@ -96,6 +96,8 @@ export function getPrimaryDate(entry: TimelineEntry): Date {
       return new Date(entry.timestamp);
     case 'note':
       return new Date(entry.timestamp);
+    case 'log':
+      return new Date(entry.timestamp);
     case 'habit-log':
       return new Date(entry.timestamp);
     case 'time-block':

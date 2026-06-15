@@ -21,9 +21,10 @@ import {
   Repeat2,
   Hourglass,
 } from 'lucide-react';
-import { TimelineEntry, Task, Event, Note, TimeBlock, HabitLog } from '../../types';
+import { TimelineEntry, Task, Log, Event, Note, TimeBlock, HabitLog } from '../../types';
 import { formatDuration } from '../../utils';
 import TimePickerSheet from '../TimePickerSheet';
+import { db } from '../../db';
 
 export type RenderItem =
   | {
@@ -83,6 +84,16 @@ export default function DayTimeline({
   });
   // Local state for time picker
   const [pickerEntry, setPickerEntry] = useState<TimelineEntry | null>(null);
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [editingLogTitle, setEditingLogTitle] = useState('');
+
+  const saveInlineTitle = async (id: string) => {
+    const trimmed = editingLogTitle.trim();
+    if (trimmed) {
+      await db.entries.update(id, { title: trimmed });
+    }
+    setEditingLogId(null);
+  };
 
   const getPickerInitialDate = (entry: TimelineEntry): Date => {
     if (entry.type === 'task') {
@@ -90,6 +101,7 @@ export default function DayTimeline({
       if (task.status === 'done' && task.completed_at) return new Date(task.completed_at);
       return new Date(task.scheduled_at || task.created_at);
     }
+    if (entry.type === 'log') return new Date((entry as Log).timestamp);
     if (entry.type === 'event') return new Date((entry as Event).timestamp);
     if (entry.type === 'note') return new Date((entry as Note).timestamp);
     if (entry.type === 'habit-log') return new Date((entry as HabitLog).timestamp);
@@ -104,6 +116,7 @@ export default function DayTimeline({
     customSpineMargin = 'left-[19.5px]',
   ) => {
     const isTask = entry.type === 'task';
+    const isLog = entry.type === 'log';
     const isEvent = entry.type === 'event';
     const isNote = entry.type === 'note';
     const isHabitLog = entry.type === 'habit-log';
@@ -121,6 +134,8 @@ export default function DayTimeline({
         primaryTime = formatTime(task.scheduled_at || task.created_at);
         isScheduledTime = !!task.scheduled_at;
       }
+    } else if (isLog) {
+      primaryTime = formatTime((entry as Log).timestamp);
     } else if (isEvent) {
       primaryTime = formatTime((entry as Event).timestamp);
     } else if (isNote) {
@@ -133,9 +148,9 @@ export default function DayTimeline({
       <div
         key={entry.id}
         id={`entry-${entry.id}`}
-        onClick={() => !isHabitLog && handleOpenDetail(entry)}
+        onClick={() => !isHabitLog && entry.type !== 'log' && handleOpenDetail(entry)}
         className={`group relative flex items-center gap-2.5 py-2 rounded md:px-3 transition-colors border-stone-900/50 last:border-b-0 ${
-          isHabitLog ? '' : 'hover:bg-stone-900/40 cursor-pointer'
+          isHabitLog || entry.type === 'log' ? '' : 'hover:bg-stone-900/40 cursor-pointer'
         }`}
       >
         {/* Left Column 1: Time Gutter */}
@@ -176,6 +191,12 @@ export default function DayTimeline({
             </button>
           )}
 
+          {isLog && (
+            <div className="w-6 h-6 flex items-center justify-center select-none">
+              <div className="w-2 h-2 rounded-full bg-stone-500" />
+            </div>
+          )}
+
           {isEvent && (
             <div className="w-6 h-6 rounded border border-stone-800 bg-[#121212] text-indigo-400 flex items-center justify-center">
               <Calendar className="w-3.5 h-3.5" />
@@ -206,6 +227,41 @@ export default function DayTimeline({
           {/* Row 1: Title + Action Tools */}
           <div className="flex justify-between items-center gap-4">
             <div className="flex-1">
+              {isLog && (
+                <>
+                  {editingLogId === entry.id ? (
+                    <input
+                      type="text"
+                      value={editingLogTitle}
+                      onChange={(e) => setEditingLogTitle(e.target.value)}
+                      onBlur={() => saveInlineTitle(entry.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          saveInlineTitle(entry.id);
+                        } else if (e.key === 'Escape') {
+                          setEditingLogId(null);
+                        }
+                      }}
+                      autoFocus
+                      className="bg-stone-900 border border-stone-800 rounded px-2 py-0.5 text-xs text-stone-200 focus:outline-none focus:border-stone-700 w-full font-sans font-semibold"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <p
+                      id={`log-title-${entry.id}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingLogId(entry.id);
+                        setEditingLogTitle((entry as Log).title);
+                      }}
+                      className="text-xs font-sans font-semibold text-stone-200 break-words line-clamp-1 hover:text-stone-300 transition-colors"
+                    >
+                      {(entry as Log).title}
+                    </p>
+                  )}
+                </>
+              )}
+
               {isTask && (
                 <p
                   id={`task-title-${entry.id}`}
@@ -300,6 +356,12 @@ export default function DayTimeline({
 
           {/* Row 2: Custom info triggers */}
           <div className="flex items-center gap-x-1.5 text-xs pb-1">
+            {isLog && (
+              <span className="font-mono text-stone-500">
+                Logged at: {formatTime((entry as Log).timestamp)}
+              </span>
+            )}
+
             {isTask && (
               <>
                 <span className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 rounded px-2 py-0.5 text-[8px]">

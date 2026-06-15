@@ -5,6 +5,7 @@
 
 export type EntryType =
   | 'task'
+  | 'log'
   | 'event'
   | 'note'
   | 'time-block'
@@ -51,6 +52,12 @@ export interface Note extends BaseEntry {
   timestamp: Date;
 }
 
+export interface Log extends BaseEntry {
+  type: 'log';
+  title: string;
+  timestamp: Date;
+}
+
 export interface TimeBlock extends BaseEntry {
   type: 'time-block';
   title: string;
@@ -79,7 +86,7 @@ export interface Goal extends BaseEntry {
   sort_order?: number; // display ordering
 }
 
-export type TimelineEntry = Task | Event | Note | TimeBlock | Objective | Goal | HabitLog;
+export type TimelineEntry = Task | Log | Event | Note | TimeBlock | Objective | Goal | HabitLog;
 
 // Habit template — stored in the `habits` Dexie table, NOT a TimelineEntry
 export interface Habit {

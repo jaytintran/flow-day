@@ -15,6 +15,7 @@ import {
   HelpCircle,
   X,
   ChevronDown,
+  CircleDot,
 } from 'lucide-react';
 import { toLocalDateString } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -360,6 +361,30 @@ export default function InputBar({ activeDate }: InputBarProps) {
         created_at: getBaseCompletedDate(),
         scheduled_at: finalDate,
       };
+    } else if (activeType === 'log') {
+      let cleanTitle = title.trim();
+      let defaultBaseDate =
+        timeManuallySet && timestampStr ? new Date(timestampStr) : getBaseCompletedDate();
+
+      const { parsedDate: dateBase, textAfterDateRemoval } = parseSmartDate(
+        cleanTitle,
+        defaultBaseDate,
+      );
+      cleanTitle = textAfterDateRemoval;
+
+      const { parsedDate: finalDate, textAfterTimeRemoval } = parseSmartTime(cleanTitle, dateBase);
+      cleanTitle = textAfterTimeRemoval;
+
+      const finalTitle = cleanTitle || title.trim();
+      if (!finalTitle) return;
+
+      newEntry = {
+        id: entryId,
+        type: 'log',
+        title: finalTitle,
+        timestamp: finalDate,
+        created_at: getBaseCompletedDate(),
+      };
     } else if (activeType === 'event') {
       let cleanTitle = title.trim();
       let defaultBaseDate =
@@ -473,6 +498,7 @@ export default function InputBar({ activeDate }: InputBarProps) {
               <div className="flex items-center justify-between border-b border-stone-800 pb-2.5 mb-3">
                 <div className="flex items-center gap-2">
                   {activeType === 'task' && <CheckSquare className="w-4 h-4 text-emerald-400" />}
+                  {activeType === 'log' && <CircleDot className="w-4 h-4 text-stone-400" />}
                   {activeType === 'event' && <Calendar className="w-4 h-4 text-amber-400" />}
                   {activeType === 'note' && <FileText className="w-4 h-4 text-blue-400" />}
                   {activeType === 'time-block' && <Clock className="w-4 h-4 text-indigo-400" />}
@@ -555,6 +581,71 @@ export default function InputBar({ activeDate }: InputBarProps) {
                         <span>
                           ✓ Calculated Date:{' '}
                           <strong className="text-emerald-400">Tomorrow @ 11:00 AM</strong>
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {activeType === 'log' && (
+                  <>
+                    <p className="text-stone-400 leading-relaxed">
+                      Our log input scans your words dynamically for dates and times, creates the
+                      timeline entry correctly, and formats the clean residual title.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
+                        <div className="font-mono text-[9px] text-stone-500 uppercase tracking-widest mb-1.5 font-bold">
+                          Time Recognition
+                        </div>
+                        <p className="text-stone-300 leading-relaxed">
+                          Type{' '}
+                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
+                            at 3:45pm
+                          </code>{' '}
+                          or{' '}
+                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
+                            at 20:15
+                          </code>
+                          .
+                        </p>
+                      </div>
+                      <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
+                        <div className="font-mono text-[9px] text-stone-500 uppercase tracking-widest mb-1.5 font-bold">
+                          Date Recognition
+                        </div>
+                        <p className="text-stone-300 leading-relaxed">
+                          Type{' '}
+                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
+                            today
+                          </code>
+                          ,{' '}
+                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
+                            tomorrow
+                          </code>
+                          , or specific date{' '}
+                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
+                            24/6
+                          </code>
+                          .
+                        </p>
+                      </div>
+                    </div>
+                    <div className="bg-stone-950/15 border border-stone-900/30 rounded-lg p-3 mt-2">
+                      <span className="font-mono font-bold text-[9px] text-stone-450 uppercase tracking-wider block mb-1">
+                        Interactive Example:
+                      </span>
+                      <span className="font-sans text-stone-200 text-sm leading-relaxed block font-medium">
+                        "Walking to the train station today at 2:30pm"
+                      </span>
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-mono text-stone-400 border-t border-stone-900/20 pt-1.5">
+                        <span>
+                          ✓ Clean Title:{' '}
+                          <strong className="text-stone-450">"Walking to the train station"</strong>
+                        </span>
+                        <span>
+                          ✓ Calculated Date:{' '}
+                          <strong className="text-stone-450">Today @ 2:30 PM</strong>
                         </span>
                       </div>
                     </div>
@@ -725,11 +816,13 @@ export default function InputBar({ activeDate }: InputBarProps) {
             className={`absolute top-0 left-0 right-0 h-[2px] transition-all duration-300 ${
               activeType === 'task'
                 ? 'bg-gradient-to-r from-emerald-500/20 via-emerald-500 to-emerald-500/20'
-                : activeType === 'event'
-                  ? 'bg-gradient-to-r from-amber-500/20 via-amber-500 to-amber-500/20'
-                  : activeType === 'note'
-                    ? 'bg-gradient-to-r from-blue-500/20 via-blue-500 to-blue-500/20'
-                    : 'bg-gradient-to-r from-indigo-500/20 via-indigo-500 to-indigo-500/20'
+                : activeType === 'log'
+                  ? 'bg-gradient-to-r from-stone-500/20 via-stone-500 to-stone-500/20'
+                  : activeType === 'event'
+                    ? 'bg-gradient-to-r from-amber-500/20 via-amber-500 to-amber-500/20'
+                    : activeType === 'note'
+                      ? 'bg-gradient-to-r from-blue-500/20 via-blue-500 to-blue-500/20'
+                      : 'bg-gradient-to-r from-indigo-500/20 via-indigo-500 to-indigo-500/20'
             }`}
           />
 
@@ -758,6 +851,21 @@ export default function InputBar({ activeDate }: InputBarProps) {
                 >
                   <CheckSquare className="w-3.5 h-3.5" />
                   <span>Task</span>
+                </button>
+
+                {/* LOG */}
+                <button
+                  type="button"
+                  id="chip-log"
+                  onClick={() => setActiveType('log')}
+                  className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                    activeType === 'log'
+                      ? 'bg-stone-500/10 text-stone-400 border border-stone-500/20 shadow-md font-extrabold'
+                      : 'text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-transparent'
+                  }`}
+                >
+                  <CircleDot className="w-3.5 h-3.5" />
+                  <span>Log</span>
                 </button>
 
                 {/* EVENT */}
@@ -822,22 +930,26 @@ export default function InputBar({ activeDate }: InputBarProps) {
                     }`}
                     style={{
                       borderColor: showTimePopup
-                        ? activeType === 'event'
-                          ? '#f59e0b'
-                          : activeType === 'note'
-                            ? '#3b82f6'
-                            : '#6366f1'
+                        ? activeType === 'log'
+                          ? '#a8a29e'
+                          : activeType === 'event'
+                            ? '#f59e0b'
+                            : activeType === 'note'
+                              ? '#3b82f6'
+                              : '#6366f1'
                         : undefined,
                     }}
                     title={`Configure ${activeType} time settings manually`}
                   >
                     <Clock
                       className={`w-4 h-4 ${
-                        activeType === 'event'
-                          ? 'text-amber-400'
-                          : activeType === 'note'
-                            ? 'text-blue-400'
-                            : 'text-indigo-400'
+                        activeType === 'log'
+                          ? 'text-stone-400'
+                          : activeType === 'event'
+                            ? 'text-amber-400'
+                            : activeType === 'note'
+                              ? 'text-blue-400'
+                              : 'text-indigo-400'
                       }`}
                     />
                   </button>
@@ -868,6 +980,27 @@ export default function InputBar({ activeDate }: InputBarProps) {
 
                         {/* Config fields */}
                         <div className="space-y-3">
+                          {activeType === 'log' && (
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <CircleDot className="w-3.5 h-3.5 text-stone-400" />
+                                <span className="text-[10px] font-mono text-stone-500 uppercase tracking-widest font-bold">
+                                  Log Time Details
+                                </span>
+                              </div>
+                              <input
+                                id="input-log-time"
+                                type="datetime-local"
+                                required
+                                value={timestampStr}
+                                onChange={(e) => {
+                                  setTimestampStr(e.target.value);
+                                  setTimeManuallySet(true);
+                                }}
+                              />
+                            </div>
+                          )}
+
                           {activeType === 'event' && (
                             <div className="space-y-1.5">
                               <div className="flex items-center gap-1.5">
@@ -976,6 +1109,11 @@ export default function InputBar({ activeDate }: InputBarProps) {
                     Parser Enabled
                   </span>
                 )}
+                {activeType === 'log' && (
+                  <span className="text-[10px] font-mono font-semibold text-stone-400 bg-stone-950/15 border border-stone-950 px-2 py-0.5 rounded-md">
+                    Parser Enabled
+                  </span>
+                )}
                 {activeType === 'event' && (
                   <span className="text-[10px] font-mono font-semibold text-amber-400 bg-amber-950/15 border border-amber-950 px-2 py-0.5 rounded-md">
                     Implicit Schedule Active
@@ -1037,6 +1175,30 @@ export default function InputBar({ activeDate }: InputBarProps) {
                     className="max-sm:hidden px-6 bg-emerald-500 text-[#070e0a] hover:bg-emerald-400 border border-emerald-400 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all duration-250 active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer"
                   >
                     <span>Save Entry</span>
+                    <Send className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* LOG INJECT */}
+              {activeType === 'log' && (
+                <div className="relative w-full flex gap-3.5 items-stretch h-full">
+                  <input
+                    id="input-log-title"
+                    type="text"
+                    required
+                    maxLength={100}
+                    placeholder="Describe what you are doing at the moment (e.g. Walking to the train station)..."
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    className="flex-1 bg-[#0a0a0a] text-stone-100 hover:bg-[#080808]/50 border border-stone-850 rounded-xl px-4 py-3 text-sm placeholder-stone-600 focus:outline-none focus:border-stone-500/50 focus:bg-stone-950 transition-all shadow-inner"
+                  />
+                  <button
+                    type="submit"
+                    className="max-sm:hidden px-6 bg-stone-850 text-stone-300 hover:bg-stone-800 border border-stone-700 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all duration-250 active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer"
+                  >
+                    <span>Save Log</span>
                     <Send className="w-3.5 h-3.5" />
                   </button>
                 </div>

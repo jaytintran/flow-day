@@ -585,6 +585,7 @@ export default function Journal({
       }
       case 'event':
       case 'note':
+      case 'log':
       case 'habit-log':
         await db.entries.update(id, { timestamp: newDate } as any);
         break;

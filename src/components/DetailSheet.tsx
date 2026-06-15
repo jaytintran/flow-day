@@ -7,7 +7,7 @@ import React, { ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
 
-export type LabelColor = 'blue' | 'indigo' | 'amber' | 'emerald';
+export type LabelColor = 'blue' | 'indigo' | 'amber' | 'emerald' | 'stone';
 
 interface DetailSheetProps {
   open: boolean;
@@ -23,6 +23,7 @@ const colorClasses: Record<LabelColor, string> = {
   indigo: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
   amber: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
   emerald: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+  stone: 'text-stone-400 bg-stone-500/10 border-stone-500/20',
 };
 
 export default function DetailSheet({

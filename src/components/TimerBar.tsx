@@ -532,12 +532,7 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
                       ) : syncStatus === 'error' ? (
                         <AlertTriangle className="w-4 h-4 text-red-400" />
                       ) : (
-                        <UploadCloud
-                          className={
-                            `w-4 h-4 shrink-0 transition-transform ` +
-                            (isSyncDirty ? 'animate-bounce' : '')
-                          }
-                        />
+                        <UploadCloud className="w-4 h-4 shrink-0" />
                       )}
                     </button>
 
