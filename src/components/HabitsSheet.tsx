@@ -39,12 +39,17 @@ import { toLocalDateString } from '../utils';
 import HabitConsistencyModal from './HabitConsistencyModal';
 import SortableRow from './SortableRow';
 
+import { Compass } from 'lucide-react';
+import PurposePickerSheet from './PurposePickerSheet';
+import { Purpose } from '../types';
+
 interface HabitsSheetProps {
   open?: boolean;
   onClose?: () => void;
   /** The currently active date in the navigator — used for tick/check operations */
   activeDate: Date;
   isInline?: boolean;
+  highlightPurposeIds?: string[] | null;
 }
 
 // ─── Color palette ────────────────────────────────────────────────────────────
@@ -169,6 +174,7 @@ export default function HabitsSheet({
   onClose = () => {},
   activeDate,
   isInline = false,
+  highlightPurposeIds,
 }: HabitsSheetProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -181,6 +187,9 @@ export default function HabitsSheet({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+
+  const [purposePickerTarget, setPurposePickerTarget] = useState<Habit | null>(null);
+  const purposes = (useLiveQuery(() => db.purposes.toArray()) || []) as Purpose[];
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -326,6 +335,14 @@ export default function HabitsSheet({
     await db.habits.update(habit.id, { status: 'archived' });
   };
 
+  const handlePurposeToggle = async (habit: Habit, purposeId: string) => {
+    const current = habit.purpose_ids ?? [];
+    const next = current.includes(purposeId)
+      ? current.filter((id) => id !== purposeId)
+      : [...current, purposeId];
+    await db.habits.update(habit.id, { purpose_ids: next });
+  };
+
   const handleUnarchive = async (habit: Habit) => {
     await db.habits.update(habit.id, { status: 'active' });
   };
@@ -348,6 +365,11 @@ export default function HabitsSheet({
     const isEditing = editingId === habit.id;
     const isDeleting = deletingId === habit.id;
 
+    const isDimmed =
+      highlightPurposeIds != null &&
+      highlightPurposeIds.length > 0 &&
+      !(habit.purpose_ids ?? []).some((pid) => highlightPurposeIds.includes(pid));
+
     const todayLogs = allLogs.filter(
       (l) => l.habit_id === habit.id && toLocalDateString(new Date(l.timestamp)) === activeDateStr,
     );
@@ -356,7 +378,7 @@ export default function HabitsSheet({
     return (
       <div
         key={habit.id}
-        className="flex flex-col gap-0 px-3 py-2.5 bg-[#0a0a0a] border border-stone-800/80 rounded-xl hover:border-stone-700 transition-colors group"
+        className={`flex flex-col gap-0 px-3 py-2.5 bg-[#0a0a0a] border border-stone-800/80 rounded-xl hover:border-stone-700 transition-colors group ${isDimmed ? 'opacity-50' : ''}`}
       >
         {/* Row 1: Check + title/edit + actions */}
         <div className="flex items-center gap-2.5 min-w-0">
@@ -522,6 +544,35 @@ export default function HabitsSheet({
           </div>
         </div>
 
+        {/* Row 1.5: Purpose chips */}
+        {!isArchived && (
+          <div className="flex items-center gap-1.5 pl-[30px] flex-wrap mt-1">
+            {(habit.purpose_ids ?? []).map((pid) => {
+              const p = purposes.find((x) => x.id === pid);
+              if (!p) return null;
+              return (
+                <span
+                  key={pid}
+                  className="text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 border border-indigo-700/40 text-indigo-400 bg-indigo-500/10"
+                >
+                  <Compass className="w-2.5 h-2.5" />
+                  {p.title}
+                </span>
+              );
+            })}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setPurposePickerTarget(habit);
+              }}
+              className="text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 border border-stone-800 text-stone-500 hover:text-indigo-400 hover:border-indigo-700/50 transition-colors cursor-pointer"
+            >
+              <Compass className="w-2.5 h-2.5" />
+              Purpose
+            </button>
+          </div>
+        )}
+
         {/* Row 2: 7-day mini strip (active habits only) */}
         {!isArchived && (
           <div className="pl-[30px]">
@@ -680,6 +731,13 @@ export default function HabitsSheet({
             onClose={() => setConsistencyHabit(null)}
           />
         )}
+        <PurposePickerSheet
+          open={purposePickerTarget !== null}
+          onClose={() => setPurposePickerTarget(null)}
+          currentPurposeIds={purposePickerTarget?.purpose_ids ?? []}
+          onToggle={(pid) => purposePickerTarget && handlePurposeToggle(purposePickerTarget, pid)}
+          isMobile={isMobile}
+        />
       </div>
     );
   }
@@ -727,6 +785,14 @@ export default function HabitsSheet({
       {consistencyHabit && (
         <HabitConsistencyModal habit={consistencyHabit} onClose={() => setConsistencyHabit(null)} />
       )}
+
+      <PurposePickerSheet
+        open={purposePickerTarget !== null}
+        onClose={() => setPurposePickerTarget(null)}
+        currentPurposeIds={purposePickerTarget?.purpose_ids ?? []}
+        onToggle={(pid) => purposePickerTarget && handlePurposeToggle(purposePickerTarget, pid)}
+        isMobile={isMobile}
+      />
     </>
   );
 }

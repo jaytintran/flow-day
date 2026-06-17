@@ -17,14 +17,17 @@ import GoalsSheet from '../GoalsSheet';
 import ObjectivesSheet from '../ObjectivesSheet';
 import HabitsSheet from '../HabitsSheet';
 
+import FocusSheet from '../FocusSheet';
+import { Purpose } from '../../types';
+
 interface JournalProps {
   activeDate: Date;
   setActiveDate: (date: Date) => void;
   viewMode: 'day' | 'timeline' | 'records' | 'tasks' | 'hub';
   activeTaskId: string | null;
   setActiveTaskId: (id: string | null) => void;
-  activeHubTab?: 'goals' | 'objectives' | 'habits';
-  setActiveHubTab?: (tab: 'goals' | 'objectives' | 'habits') => void;
+  activeHubTab?: 'goals' | 'objectives' | 'habits' | 'focus';
+  setActiveHubTab?: (tab: 'goals' | 'objectives' | 'habits' | 'focus') => void;
 }
 
 // ─── EditableChip ───────────────────────────────────────────────────────────
@@ -295,6 +298,21 @@ export default function Journal({
   const [editTimestamp, setEditTimestamp] = useState('');
   const [editStartAt, setEditStartAt] = useState('');
   const [editEndAt, setEditEndAt] = useState('');
+
+  const [selectedPurposeId, setSelectedPurposeId] = useState<string | null>(null);
+  const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
+
+  const allPurposes = (useLiveQuery(() => db.purposes.toArray()) || []) as Purpose[];
+
+  const highlightPurposeIds = React.useMemo(() => {
+    if (selectedPurposeId) return [selectedPurposeId];
+    if (selectedDomainId) {
+      return allPurposes
+        .filter((p) => (p.domain_ids ?? []).includes(selectedDomainId))
+        .map((p) => p.id);
+    }
+    return null;
+  }, [selectedPurposeId, selectedDomainId, allPurposes]);
 
   // Helper: format a Date to "YYYY-MM-DD" for date input
   const toDateInputValue = (d: Date): string => {
@@ -822,18 +840,48 @@ export default function Journal({
           />
         ) : viewMode === 'hub' ? (
           <div className="w-full flex-1 min-h-0 flex flex-col">
-            {/* Desktop 3-column Layout */}
-            <div className="hidden md:grid grid-cols-3 gap-6 h-full items-stretch pt-2">
-              <GoalsSheet isInline={true} />
-              <ObjectivesSheet isInline={true} />
-              <HabitsSheet isInline={true} activeDate={activeDate} />
+            {/* Desktop 4-column Layout */}
+            <div className="hidden md:grid xl:grid-cols-4 lg:grid-cols-2 gap-6 h-full items-stretch pt-2">
+              <FocusSheet
+                isInline
+                selectedPurposeId={selectedPurposeId}
+                selectedDomainId={selectedDomainId}
+                onSelectPurpose={setSelectedPurposeId}
+                onSelectDomain={setSelectedDomainId}
+              />
+              <GoalsSheet isInline highlightPurposeIds={highlightPurposeIds} />
+              <ObjectivesSheet isInline highlightPurposeIds={highlightPurposeIds} />
+              <HabitsSheet
+                isInline
+                activeDate={activeDate}
+                highlightPurposeIds={highlightPurposeIds}
+              />
             </div>
 
             {/* Mobile Single-column Switchable Layout */}
             <div className="md:hidden h-full flex flex-col pb-2">
-              {activeHubTab === 'goals' && <GoalsSheet isInline={true} />}
-              {activeHubTab === 'objectives' && <ObjectivesSheet isInline={true} />}
-              {activeHubTab === 'habits' && <HabitsSheet isInline={true} activeDate={activeDate} />}
+              {activeHubTab === 'focus' && (
+                <FocusSheet
+                  isInline
+                  selectedPurposeId={selectedPurposeId}
+                  selectedDomainId={selectedDomainId}
+                  onSelectPurpose={setSelectedPurposeId}
+                  onSelectDomain={setSelectedDomainId}
+                />
+              )}
+              {activeHubTab === 'goals' && (
+                <GoalsSheet isInline highlightPurposeIds={highlightPurposeIds} />
+              )}
+              {activeHubTab === 'objectives' && (
+                <ObjectivesSheet isInline highlightPurposeIds={highlightPurposeIds} />
+              )}
+              {activeHubTab === 'habits' && (
+                <HabitsSheet
+                  isInline
+                  activeDate={activeDate}
+                  highlightPurposeIds={highlightPurposeIds}
+                />
+              )}
             </div>
           </div>
         ) : (

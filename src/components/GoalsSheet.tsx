@@ -22,7 +22,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { db } from '../db';
-import { Goal, Category } from '../types';
+import { Goal, Category, Purpose } from '../types';
 import { formatDuration } from '../utils';
 import {
   Flag,
@@ -40,6 +40,9 @@ import CategoryStrip from './CategoryStrip';
 import CategoryManagementSheet from './CategoryManagementSheet';
 import SortableRow from './SortableRow';
 
+import { Compass } from 'lucide-react';
+import PurposePickerSheet from './PurposePickerSheet';
+
 const colorDotMap: Record<string, string> = {
   emerald: 'bg-emerald-400',
   sky: 'bg-sky-400',
@@ -55,12 +58,14 @@ interface GoalsSheetProps {
   open?: boolean;
   onClose?: () => void;
   isInline?: boolean;
+  highlightPurposeIds?: string[] | null;
 }
 
 export default function GoalsSheet({
   open = false,
   onClose = () => {},
   isInline = false,
+  highlightPurposeIds,
 }: GoalsSheetProps) {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
@@ -74,6 +79,7 @@ export default function GoalsSheet({
 
   const goals = useLiveQuery(() => db.entries.where('type').equals('goal').toArray()) || [];
   const typedGoals = goals as Goal[];
+  const purposes = (useLiveQuery(() => db.purposes.toArray()) || []) as Purpose[];
 
   const activeGoals = typedGoals.filter((o) => o.status === 'active');
   const achievedGoals = typedGoals.filter((o) => o.status === 'achieved');
@@ -84,6 +90,8 @@ export default function GoalsSheet({
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [chipOpenId, setChipOpenId] = useState<string | null>(null);
+  const [purposePickerTarget, setPurposePickerTarget] = useState<Goal | null>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const chipRef = useRef<HTMLDivElement>(null);
 
@@ -217,6 +225,14 @@ export default function GoalsSheet({
     await db.entries.update(goal.id, { category_ids: next } as any);
   };
 
+  const handlePurposeToggle = async (goal: Goal, purposeId: string) => {
+    const current = goal.purpose_ids ?? [];
+    const next = current.includes(purposeId)
+      ? current.filter((id) => id !== purposeId)
+      : [...current, purposeId];
+    await db.entries.update(goal.id, { purpose_ids: next } as any);
+  };
+
   // Count linked objectives and tasks for display
   const allObjs = useLiveQuery(() => db.entries.where('type').equals('objective').toArray()) || [];
   const allTasks = useLiveQuery(() => db.entries.where('type').equals('task').toArray()) || [];
@@ -244,10 +260,18 @@ export default function GoalsSheet({
 
   const renderGoalRow = (obj: Goal) => {
     const assigned = assignedCategories(obj);
+
+    const isDimmed =
+      highlightPurposeIds != null &&
+      highlightPurposeIds.length > 0 &&
+      !(obj.purpose_ids ?? []).some((pid) => highlightPurposeIds.includes(pid));
+
     return (
       <div
         key={obj.id}
         className={`relative flex flex-col gap-1.5 px-4 py-3 border rounded-xl transition-colors group ${
+          isDimmed ? 'opacity-50' : ''
+        } ${
           obj.status === 'achieved'
             ? 'bg-emerald-950/10 border-emerald-900/30 hover:border-emerald-800/50'
             : obj.status === 'archived'
@@ -434,6 +458,33 @@ export default function GoalsSheet({
               )}
             </div>
           )}
+
+          {/* Assigned purpose chips */}
+          {(obj.purpose_ids ?? []).map((pid) => {
+            const p = purposes.find((x) => x.id === pid);
+            if (!p) return null;
+            return (
+              <span
+                key={pid}
+                className="text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 border border-indigo-700/40 text-indigo-400 bg-indigo-500/10"
+              >
+                <Compass className="w-2.5 h-2.5" />
+                {p.title}
+              </span>
+            );
+          })}
+
+          {/* Link Purpose button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setPurposePickerTarget(obj);
+            }}
+            className="text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 border border-stone-800 text-stone-500 hover:text-indigo-400 hover:border-indigo-700/50 transition-colors cursor-pointer"
+          >
+            <Compass className="w-2.5 h-2.5" />
+            Purpose
+          </button>
         </div>
       </div>
     );
@@ -570,6 +621,13 @@ export default function GoalsSheet({
           onClose={() => setIsCategoryManagerOpen(false)}
           scope="goal"
         />
+        <PurposePickerSheet
+          open={purposePickerTarget !== null}
+          onClose={() => setPurposePickerTarget(null)}
+          currentPurposeIds={purposePickerTarget?.purpose_ids ?? []}
+          onToggle={(pid) => purposePickerTarget && handlePurposeToggle(purposePickerTarget, pid)}
+          isMobile={isMobile}
+        />
       </div>
     );
   }
@@ -610,6 +668,14 @@ export default function GoalsSheet({
             open={isCategoryManagerOpen}
             onClose={() => setIsCategoryManagerOpen(false)}
             scope="goal"
+          />
+
+          <PurposePickerSheet
+            open={purposePickerTarget !== null}
+            onClose={() => setPurposePickerTarget(null)}
+            currentPurposeIds={purposePickerTarget?.purpose_ids ?? []}
+            onToggle={(pid) => purposePickerTarget && handlePurposeToggle(purposePickerTarget, pid)}
+            isMobile={isMobile}
           />
         </>
       )}

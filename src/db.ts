@@ -4,12 +4,14 @@
  */
 
 import Dexie, { type Table } from 'dexie';
-import { TimelineEntry, Habit, Category } from './types';
+import { TimelineEntry, Habit, Category, Purpose, Domain } from './types';
 
 export class PersonalTimelineDB extends Dexie {
   entries!: Table<TimelineEntry>;
   habits!: Table<Habit>;
   categories!: Table<Category>;
+  purposes!: Table<Purpose>;
+  domains!: Table<Domain>;
 
   constructor() {
     super('PersonalTimelineDB');
@@ -79,6 +81,14 @@ export class PersonalTimelineDB extends Dexie {
           await tx.table('habits').update(unparented[i].id, { sort_order: i });
         }
       });
+    this.version(11).stores({
+      entries:
+        'id, type, created_at, status, timestamp, start_at, end_at, title, carried_to, objective_id, goal_id, scheduled_at, habit_id, *category_ids, sort_order, *purpose_ids',
+      habits: 'id, status, sort_order, *purpose_ids',
+      categories: 'id, name, scope, [scope+name]',
+      purposes: 'id, sort_order, *domain_ids',
+      domains: 'id, sort_order',
+    });
   }
 }
 

@@ -29,8 +29,8 @@ interface DayNavigatorProps {
   setActiveDate: (date: Date) => void;
   viewMode: 'day' | 'timeline' | 'records' | 'tasks' | 'hub';
   setViewMode: (mode: 'day' | 'timeline' | 'records' | 'tasks' | 'hub') => void;
-  activeHubTab?: 'goals' | 'objectives' | 'habits';
-  setActiveHubTab?: (tab: 'goals' | 'objectives' | 'habits') => void;
+  activeHubTab?: 'goals' | 'objectives' | 'habits' | 'focus';
+  setActiveHubTab?: (tab: 'goals' | 'objectives' | 'habits' | 'focus') => void;
 }
 
 export default function DayNavigator({
@@ -243,6 +243,11 @@ export default function DayNavigator({
                       <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]" />
                       System Hub
                     </>
+                  ) : viewMode === 'focus' ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]" />
+                      Focus
+                    </>
                   ) : null}
                 </span>
               </div>
@@ -397,6 +402,17 @@ export default function DayNavigator({
         {/* Mobile sub-tab switcher for Hub */}
         {viewMode === 'hub' && (
           <div className="md:hidden flex gap-1 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 w-full">
+            <button
+              id="view-mode-hub"
+              onClick={() => setActiveHubTab?.('focus')}
+              className={`flex-1 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all ${
+                activeHubTab === 'focus'
+                  ? 'bg-indigo-500/10 text-sky-400 border border-sky-500/20'
+                  : 'text-stone-500 border border-transparent hover:text-stone-400'
+              }`}
+            >
+              Focus
+            </button>
             <button
               onClick={() => setActiveHubTab?.('goals')}
               className={`flex-1 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all ${

@@ -22,7 +22,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { db } from '../db';
-import { Objective, Goal, Category } from '../types';
+import { Objective, Goal, Category, Purpose } from '../types';
 import { formatDuration } from '../utils';
 import {
   Target,
@@ -42,6 +42,9 @@ import CategoryStrip from './CategoryStrip';
 import CategoryManagementSheet from './CategoryManagementSheet';
 import SortableRow from './SortableRow';
 
+import { Compass } from 'lucide-react';
+import PurposePickerSheet from './PurposePickerSheet';
+
 const colorDotMap: Record<string, string> = {
   emerald: 'bg-emerald-400',
   sky: 'bg-sky-400',
@@ -57,18 +60,23 @@ interface ObjectivesSheetProps {
   open?: boolean;
   onClose?: () => void;
   isInline?: boolean;
+  highlightPurposeIds?: string[] | null;
 }
 
 export default function ObjectivesSheet({
   open = false,
   onClose = () => {},
   isInline = false,
+  highlightPurposeIds,
 }: ObjectivesSheetProps) {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+
+  const [purposePickerTarget, setPurposePickerTarget] = useState<Objective | null>(null);
+  const purposes = (useLiveQuery(() => db.purposes.toArray()) || []) as Purpose[];
 
   const startEdit = (obj: Objective) => {
     setEditingId(obj.id);
@@ -251,15 +259,29 @@ export default function ObjectivesSheet({
     await db.entries.update(obj.id, { category_ids: next } as any);
   };
 
+  const handlePurposeToggle = async (obj: Objective, purposeId: string) => {
+    const current = obj.purpose_ids ?? [];
+    const next = current.includes(purposeId)
+      ? current.filter((id) => id !== purposeId)
+      : [...current, purposeId];
+    await db.entries.update(obj.id, { purpose_ids: next } as any);
+  };
+
   const assignedCategories = (obj: Objective) =>
     (obj.category_ids ?? []).map((id) => categoryMap[id]).filter(Boolean) as Category[];
 
   const renderObjectiveRow = (obj: Objective) => {
     const assigned = assignedCategories(obj);
+    const isDimmed =
+      highlightPurposeIds != null &&
+      highlightPurposeIds.length > 0 &&
+      !(obj.purpose_ids ?? []).some((pid) => highlightPurposeIds.includes(pid));
     return (
       <div
         key={obj.id}
         className={`relative flex flex-col gap-1.5 px-4 py-3 border rounded-xl transition-colors group ${
+          isDimmed ? 'opacity-50' : ''
+        } ${
           obj.status === 'done'
             ? 'bg-emerald-950/10 border-emerald-900/30 hover:border-emerald-800/50'
             : obj.status === 'archived'
@@ -423,6 +445,32 @@ export default function ObjectivesSheet({
               {cat.name}
             </span>
           ))}
+
+          {/* Assigned purpose chips */}
+          {(obj.purpose_ids ?? []).map((pid) => {
+            const p = purposes.find((x) => x.id === pid);
+            if (!p) return null;
+            return (
+              <span
+                key={pid}
+                className="text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 border border-indigo-700/40 text-indigo-400 bg-indigo-500/10"
+              >
+                <Compass className="w-2.5 h-2.5" />
+                {p.title}
+              </span>
+            );
+          })}
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setPurposePickerTarget(obj);
+            }}
+            className="text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 border border-stone-800 text-stone-500 hover:text-indigo-400 hover:border-indigo-700/50 transition-colors cursor-pointer"
+          >
+            <Compass className="w-2.5 h-2.5" />
+            Purpose
+          </button>
 
           {/* Tag button + popover */}
           {categories.length > 0 && (
@@ -615,6 +663,14 @@ export default function ObjectivesSheet({
           onSelect={handleGoalSelect}
           isMobile={isMobile}
         />
+
+        <PurposePickerSheet
+          open={purposePickerTarget !== null}
+          onClose={() => setPurposePickerTarget(null)}
+          currentPurposeIds={purposePickerTarget?.purpose_ids ?? []}
+          onToggle={(pid) => purposePickerTarget && handlePurposeToggle(purposePickerTarget, pid)}
+          isMobile={isMobile}
+        />
       </div>
     );
   }
@@ -662,6 +718,14 @@ export default function ObjectivesSheet({
             onClose={() => setGoalPickerTarget(null)}
             currentGoalId={goalPickerTarget?.goal_id}
             onSelect={handleGoalSelect}
+            isMobile={isMobile}
+          />
+
+          <PurposePickerSheet
+            open={purposePickerTarget !== null}
+            onClose={() => setPurposePickerTarget(null)}
+            currentPurposeIds={purposePickerTarget?.purpose_ids ?? []}
+            onToggle={(pid) => purposePickerTarget && handlePurposeToggle(purposePickerTarget, pid)}
             isMobile={isMobile}
           />
         </>
