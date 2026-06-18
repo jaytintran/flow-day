@@ -99,6 +99,12 @@ export function useGistSync() {
     db.categories.hook('creating', onWrite);
     db.categories.hook('updating', onWrite);
     db.categories.hook('deleting', onWrite);
+    db.purposes.hook('creating', onWrite);
+    db.purposes.hook('updating', onWrite);
+    db.purposes.hook('deleting', onWrite);
+    db.domains.hook('creating', onWrite);
+    db.domains.hook('updating', onWrite);
+    db.domains.hook('deleting', onWrite);
 
     return () => {
       db.entries.hook('creating').unsubscribe(onWrite);
@@ -110,22 +116,25 @@ export function useGistSync() {
       db.categories.hook('creating').unsubscribe(onWrite);
       db.categories.hook('updating').unsubscribe(onWrite);
       db.categories.hook('deleting').unsubscribe(onWrite);
+      db.purposes.hook('creating').unsubscribe(onWrite);
+      db.purposes.hook('updating').unsubscribe(onWrite);
+      db.purposes.hook('deleting').unsubscribe(onWrite);
+      db.domains.hook('creating').unsubscribe(onWrite);
+      db.domains.hook('updating').unsubscribe(onWrite);
+      db.domains.hook('deleting').unsubscribe(onWrite);
     };
   }, []);
 
-  const showToast = useCallback(
-    (msg: string, type: SyncStatus = 'success') => {
-      setStatus(type);
-      setStatusMsg(msg);
-      if (type !== 'loading') {
-        setTimeout(() => {
-          setStatus('idle');
-          setStatusMsg('');
-        }, 4000);
-      }
-    },
-    [],
-  );
+  const showToast = useCallback((msg: string, type: SyncStatus = 'success') => {
+    setStatus(type);
+    setStatusMsg(msg);
+    if (type !== 'loading') {
+      setTimeout(() => {
+        setStatus('idle');
+        setStatusMsg('');
+      }, 4000);
+    }
+  }, []);
 
   const fetchGist = async (token: string, id: string) => {
     const res = await fetch(`https://api.github.com/gists/${id}`, {
@@ -142,12 +151,16 @@ export function useGistSync() {
     const entries = await db.entries.toArray();
     const habits = await db.habits.toArray();
     const categories = await db.categories.toArray();
+    const purposes = await db.purposes.toArray();
+    const domains = await db.domains.toArray();
     return {
       version: 1,
       exportedAt: new Date().toISOString(),
       entries,
       habits,
       categories,
+      purposes,
+      domains,
     };
   };
 
@@ -179,19 +192,37 @@ export function useGistSync() {
       if (c.created_at) c.created_at = new Date(c.created_at);
       return c;
     };
+    const parsePurposeDates = (p: any) => {
+      if (p.created_at) p.created_at = new Date(p.created_at);
+      return p;
+    };
+    const parseDomainDates = (d: any) => {
+      if (d.created_at) d.created_at = new Date(d.created_at);
+      return d;
+    };
 
+    const parsedPurposes = (data.purposes ?? []).map(parsePurposeDates);
+    const parsedDomains = (data.domains ?? []).map(parseDomainDates);
     const parsedEntries = data.entries.map(parseEntryDates);
     const parsedHabits = data.habits.map(parseHabitDates);
     const parsedCategories = data.categories.map(parseCategoryDates);
 
-    await db.transaction('rw', [db.entries, db.habits, db.categories], async () => {
-      await db.entries.clear();
-      await db.habits.clear();
-      await db.categories.clear();
-      if (parsedEntries.length > 0) await db.entries.bulkAdd(parsedEntries);
-      if (parsedHabits.length > 0) await db.habits.bulkAdd(parsedHabits);
-      if (parsedCategories.length > 0) await db.categories.bulkAdd(parsedCategories);
-    });
+    await db.transaction(
+      'rw',
+      [db.entries, db.habits, db.categories, db.purposes, db.domains],
+      async () => {
+        await db.entries.clear();
+        await db.habits.clear();
+        await db.categories.clear();
+        await db.purposes.clear();
+        await db.domains.clear();
+        if (parsedEntries.length > 0) await db.entries.bulkAdd(parsedEntries);
+        if (parsedHabits.length > 0) await db.habits.bulkAdd(parsedHabits);
+        if (parsedCategories.length > 0) await db.categories.bulkAdd(parsedCategories);
+        if (parsedPurposes.length > 0) await db.purposes.bulkAdd(parsedPurposes);
+        if (parsedDomains.length > 0) await db.domains.bulkAdd(parsedDomains);
+      },
+    );
   };
 
   const pushToCloud = async (): Promise<boolean> => {
