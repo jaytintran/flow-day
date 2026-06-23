@@ -166,7 +166,7 @@ export default function DayTimeline({
     return (
       <div
         key="sleep-timeline-row"
-        className="group relative flex items-center gap-2.5 py-3 rounded md:px-3 border-y border-stone-850 bg-stone-900/10 select-none"
+        className="group relative flex items-center gap-2.5 py-3 rounded md:px-3 select-none"
       >
         {/* Left Column 1: Time Gutter */}
         <div className="w-10 text-right shrink-0">
@@ -184,11 +184,11 @@ export default function DayTimeline({
 
         {/* Right Column: Sleep Label and Countdown */}
         <div className="flex-1 min-w-0 flex items-center gap-2">
-          <span className="text-xs font-sans font-semibold text-violet-300">
-            Sleep Time
-          </span>
+          <span className="text-xs font-sans font-semibold text-violet-300">Sleep Time</span>
           {countdownText && (
-            <span className={`text-[10px] font-mono ${countdownText.includes('Past') ? 'text-red-400 font-semibold' : 'text-stone-500'}`}>
+            <span
+              className={`text-[10px] font-mono ${countdownText.includes('Past') ? 'text-red-400 font-semibold' : 'text-stone-500'}`}
+            >
               {countdownText}
             </span>
           )}
@@ -259,12 +259,12 @@ export default function DayTimeline({
         key={entry.id}
         id={`entry-${entry.id}`}
         onClick={() => !isHabitLog && entry.type !== 'log' && handleOpenDetail(entry)}
-        className={`group relative flex items-center gap-2.5 py-2 rounded md:px-3 transition-colors border-stone-900/50 last:border-b-0 ${
+        className={`group relative flex items-start gap-2.5 py-2 rounded md:px-3 transition-colors border-stone-900/50 last:border-b-0 ${
           isHabitLog || entry.type === 'log' ? '' : 'hover:bg-stone-900/40 cursor-pointer'
         }`}
       >
         {/* Left Column 1: Time Gutter */}
-        <div className="w-10 text-right shrink-0 select-none">
+        <div className="w-10 text-right shrink-0 select-none pt-0.5">
           <span
             onClick={(e) => {
               e.stopPropagation();
@@ -283,7 +283,7 @@ export default function DayTimeline({
         </div>
 
         {/* Left Column 2: Icon Dot */}
-        <div className="w-5 h-5 flex items-center justify-center relative shrink-0 z-10">
+        <div className="w-5 h-5 flex items-center justify-center relative shrink-0 z-10 mt-0.5">
           {isTask && (
             <button
               id={`task-status-btn-${entry.id}`}
@@ -738,14 +738,16 @@ export default function DayTimeline({
           <div className="space-y-0 pt-1">
             {/* Non-habit items render normally */}
             {enrichedItems
-              .filter((item) => !(item.type === 'standalone' && item.entry.type === 'habit-log'))
+              .filter(
+                (item) =>
+                  !(item.type === 'standalone' && item.entry.type === 'habit-log') &&
+                  item.type !== 'sleep',
+              )
               .map((item) => {
                 if (item.type === 'standalone') {
                   return renderStandaloneRow(item.entry, false, false);
                 } else if (item.type === 'bracket') {
                   return renderBracketItem(item.block, item.children);
-                } else if (item.type === 'sleep') {
-                  return renderSleepRow(item.timeStr, item.sortTime);
                 }
                 return null;
               })}
@@ -759,24 +761,22 @@ export default function DayTimeline({
 
               return (
                 <>
-                  <div className="flex items-start gap-3 px-3 py-2">
-                    <div className="flex-1 h-px bg-stone-900" />
+                  <div className="flex items-center gap-3 px-3 py-2">
                     <button
-                      onClick={() =>
-                        setHabitsCollapsed((v) => {
-                          const next = !v;
-                          try {
-                            localStorage.setItem(HABITS_COLLAPSE_KEY, String(next));
-                          } catch {}
-                          return next;
-                        })
-                      }
-                      className="flex items-start gap-1.5 px-2.5 py-1 border-b border-emerald-800/30 text-[10px] text-emerald-600 hover:text-emerald-400 hover:border-emerald-700/50 transition-colors cursor-pointer shrink-0"
+                       onClick={() =>
+                         setHabitsCollapsed((v) => {
+                           const next = !v;
+                           try {
+                             localStorage.setItem(HABITS_COLLAPSE_KEY, String(next));
+                           } catch {}
+                           return next;
+                         })
+                       }
+                       className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] text-emerald-600 hover:text-emerald-400 transition-colors cursor-pointer shrink-0"
                     >
                       <Repeat2 className="w-3 h-3" />
                       <span>
-                        {habitItems.length} habit
-                        {habitItems.length !== 1 ? 's' : ''} done
+                        {habitItems.length} Habit{habitItems.length !== 1 ? 's' : ''} Done
                       </span>
                       {habitsCollapsed ? (
                         <ChevronRight className="w-3 h-3" />
@@ -784,7 +784,7 @@ export default function DayTimeline({
                         <ChevronDown className="w-3 h-3" />
                       )}
                     </button>
-                    <div className="flex-1 h-px bg-stone-900" />
+                    <div className="flex-1 h-px bg-stone-900 self-center" />
                   </div>
 
                   {!habitsCollapsed && (
@@ -806,6 +806,15 @@ export default function DayTimeline({
                   )}
                 </>
               );
+            })()}
+
+            {/* Sleep row rendered at the end */}
+            {(() => {
+              const sleepItem = enrichedItems.find((item) => item.type === 'sleep');
+              if (sleepItem && sleepItem.type === 'sleep') {
+                return renderSleepRow(sleepItem.timeStr, sleepItem.sortTime);
+              }
+              return null;
             })()}
           </div>
         ) : (

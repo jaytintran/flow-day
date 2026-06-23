@@ -73,7 +73,14 @@ export default function CategoryStrip({
 }: CategoryStripProps) {
   return (
     <div className="flex items-center gap-1 px-4 py-2 border-b border-stone-800/60 bg-[#121212] w-full overflow-hidden">
-      <div className="flex items-center gap-1 flex-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+      <div
+        onWheel={(e) => {
+          if (e.deltaY !== 0) {
+            e.currentTarget.scrollLeft += e.deltaY;
+          }
+        }}
+        className="flex items-center gap-1 flex-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+      >
         {/* "All" pill */}
         <button
           onClick={() => onSelect(null)}

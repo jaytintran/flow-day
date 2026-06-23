@@ -257,6 +257,7 @@ export default function ObjectivesSheet({
       time_spent: 0,
       status: 'todo',
       created_at: new Date(),
+      category_ids: selectedCategoryId ? [selectedCategoryId] : undefined,
     };
     await db.entries.add(newObj);
     setNewTitle('');

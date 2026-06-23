@@ -223,6 +223,7 @@ export default function GoalsSheet({
       time_spent: 0,
       status: 'active',
       created_at: new Date(),
+      category_ids: selectedCategoryId ? [selectedCategoryId] : undefined,
     };
     await db.entries.add(newObj);
     setNewTitle('');
