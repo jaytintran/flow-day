@@ -25,6 +25,7 @@ import { Compass, Globe, Plus, Trash2, Check, ChevronDown, X } from 'lucide-reac
 import { db } from '../db';
 import { Purpose, Domain } from '../types';
 import SortableRow from './SortableRow';
+import DomainPickerSheet from './DomainPickerSheet';
 
 interface FocusSheetProps {
   isInline?: boolean;
@@ -48,8 +49,15 @@ export default function FocusSheet({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [domainPickerOpenId, setDomainPickerOpenId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const inputRef = useRef<HTMLInputElement>(null);
-  const domainPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const purposes = (useLiveQuery(() => db.purposes.toArray()) || []) as Purpose[];
   const domains = (useLiveQuery(() => db.domains.toArray()) || []) as Domain[];
@@ -218,17 +226,6 @@ export default function FocusSheet({
     await db.purposes.update(purpose.id, { domain_ids: next });
   };
 
-  // Close domain picker on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (domainPickerRef.current && !domainPickerRef.current.contains(e.target as Node)) {
-        setDomainPickerOpenId(null);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
   const renderPurposeRow = (purpose: Purpose) => {
     const isSelected = selectedPurposeId === purpose.id;
     const assignedDomains = (purpose.domain_ids ?? [])
@@ -243,10 +240,13 @@ export default function FocusSheet({
             ? 'bg-indigo-500/10 border-indigo-500/40 shadow-[0_0_12px_rgba(99,102,241,0.1)]'
             : 'bg-[#0a0a0a] border-stone-800/80 hover:border-stone-700'
         }`}
-        onClick={() => onSelectPurpose(isSelected ? null : purpose.id)}
+        onDoubleClick={() => {
+          onSelectDomain(null);
+          onSelectPurpose(isSelected ? null : purpose.id);
+        }}
+        title="Double-click to filter by this purpose"
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          {/* Selection indicator */}
           <div
             className={`w-3.5 h-3.5 rounded-full border shrink-0 flex items-center justify-center transition-all ${
               isSelected
@@ -257,7 +257,6 @@ export default function FocusSheet({
             {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />}
           </div>
 
-          {/* Title */}
           {editingId === purpose.id ? (
             <input
               autoFocus
@@ -297,12 +296,10 @@ export default function FocusSheet({
           </button>
         </div>
 
-        {/* Bottom chip row */}
         <div
           className="flex items-center gap-1.5 pl-6 flex-wrap"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Count badges */}
           {purposeGoalCounts[purpose.id] > 0 && (
             <span className="text-[9px] font-mono text-stone-500 bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded">
               {purposeGoalCounts[purpose.id]} goals
@@ -319,7 +316,6 @@ export default function FocusSheet({
             </span>
           )}
 
-          {/* Assigned domain chips */}
           {assignedDomains.map((d) => (
             <span
               key={d.id}
@@ -330,49 +326,17 @@ export default function FocusSheet({
             </span>
           ))}
 
-          {/* Domain picker toggle */}
           {domains.length > 0 && (
-            <div className="relative">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDomainPickerOpenId(domainPickerOpenId === purpose.id ? null : purpose.id);
-                }}
-                className="text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 border border-stone-800 text-stone-500 hover:text-teal-400 hover:border-teal-700/50 transition-colors cursor-pointer"
-              >
-                <Globe className="w-2.5 h-2.5" />
-                Domain
-              </button>
-
-              {domainPickerOpenId === purpose.id && (
-                <div
-                  ref={domainPickerRef}
-                  className="absolute bottom-full left-0 mb-1 z-50 bg-[#1a1a1a] border border-stone-700 rounded-lg p-1.5 shadow-xl flex flex-col gap-1 min-w-[150px]"
-                >
-                  {sortedDomains.map((d) => {
-                    const isActive = (purpose.domain_ids ?? []).includes(d.id);
-                    return (
-                      <button
-                        key={d.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleDomainOnPurpose(purpose, d.id);
-                        }}
-                        className={`flex items-center gap-2 px-2 py-1 rounded text-[11px] font-mono transition-colors cursor-pointer text-left ${
-                          isActive
-                            ? 'bg-stone-700/50 text-stone-200'
-                            : 'text-stone-400 hover:bg-stone-800/60 hover:text-stone-300'
-                        }`}
-                      >
-                        <Globe className="w-2.5 h-2.5 shrink-0 text-teal-400" />
-                        <span className="flex-1">{d.title}</span>
-                        {isActive && <Check className="w-3 h-3 text-teal-400" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setDomainPickerOpenId(purpose.id);
+              }}
+              className="text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 border border-stone-800 text-stone-500 hover:text-teal-400 hover:border-teal-700/50 transition-colors cursor-pointer"
+            >
+              <Globe className="w-2.5 h-2.5" />
+              Domain
+            </button>
           )}
         </div>
       </div>
@@ -391,9 +355,12 @@ export default function FocusSheet({
             ? 'bg-teal-500/10 border-teal-500/40 shadow-[0_0_12px_rgba(20,184,166,0.1)]'
             : 'bg-[#0a0a0a] border-stone-800/80 hover:border-stone-700'
         }`}
-        onClick={() => onSelectDomain(isSelected ? null : domain.id)}
+        onDoubleClick={() => {
+          onSelectPurpose(null);
+          onSelectDomain(isSelected ? null : domain.id);
+        }}
+        title="Double-click to filter by this domain"
       >
-        {/* Selection indicator */}
         <div
           className={`w-3.5 h-3.5 rounded-full border shrink-0 flex items-center justify-center transition-all ${
             isSelected
@@ -453,7 +420,6 @@ export default function FocusSheet({
 
   const content = (
     <div className="flex flex-col h-full bg-[#121212]">
-      {/* Header */}
       {!isInline && (
         <div className="flex items-center justify-between border-b border-stone-800/60 px-4 py-3.5">
           <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border text-indigo-400 bg-indigo-500/10 border-indigo-500/20 flex items-center gap-1.5">
@@ -469,7 +435,6 @@ export default function FocusSheet({
         </div>
       )}
 
-      {/* Tab switcher */}
       <div className="flex gap-1 p-2 border-b border-stone-800/60">
         <button
           onClick={() => setActiveTab('purposes')}
@@ -495,7 +460,6 @@ export default function FocusSheet({
         </button>
       </div>
 
-      {/* Active filter pill */}
       {(selectedPurposeId || selectedDomainId) && (
         <div className="px-3 py-2 border-b border-stone-800/40">
           <div className="flex items-center gap-1.5">
@@ -524,7 +488,6 @@ export default function FocusSheet({
         </div>
       )}
 
-      {/* List */}
       <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-1.5 pt-3">
         {activeTab === 'purposes' ? (
           <>
@@ -587,7 +550,6 @@ export default function FocusSheet({
         )}
       </div>
 
-      {/* Create input */}
       <div className="flex-none p-3 border-t border-stone-800 bg-[#121212] relative z-10">
         <div className="flex items-stretch gap-3">
           <input
@@ -621,13 +583,26 @@ export default function FocusSheet({
     </div>
   );
 
-  if (isInline) {
-    return (
-      <div className="h-full w-full flex flex-col relative bg-[#121212] border border-stone-800 rounded-2xl overflow-hidden shadow-xl">
-        {content}
-      </div>
-    );
-  }
+  const purposeToPicker = purposes.find((p) => p.id === domainPickerOpenId);
 
-  return content;
+  return (
+    <>
+      {isInline ? (
+        <div className="h-full w-full flex flex-col relative bg-[#121212] border border-stone-800 rounded-2xl overflow-hidden shadow-xl">
+          {content}
+        </div>
+      ) : (
+        content
+      )}
+      {purposeToPicker && (
+        <DomainPickerSheet
+          open={!!domainPickerOpenId}
+          onClose={() => setDomainPickerOpenId(null)}
+          currentDomainIds={purposeToPicker.domain_ids ?? []}
+          onToggle={(domainId) => handleToggleDomainOnPurpose(purposeToPicker, domainId)}
+          isMobile={isMobile}
+        />
+      )}
+    </>
+  );
 }

@@ -73,17 +73,27 @@ export default function DayNavigator({
     if (todayLogs.length > 0) {
       await db.entries.delete(todayLogs[todayLogs.length - 1].id);
     } else {
+      const logTimestamp = new Date(activeDate);
+      const now = new Date();
+      logTimestamp.setHours(
+        now.getHours(),
+        now.getMinutes(),
+        now.getSeconds(),
+        now.getMilliseconds(),
+      );
+
       const log: HabitLog = {
         id: crypto.randomUUID(),
         type: 'habit-log',
         habit_id: habit.id,
         title: habit.title,
-        timestamp: new Date(),
+        timestamp: logTimestamp,
         created_at: new Date(),
       };
       await db.entries.add(log as any);
     }
   };
+
 
   const dayStatsMap = React.useMemo(() => {
     const map: {

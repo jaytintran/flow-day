@@ -22,7 +22,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { db } from '../db';
-import { Goal, Category, Purpose } from '../types';
+import { Goal, Category, Purpose, Domain } from '../types';
 import { formatDuration } from '../utils';
 import {
   Flag,
@@ -35,6 +35,7 @@ import {
   ChevronDown,
   Tag,
   MoreHorizontal,
+  Globe,
 } from 'lucide-react';
 import CategoryStrip from './CategoryStrip';
 import CategoryManagementSheet from './CategoryManagementSheet';
@@ -42,6 +43,7 @@ import SortableRow from './SortableRow';
 
 import { Compass } from 'lucide-react';
 import PurposePickerSheet from './PurposePickerSheet';
+import DomainPickerSheet from './DomainPickerSheet';
 
 const colorDotMap: Record<string, string> = {
   emerald: 'bg-emerald-400',
@@ -59,6 +61,7 @@ interface GoalsSheetProps {
   onClose?: () => void;
   isInline?: boolean;
   highlightPurposeIds?: string[] | null;
+  highlightDomainId?: string | null;
 }
 
 export default function GoalsSheet({
@@ -66,6 +69,7 @@ export default function GoalsSheet({
   onClose = () => {},
   isInline = false,
   highlightPurposeIds,
+  highlightDomainId,
 }: GoalsSheetProps) {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
@@ -91,6 +95,7 @@ export default function GoalsSheet({
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [chipOpenId, setChipOpenId] = useState<string | null>(null);
   const [purposePickerTarget, setPurposePickerTarget] = useState<Goal | null>(null);
+  const [domainPickerTarget, setDomainPickerTarget] = useState<Goal | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const chipRef = useRef<HTMLDivElement>(null);
@@ -100,6 +105,14 @@ export default function GoalsSheet({
 
   const categories =
     useLiveQuery(() => db.categories.where('scope').equals('goal').toArray()) || [];
+  const domains = (useLiveQuery(() => db.domains.toArray()) || []) as Domain[];
+  const domainMap = React.useMemo(() => {
+    const map: Record<string, Domain> = {};
+    for (const d of domains) {
+      map[d.id] = d;
+    }
+    return map;
+  }, [domains]);
   const categoryMap = React.useMemo(() => {
     const map: Record<string, Category> = {};
     for (const c of categories) {
@@ -233,6 +246,14 @@ export default function GoalsSheet({
     await db.entries.update(goal.id, { purpose_ids: next } as any);
   };
 
+  const handleDomainToggle = async (goal: Goal, domainId: string) => {
+    const current = goal.domain_ids ?? [];
+    const next = current.includes(domainId)
+      ? current.filter((id) => id !== domainId)
+      : [...current, domainId];
+    await db.entries.update(goal.id, { domain_ids: next } as any);
+  };
+
   // Count linked objectives and tasks for display
   const allObjs = useLiveQuery(() => db.entries.where('type').equals('objective').toArray()) || [];
   const allTasks = useLiveQuery(() => db.entries.where('type').equals('task').toArray()) || [];
@@ -258,13 +279,24 @@ export default function GoalsSheet({
   const assignedCategories = (obj: Goal) =>
     (obj.category_ids ?? []).map((id) => categoryMap[id]).filter(Boolean) as Category[];
 
+  const matchesHighlightedDomain = (obj: Goal) => {
+    if (!highlightDomainId) return true;
+    if ((obj.domain_ids ?? []).includes(highlightDomainId)) return true;
+    return (obj.purpose_ids ?? []).some((pid) => {
+      const purpose = purposes.find((p) => p.id === pid);
+      return (purpose?.domain_ids ?? []).includes(highlightDomainId);
+    });
+  };
+
   const renderGoalRow = (obj: Goal) => {
     const assigned = assignedCategories(obj);
 
-    const isDimmed =
+    const isDimmedByPurpose =
       highlightPurposeIds != null &&
       highlightPurposeIds.length > 0 &&
       !(obj.purpose_ids ?? []).some((pid) => highlightPurposeIds.includes(pid));
+    const isDimmedByDomain = highlightDomainId != null && !matchesHighlightedDomain(obj);
+    const isDimmed = isDimmedByPurpose || isDimmedByDomain;
 
     return (
       <div
@@ -474,6 +506,21 @@ export default function GoalsSheet({
             );
           })}
 
+          {/* Assigned domain chips */}
+          {(obj.domain_ids ?? []).map((did) => {
+            const d = domainMap[did];
+            if (!d) return null;
+            return (
+              <span
+                key={did}
+                className="text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 border border-teal-700/40 text-teal-400 bg-teal-500/10"
+              >
+                <Globe className="w-2.5 h-2.5" />
+                {d.title}
+              </span>
+            );
+          })}
+
           {/* Link Purpose button */}
           <button
             onClick={(e) => {
@@ -484,6 +531,17 @@ export default function GoalsSheet({
           >
             <Compass className="w-2.5 h-2.5" />
             Purpose
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setDomainPickerTarget(obj);
+            }}
+            className="text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 border border-stone-800 text-stone-500 hover:text-teal-400 hover:border-teal-700/50 transition-colors cursor-pointer"
+          >
+            <Globe className="w-2.5 h-2.5" />
+            Domain
           </button>
         </div>
       </div>
@@ -628,6 +686,13 @@ export default function GoalsSheet({
           onToggle={(pid) => purposePickerTarget && handlePurposeToggle(purposePickerTarget, pid)}
           isMobile={isMobile}
         />
+        <DomainPickerSheet
+          open={domainPickerTarget !== null}
+          onClose={() => setDomainPickerTarget(null)}
+          currentDomainIds={domainPickerTarget?.domain_ids ?? []}
+          onToggle={(did) => domainPickerTarget && handleDomainToggle(domainPickerTarget, did)}
+          isMobile={isMobile}
+        />
       </div>
     );
   }
@@ -675,6 +740,14 @@ export default function GoalsSheet({
             onClose={() => setPurposePickerTarget(null)}
             currentPurposeIds={purposePickerTarget?.purpose_ids ?? []}
             onToggle={(pid) => purposePickerTarget && handlePurposeToggle(purposePickerTarget, pid)}
+            isMobile={isMobile}
+          />
+
+          <DomainPickerSheet
+            open={domainPickerTarget !== null}
+            onClose={() => setDomainPickerTarget(null)}
+            currentDomainIds={domainPickerTarget?.domain_ids ?? []}
+            onToggle={(did) => domainPickerTarget && handleDomainToggle(domainPickerTarget, did)}
             isMobile={isMobile}
           />
         </>

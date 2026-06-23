@@ -74,6 +74,7 @@ export interface Objective extends BaseEntry {
   goal_id?: string; // link to a goal/project
   category_ids?: string[]; // links to categories
   purpose_ids?: string[];
+  domain_ids?: string[];
   sort_order?: number; // display ordering
 }
 
@@ -85,6 +86,7 @@ export interface Goal extends BaseEntry {
   achieved_at?: Date;
   category_ids?: string[]; // links to categories
   purpose_ids?: string[];
+  domain_ids?: string[];
   sort_order?: number; // display ordering
 }
 
@@ -99,6 +101,7 @@ export interface Habit {
   color?: 'emerald' | 'sky' | 'violet' | 'rose' | 'amber';
   sort_order?: number; // display ordering
   purpose_ids?: string[];
+  domain_ids?: string[];
 }
 
 // One log per tick — IS a TimelineEntry (appears in the daily timeline)

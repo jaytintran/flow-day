@@ -17,6 +17,7 @@ import {
   ChevronDown,
   RotateCcw,
   MoreHorizontal,
+  Globe,
 } from 'lucide-react';
 import {
   DndContext,
@@ -41,7 +42,8 @@ import SortableRow from './SortableRow';
 
 import { Compass } from 'lucide-react';
 import PurposePickerSheet from './PurposePickerSheet';
-import { Purpose } from '../types';
+import DomainPickerSheet from './DomainPickerSheet';
+import { Purpose, Domain } from '../types';
 
 interface HabitsSheetProps {
   open?: boolean;
@@ -50,6 +52,7 @@ interface HabitsSheetProps {
   activeDate: Date;
   isInline?: boolean;
   highlightPurposeIds?: string[] | null;
+  highlightDomainId?: string | null;
 }
 
 // ─── Color palette ────────────────────────────────────────────────────────────
@@ -175,6 +178,7 @@ export default function HabitsSheet({
   activeDate,
   isInline = false,
   highlightPurposeIds,
+  highlightDomainId,
 }: HabitsSheetProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -189,7 +193,16 @@ export default function HabitsSheet({
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   const [purposePickerTarget, setPurposePickerTarget] = useState<Habit | null>(null);
+  const [domainPickerTarget, setDomainPickerTarget] = useState<Habit | null>(null);
   const purposes = (useLiveQuery(() => db.purposes.toArray()) || []) as Purpose[];
+  const domains = (useLiveQuery(() => db.domains.toArray()) || []) as Domain[];
+  const domainMap = React.useMemo(() => {
+    const map: Record<string, Domain> = {};
+    for (const d of domains) {
+      map[d.id] = d;
+    }
+    return map;
+  }, [domains]);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -343,6 +356,14 @@ export default function HabitsSheet({
     await db.habits.update(habit.id, { purpose_ids: next });
   };
 
+  const handleDomainToggle = async (habit: Habit, domainId: string) => {
+    const current = habit.domain_ids ?? [];
+    const next = current.includes(domainId)
+      ? current.filter((id) => id !== domainId)
+      : [...current, domainId];
+    await db.habits.update(habit.id, { domain_ids: next });
+  };
+
   const handleUnarchive = async (habit: Habit) => {
     await db.habits.update(habit.id, { status: 'active' });
   };
@@ -365,10 +386,21 @@ export default function HabitsSheet({
     const isEditing = editingId === habit.id;
     const isDeleting = deletingId === habit.id;
 
-    const isDimmed =
+    const matchesHighlightedDomain = () => {
+      if (!highlightDomainId) return true;
+      if ((habit.domain_ids ?? []).includes(highlightDomainId)) return true;
+      return (habit.purpose_ids ?? []).some((pid) => {
+        const purpose = purposes.find((p) => p.id === pid);
+        return (purpose?.domain_ids ?? []).includes(highlightDomainId);
+      });
+    };
+
+    const isDimmedByPurpose =
       highlightPurposeIds != null &&
       highlightPurposeIds.length > 0 &&
       !(habit.purpose_ids ?? []).some((pid) => highlightPurposeIds.includes(pid));
+    const isDimmedByDomain = highlightDomainId != null && !matchesHighlightedDomain();
+    const isDimmed = isDimmedByPurpose || isDimmedByDomain;
 
     const todayLogs = allLogs.filter(
       (l) => l.habit_id === habit.id && toLocalDateString(new Date(l.timestamp)) === activeDateStr,
@@ -560,6 +592,19 @@ export default function HabitsSheet({
                 </span>
               );
             })}
+            {(habit.domain_ids ?? []).map((did) => {
+              const d = domainMap[did];
+              if (!d) return null;
+              return (
+                <span
+                  key={did}
+                  className="text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 border border-teal-700/40 text-teal-400 bg-teal-500/10"
+                >
+                  <Globe className="w-2.5 h-2.5" />
+                  {d.title}
+                </span>
+              );
+            })}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -569,6 +614,16 @@ export default function HabitsSheet({
             >
               <Compass className="w-2.5 h-2.5" />
               Purpose
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setDomainPickerTarget(habit);
+              }}
+              className="text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 border border-stone-800 text-stone-500 hover:text-teal-400 hover:border-teal-700/50 transition-colors cursor-pointer"
+            >
+              <Globe className="w-2.5 h-2.5" />
+              Domain
             </button>
           </div>
         )}
@@ -738,6 +793,13 @@ export default function HabitsSheet({
           onToggle={(pid) => purposePickerTarget && handlePurposeToggle(purposePickerTarget, pid)}
           isMobile={isMobile}
         />
+        <DomainPickerSheet
+          open={domainPickerTarget !== null}
+          onClose={() => setDomainPickerTarget(null)}
+          currentDomainIds={domainPickerTarget?.domain_ids ?? []}
+          onToggle={(did) => domainPickerTarget && handleDomainToggle(domainPickerTarget, did)}
+          isMobile={isMobile}
+        />
       </div>
     );
   }
@@ -791,6 +853,14 @@ export default function HabitsSheet({
         onClose={() => setPurposePickerTarget(null)}
         currentPurposeIds={purposePickerTarget?.purpose_ids ?? []}
         onToggle={(pid) => purposePickerTarget && handlePurposeToggle(purposePickerTarget, pid)}
+        isMobile={isMobile}
+      />
+
+      <DomainPickerSheet
+        open={domainPickerTarget !== null}
+        onClose={() => setDomainPickerTarget(null)}
+        currentDomainIds={domainPickerTarget?.domain_ids ?? []}
+        onToggle={(did) => domainPickerTarget && handleDomainToggle(domainPickerTarget, did)}
         isMobile={isMobile}
       />
     </>

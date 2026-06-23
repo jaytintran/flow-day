@@ -22,7 +22,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { db } from '../db';
-import { Objective, Goal, Category, Purpose } from '../types';
+import { Objective, Goal, Category, Purpose, Domain } from '../types';
 import { formatDuration } from '../utils';
 import {
   Target,
@@ -36,6 +36,7 @@ import {
   Flag,
   Tag,
   MoreHorizontal,
+  Globe,
 } from 'lucide-react';
 import GoalPickerSheet from './GoalPickerSheet';
 import CategoryStrip from './CategoryStrip';
@@ -44,6 +45,7 @@ import SortableRow from './SortableRow';
 
 import { Compass } from 'lucide-react';
 import PurposePickerSheet from './PurposePickerSheet';
+import DomainPickerSheet from './DomainPickerSheet';
 
 const colorDotMap: Record<string, string> = {
   emerald: 'bg-emerald-400',
@@ -61,6 +63,7 @@ interface ObjectivesSheetProps {
   onClose?: () => void;
   isInline?: boolean;
   highlightPurposeIds?: string[] | null;
+  highlightDomainId?: string | null;
 }
 
 export default function ObjectivesSheet({
@@ -68,6 +71,7 @@ export default function ObjectivesSheet({
   onClose = () => {},
   isInline = false,
   highlightPurposeIds,
+  highlightDomainId,
 }: ObjectivesSheetProps) {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
@@ -76,7 +80,16 @@ export default function ObjectivesSheet({
   const [editTitle, setEditTitle] = useState('');
 
   const [purposePickerTarget, setPurposePickerTarget] = useState<Objective | null>(null);
+  const [domainPickerTarget, setDomainPickerTarget] = useState<Objective | null>(null);
   const purposes = (useLiveQuery(() => db.purposes.toArray()) || []) as Purpose[];
+  const domains = (useLiveQuery(() => db.domains.toArray()) || []) as Domain[];
+  const domainMap = React.useMemo(() => {
+    const map: Record<string, Domain> = {};
+    for (const d of domains) {
+      map[d.id] = d;
+    }
+    return map;
+  }, [domains]);
 
   const startEdit = (obj: Objective) => {
     setEditingId(obj.id);
@@ -267,15 +280,34 @@ export default function ObjectivesSheet({
     await db.entries.update(obj.id, { purpose_ids: next } as any);
   };
 
+  const handleDomainToggle = async (obj: Objective, domainId: string) => {
+    const current = obj.domain_ids ?? [];
+    const next = current.includes(domainId)
+      ? current.filter((id) => id !== domainId)
+      : [...current, domainId];
+    await db.entries.update(obj.id, { domain_ids: next } as any);
+  };
+
   const assignedCategories = (obj: Objective) =>
     (obj.category_ids ?? []).map((id) => categoryMap[id]).filter(Boolean) as Category[];
 
+  const matchesHighlightedDomain = (obj: Objective) => {
+    if (!highlightDomainId) return true;
+    if ((obj.domain_ids ?? []).includes(highlightDomainId)) return true;
+    return (obj.purpose_ids ?? []).some((pid) => {
+      const purpose = purposes.find((p) => p.id === pid);
+      return (purpose?.domain_ids ?? []).includes(highlightDomainId);
+    });
+  };
+
   const renderObjectiveRow = (obj: Objective) => {
     const assigned = assignedCategories(obj);
-    const isDimmed =
+    const isDimmedByPurpose =
       highlightPurposeIds != null &&
       highlightPurposeIds.length > 0 &&
       !(obj.purpose_ids ?? []).some((pid) => highlightPurposeIds.includes(pid));
+    const isDimmedByDomain = highlightDomainId != null && !matchesHighlightedDomain(obj);
+    const isDimmed = isDimmedByPurpose || isDimmedByDomain;
     return (
       <div
         key={obj.id}
@@ -461,6 +493,20 @@ export default function ObjectivesSheet({
             );
           })}
 
+          {(obj.domain_ids ?? []).map((did) => {
+            const d = domainMap[did];
+            if (!d) return null;
+            return (
+              <span
+                key={did}
+                className="text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 border border-teal-700/40 text-teal-400 bg-teal-500/10"
+              >
+                <Globe className="w-2.5 h-2.5" />
+                {d.title}
+              </span>
+            );
+          })}
+
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -470,6 +516,17 @@ export default function ObjectivesSheet({
           >
             <Compass className="w-2.5 h-2.5" />
             Purpose
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setDomainPickerTarget(obj);
+            }}
+            className="text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1 border border-stone-800 text-stone-500 hover:text-teal-400 hover:border-teal-700/50 transition-colors cursor-pointer"
+          >
+            <Globe className="w-2.5 h-2.5" />
+            Domain
           </button>
 
           {/* Tag button + popover */}
@@ -671,6 +728,14 @@ export default function ObjectivesSheet({
           onToggle={(pid) => purposePickerTarget && handlePurposeToggle(purposePickerTarget, pid)}
           isMobile={isMobile}
         />
+
+        <DomainPickerSheet
+          open={domainPickerTarget !== null}
+          onClose={() => setDomainPickerTarget(null)}
+          currentDomainIds={domainPickerTarget?.domain_ids ?? []}
+          onToggle={(did) => domainPickerTarget && handleDomainToggle(domainPickerTarget, did)}
+          isMobile={isMobile}
+        />
       </div>
     );
   }
@@ -726,6 +791,14 @@ export default function ObjectivesSheet({
             onClose={() => setPurposePickerTarget(null)}
             currentPurposeIds={purposePickerTarget?.purpose_ids ?? []}
             onToggle={(pid) => purposePickerTarget && handlePurposeToggle(purposePickerTarget, pid)}
+            isMobile={isMobile}
+          />
+
+          <DomainPickerSheet
+            open={domainPickerTarget !== null}
+            onClose={() => setDomainPickerTarget(null)}
+            currentDomainIds={domainPickerTarget?.domain_ids ?? []}
+            onToggle={(did) => domainPickerTarget && handleDomainToggle(domainPickerTarget, did)}
             isMobile={isMobile}
           />
         </>

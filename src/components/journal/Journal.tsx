@@ -313,6 +313,7 @@ export default function Journal({
     }
     return null;
   }, [selectedPurposeId, selectedDomainId, allPurposes]);
+  const highlightDomainId = selectedPurposeId ? null : selectedDomainId;
 
   // Helper: format a Date to "YYYY-MM-DD" for date input
   const toDateInputValue = (d: Date): string => {
@@ -849,12 +850,21 @@ export default function Journal({
                 onSelectPurpose={setSelectedPurposeId}
                 onSelectDomain={setSelectedDomainId}
               />
-              <GoalsSheet isInline highlightPurposeIds={highlightPurposeIds} />
-              <ObjectivesSheet isInline highlightPurposeIds={highlightPurposeIds} />
+              <GoalsSheet
+                isInline
+                highlightPurposeIds={highlightPurposeIds}
+                highlightDomainId={highlightDomainId}
+              />
+              <ObjectivesSheet
+                isInline
+                highlightPurposeIds={highlightPurposeIds}
+                highlightDomainId={highlightDomainId}
+              />
               <HabitsSheet
                 isInline
                 activeDate={activeDate}
                 highlightPurposeIds={highlightPurposeIds}
+                highlightDomainId={highlightDomainId}
               />
             </div>
 
@@ -870,16 +880,25 @@ export default function Journal({
                 />
               )}
               {activeHubTab === 'goals' && (
-                <GoalsSheet isInline highlightPurposeIds={highlightPurposeIds} />
+                <GoalsSheet
+                  isInline
+                  highlightPurposeIds={highlightPurposeIds}
+                  highlightDomainId={highlightDomainId}
+                />
               )}
               {activeHubTab === 'objectives' && (
-                <ObjectivesSheet isInline highlightPurposeIds={highlightPurposeIds} />
+                <ObjectivesSheet
+                  isInline
+                  highlightPurposeIds={highlightPurposeIds}
+                  highlightDomainId={highlightDomainId}
+                />
               )}
               {activeHubTab === 'habits' && (
                 <HabitsSheet
                   isInline
                   activeDate={activeDate}
                   highlightPurposeIds={highlightPurposeIds}
+                  highlightDomainId={highlightDomainId}
                 />
               )}
             </div>

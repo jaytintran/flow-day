@@ -89,6 +89,14 @@ export class PersonalTimelineDB extends Dexie {
       purposes: 'id, sort_order, *domain_ids',
       domains: 'id, sort_order',
     });
+    this.version(12).stores({
+      entries:
+        'id, type, created_at, status, timestamp, start_at, end_at, title, carried_to, objective_id, goal_id, scheduled_at, habit_id, *category_ids, sort_order, *purpose_ids, *domain_ids',
+      habits: 'id, status, sort_order, *purpose_ids, *domain_ids',
+      categories: 'id, name, scope, [scope+name]',
+      purposes: 'id, sort_order, *domain_ids',
+      domains: 'id, sort_order',
+    });
   }
 }
 
