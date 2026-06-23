@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   ChevronRight,
   ChevronDown,
@@ -22,7 +22,7 @@ import {
   Hourglass,
 } from 'lucide-react';
 import { TimelineEntry, Task, Log, Event, Note, TimeBlock, HabitLog } from '../../types';
-import { formatDuration } from '../../utils';
+import { formatDuration, toLocalDateString } from '../../utils';
 import TimePickerSheet from '../TimePickerSheet';
 import { db } from '../../db';
 
@@ -33,7 +33,8 @@ export type RenderItem =
       children: TimelineEntry[];
       sortTime: number;
     }
-  | { type: 'standalone'; entry: TimelineEntry; sortTime: number };
+  | { type: 'standalone'; entry: TimelineEntry; sortTime: number }
+  | { type: 'sleep'; timeStr: string; sortTime: number };
 
 interface DayTimelineProps {
   items: RenderItem[];
@@ -86,6 +87,115 @@ export default function DayTimeline({
   const [pickerEntry, setPickerEntry] = useState<TimelineEntry | null>(null);
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [editingLogTitle, setEditingLogTitle] = useState('');
+
+  const [showTimelineContent, setShowTimelineContent] = useState(() => {
+    try {
+      const stored = localStorage.getItem('flowday_show_note_event_content');
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const [sleepTime, setSleepTime] = useState(() => {
+    try {
+      return localStorage.getItem('flowday_sleep_time') || '23:00';
+    } catch {
+      return '23:00';
+    }
+  });
+
+  useEffect(() => {
+    const handleSettingsChange = () => {
+      try {
+        const storedShow = localStorage.getItem('flowday_show_note_event_content');
+        setShowTimelineContent(storedShow === null ? true : storedShow === 'true');
+        const storedSleep = localStorage.getItem('flowday_sleep_time');
+        setSleepTime(storedSleep || '23:00');
+      } catch {}
+    };
+    window.addEventListener('flowday-settings-change', handleSettingsChange);
+    return () => window.removeEventListener('flowday-settings-change', handleSettingsChange);
+  }, []);
+
+  const enrichedItems = useMemo(() => {
+    if (!sleepTime) return items;
+
+    // Parse sleepTime (e.g. "23:00" -> hours=23, minutes=0)
+    const [hoursStr, minutesStr] = sleepTime.split(':');
+    const hours = parseInt(hoursStr, 10);
+    const minutes = parseInt(minutesStr, 10);
+    if (isNaN(hours) || isNaN(minutes)) return items;
+
+    // Create Date for sleep time on this specific day
+    const sleepDate = new Date(labelString);
+    sleepDate.setHours(hours, minutes, 0, 0);
+    const sortTime = sleepDate.getTime();
+
+    const sleepItem: RenderItem = {
+      type: 'sleep',
+      timeStr: sleepTime,
+      sortTime,
+    };
+
+    const combined = [...items, sleepItem];
+    return combined.sort((a, b) => a.sortTime - b.sortTime);
+  }, [items, sleepTime, labelString]);
+
+  const renderSleepRow = (timeStr: string, sortTime: number) => {
+    const sleepDate = new Date(sortTime);
+    const timeLabel = formatTime(sleepDate);
+
+    const todayStr = toLocalDateString(new Date());
+    const isToday = labelString === todayStr;
+
+    let countdownText = '';
+    if (isToday) {
+      const now = new Date();
+      const diffMs = sortTime - now.getTime();
+      if (diffMs > 0) {
+        const totalMin = Math.floor(diffMs / 60000);
+        const hrs = Math.floor(totalMin / 60);
+        const mins = totalMin % 60;
+        countdownText = hrs > 0 ? `(${hrs}h ${mins}m left)` : `(${mins}m left)`;
+      } else {
+        countdownText = '(Past bedtime!)';
+      }
+    }
+
+    return (
+      <div
+        key="sleep-timeline-row"
+        className="group relative flex items-center gap-2.5 py-3 rounded md:px-3 border-y border-stone-850 bg-stone-900/10 select-none"
+      >
+        {/* Left Column 1: Time Gutter */}
+        <div className="w-10 text-right shrink-0">
+          <span className="text-[10px] font-mono font-medium tracking-tight text-violet-400">
+            {timeLabel}
+          </span>
+        </div>
+
+        {/* Left Column 2: Icon */}
+        <div className="w-5 h-5 flex items-center justify-center relative shrink-0 z-10">
+          <div className="w-6 h-6 rounded-full border border-violet-500/20 bg-violet-500/10 text-violet-400 flex items-center justify-center">
+            <span className="text-[11px]">🌙</span>
+          </div>
+        </div>
+
+        {/* Right Column: Sleep Label and Countdown */}
+        <div className="flex-1 min-w-0 flex items-center gap-2">
+          <span className="text-xs font-sans font-semibold text-violet-300">
+            Sleep Time
+          </span>
+          {countdownText && (
+            <span className={`text-[10px] font-mono ${countdownText.includes('Past') ? 'text-red-400 font-semibold' : 'text-stone-500'}`}>
+              {countdownText}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const saveInlineTitle = async (id: string) => {
     const trimmed = editingLogTitle.trim();
@@ -263,40 +373,59 @@ export default function DayTimeline({
               )}
 
               {isTask && (
-                <p
-                  id={`task-title-${entry.id}`}
-                  className={`text-xs font-sans break-words line-clamp-1 ${
-                    (entry as Task).status === 'done'
-                      ? (entry as Task).achievements?.length
-                        ? 'text-amber-400/80 line-through font-semibold'
-                        : 'text-stone-600 line-through font-semibold'
-                      : 'text-stone-200 font-semibold'
-                  }`}
-                >
-                  {(entry as Task).status === 'done' && (entry as Task).achievements?.length ? (
-                    <span className="mr-1.5 not-italic">🏆</span>
-                  ) : null}
-                  {(entry as Task).title}
-                </p>
+                <div className="flex flex-col">
+                  <p
+                    id={`task-title-${entry.id}`}
+                    className={`text-xs font-sans break-words line-clamp-1 ${
+                      (entry as Task).status === 'done'
+                        ? (entry as Task).achievements?.length
+                          ? 'text-amber-400/80 line-through font-semibold'
+                          : 'text-stone-600 line-through font-semibold'
+                        : 'text-stone-200 font-semibold'
+                    }`}
+                  >
+                    {(entry as Task).status === 'done' && (entry as Task).achievements?.length ? (
+                      <span className="mr-1.5 not-italic">🏆</span>
+                    ) : null}
+                    {(entry as Task).title}
+                  </p>
+                  {showTimelineContent && Boolean((entry as Task).content?.trim()) && (
+                    <p className="text-[11px] text-stone-400 font-sans mt-0.5 whitespace-pre-wrap break-words leading-relaxed">
+                      {(entry as Task).content}
+                    </p>
+                  )}
+                </div>
               )}
 
               {isEvent && (
-                <p
-                  id={`event-title-${entry.id}`}
-                  className="text-xs font-sans font-semibold text-stone-200 break-words line-clamp-1"
-                >
-                  {(entry as Event).title}
-                </p>
+                <div className="flex flex-col">
+                  <p
+                    id={`event-title-${entry.id}`}
+                    className="text-xs font-sans font-semibold text-stone-200 break-words line-clamp-1"
+                  >
+                    {(entry as Event).title}
+                  </p>
+                  {showTimelineContent && Boolean((entry as Event).content?.trim()) && (
+                    <p className="text-[11px] text-stone-400 font-sans mt-0.5 whitespace-pre-wrap break-words leading-relaxed">
+                      {(entry as Event).content}
+                    </p>
+                  )}
+                </div>
               )}
 
               {isNote && (
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-col">
                   <span
                     id={`note-title-${entry.id}`}
                     className="text-xs font-sans font-semibold text-stone-200 break-words line-clamp-1"
                   >
                     {(entry as Note).title || 'Untitled Note'}
                   </span>
+                  {showTimelineContent && Boolean((entry as Note).content?.trim()) && (
+                    <p className="text-[11px] text-stone-400 font-sans mt-0.5 whitespace-pre-wrap break-words leading-relaxed">
+                      {(entry as Note).content}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -505,7 +634,7 @@ export default function DayTimeline({
           else if (child.type === 'note') counts.notes++;
           else if (child.type === 'habit-log') counts.habits++;
         });
-      } else {
+      } else if (item.type === 'standalone') {
         if (item.entry.type === 'task') counts.tasks++;
         else if (item.entry.type === 'event') counts.events++;
         else if (item.entry.type === 'note') counts.notes++;
@@ -604,18 +733,21 @@ export default function DayTimeline({
       )}
 
       {!isCollapsed &&
-        (items.length > 0 ? (
+        (enrichedItems.length > 0 ? (
           // AFTER
           <div className="space-y-0 pt-1">
             {/* Non-habit items render normally */}
-            {items
+            {enrichedItems
               .filter((item) => !(item.type === 'standalone' && item.entry.type === 'habit-log'))
               .map((item) => {
                 if (item.type === 'standalone') {
                   return renderStandaloneRow(item.entry, false, false);
-                } else {
+                } else if (item.type === 'bracket') {
                   return renderBracketItem(item.block, item.children);
+                } else if (item.type === 'sleep') {
+                  return renderSleepRow(item.timeStr, item.sortTime);
                 }
+                return null;
               })}
 
             {/* Habit logs grouped into a collapsible section at the bottom */}

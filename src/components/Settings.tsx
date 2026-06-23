@@ -26,6 +26,39 @@ export default function Settings() {
   const [showHelp, setShowHelp] = useState(false);
   const [confirmAction, setConfirmAction] = useState<'push' | 'pull' | null>(null);
 
+  const [showTimelineContent, setShowTimelineContent] = useState(() => {
+    try {
+      const stored = localStorage.getItem('flowday_show_note_event_content');
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const handleToggleTimelineContent = (val: boolean) => {
+    setShowTimelineContent(val);
+    try {
+      localStorage.setItem('flowday_show_note_event_content', String(val));
+      window.dispatchEvent(new CustomEvent('flowday-settings-change'));
+    } catch {}
+  };
+
+  const [sleepTime, setSleepTime] = useState(() => {
+    try {
+      return localStorage.getItem('flowday_sleep_time') || '23:00';
+    } catch {
+      return '23:00';
+    }
+  });
+
+  const handleSaveSleepTime = (val: string) => {
+    setSleepTime(val);
+    try {
+      localStorage.setItem('flowday_sleep_time', val);
+      window.dispatchEvent(new CustomEvent('flowday-settings-change'));
+    } catch {}
+  };
+
   const {
     pat,
     setPat,
@@ -160,6 +193,41 @@ export default function Settings() {
                     </motion.div>
                   )}
                 </AnimatePresence>
+
+                {/* PREFERENCES SECTION */}
+                <div className="space-y-4 border-b border-stone-850 pb-6">
+                  <h3 className="text-stone-200 font-serif font-bold text-sm">
+                    Preferences
+                  </h3>
+                  <div className="flex items-center justify-between p-3.5 bg-stone-900/40 border border-stone-850 rounded-xl">
+                    <div className="flex flex-col gap-1 pr-4">
+                      <span className="text-xs text-stone-200 font-semibold font-sans">Show Entry Details</span>
+                      <span className="text-[10px] font-mono text-stone-500">Show content details under task, note, and event titles on the timeline.</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={showTimelineContent}
+                        onChange={(e) => handleToggleTimelineContent(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-stone-800 rounded-full peer peer-focus:outline-none peer-checked:bg-amber-500/80 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-stone-500 peer-checked:after:bg-stone-950 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3.5 bg-stone-900/40 border border-stone-850 rounded-xl">
+                    <div className="flex flex-col gap-1 pr-4">
+                      <span className="text-xs text-stone-200 font-semibold font-sans">When Do You Sleep?</span>
+                      <span className="text-[10px] font-mono text-stone-500">Specify your bedtime to display countdown on the timeline.</span>
+                    </div>
+                    <input
+                      type="time"
+                      value={sleepTime}
+                      onChange={(e) => handleSaveSleepTime(e.target.value)}
+                      className="bg-[#0a0a0a] border border-stone-850 hover:border-stone-800 focus:border-amber-500/35 rounded-xl px-3 py-2 text-xs text-stone-100 font-mono focus:outline-none focus:bg-stone-950 transition-all cursor-pointer"
+                    />
+                  </div>
+                </div>
 
                 {/* SYNC SECTION */}
                 <div className="space-y-4">
