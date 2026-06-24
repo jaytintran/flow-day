@@ -19,15 +19,12 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../db';
 import { Task, Habit, HabitLog } from '../types';
-import { formatDateLabel, isSameDay, toLocalDateString, getEffectiveDate } from '../utils';
-import ObjectivesSheet from './ObjectivesSheet';
-import GoalsSheet from './GoalsSheet';
-import HabitsSheet from './HabitsSheet';
+import { formatDateLabel, isSameDay, toLocalDateString } from '../utils';
 
 interface DayNavigatorProps {
   activeDate: Date;
   setActiveDate: (date: Date) => void;
-  viewMode: 'day' | 'timeline' | 'records' | 'tasks' | 'hub';
+  viewMode: 'tasks' | 'day' | 'timeline' | 'records' | 'hub';
   setViewMode: (mode: 'day' | 'timeline' | 'records' | 'tasks' | 'hub') => void;
   activeHubTab?: 'goals' | 'objectives' | 'habits' | 'focus';
   setActiveHubTab?: (tab: 'goals' | 'objectives' | 'habits' | 'focus') => void;
@@ -93,7 +90,6 @@ export default function DayNavigator({
       await db.entries.add(log as any);
     }
   };
-
 
   const dayStatsMap = React.useMemo(() => {
     const map: {

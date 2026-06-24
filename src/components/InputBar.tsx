@@ -22,6 +22,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface InputBarProps {
   activeDate: Date;
+  viewMode?: 'day' | 'timeline' | 'records' | 'tasks' | 'hub';
 }
 
 // Helper to parse date keyword/string from text
@@ -270,7 +271,7 @@ const formatHumanTimeOnly = (dtStr: string) => {
   }
 };
 
-export default function InputBar({ activeDate }: InputBarProps) {
+export default function InputBar({ activeDate, viewMode }: InputBarProps) {
   const [activeType, setActiveType] = useState<EntryType>('task');
   const [showHelp, setShowHelp] = useState(false);
   const [showTimePopup, setShowTimePopup] = useState(false);
@@ -359,7 +360,8 @@ export default function InputBar({ activeDate }: InputBarProps) {
         status: 'todo',
         time_spent: 0,
         created_at: getBaseCompletedDate(),
-        scheduled_at: finalDate,
+        // In 'tasks' mode, tasks are dateless (no scheduled_at) unless the user explicitly typed a date keyword
+        ...(viewMode === 'tasks' ? {} : { scheduled_at: finalDate }),
       };
     } else if (activeType === 'log') {
       let cleanTitle = title.trim();

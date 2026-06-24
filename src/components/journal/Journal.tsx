@@ -709,6 +709,8 @@ export default function Journal({
   // Day View data
   const activeDayString = toLocalDateString(activeDate);
   const activeDayEntries = entries.filter((e) => {
+    // Exclude dateless tasks from day view — they belong in Tasks mode only
+    if (e.type === 'task' && !e.scheduled_at) return false;
     return toLocalDateString(getEffectiveDate(e)) === activeDayString;
   });
   const dayRenderItems = getDayRenderItems(activeDayEntries);
@@ -716,6 +718,8 @@ export default function Journal({
   // Timeline View data: grouped by local day strings, sorted chronologically oldest-to-newest
   const timelineDaysMap: { [key: string]: TimelineEntry[] } = {};
   entries.forEach((e) => {
+    // Exclude dateless tasks from timeline view — they belong in Tasks mode only
+    if (e.type === 'task' && !e.scheduled_at) return;
     const dayStr = toLocalDateString(getEffectiveDate(e));
     if (!timelineDaysMap[dayStr]) {
       timelineDaysMap[dayStr] = [];

@@ -3,15 +3,31 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import TimerBar from './components/TimerBar';
 import DayNavigator from './components/DayNavigator';
 import Journal from './components/journal/Journal';
 import InputBar from './components/InputBar';
 
+type ViewMode = 'day' | 'timeline' | 'records' | 'tasks' | 'hub';
+const VALID_MODES: ViewMode[] = ['day', 'timeline', 'records', 'tasks', 'hub'];
+
+function getInitialViewMode(): ViewMode {
+  try {
+    const stored = localStorage.getItem('flowday-view-mode');
+    if (stored && VALID_MODES.includes(stored as ViewMode)) return stored as ViewMode;
+  } catch {}
+  return 'day';
+}
+
 export default function App() {
   const [activeDate, setActiveDate] = useState<Date>(new Date());
-  const [viewMode, setViewMode] = useState<'day' | 'timeline' | 'records' | 'tasks' | 'hub'>('day');
+  const [viewMode, setViewModeRaw] = useState<ViewMode>(getInitialViewMode);
+
+  const setViewMode = useCallback((mode: ViewMode) => {
+    setViewModeRaw(mode);
+    try { localStorage.setItem('flowday-view-mode', mode); } catch {}
+  }, []);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [activeHubTab, setActiveHubTab] = useState<'focus' | 'goals' | 'objectives' | 'habits'>(
     'goals',
@@ -65,7 +81,7 @@ export default function App() {
           id="app-fixed-input"
           style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
         >
-          <InputBar activeDate={activeDate} />
+          <InputBar activeDate={activeDate} viewMode={viewMode} />
         </footer>
       )}
     </div>
