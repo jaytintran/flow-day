@@ -303,6 +303,17 @@ export default function DayNavigator({
             id="view-mode-switcher"
           >
             <button
+              id="view-mode-tasks"
+              onClick={() => setViewMode('tasks')}
+              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer whitespace-nowrap ${
+                viewMode === 'tasks'
+                  ? 'bg-emerald-500 text-black'
+                  : 'text-stone-500 hover:text-stone-300'
+              }`}
+            >
+              Tasks
+            </button>
+            <button
               id="view-mode-day"
               onClick={() => setViewMode('day')}
               className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer whitespace-nowrap ${
@@ -313,6 +324,7 @@ export default function DayNavigator({
             >
               Day
             </button>
+
             <button
               id="view-mode-timeline"
               onClick={() => setViewMode('timeline')}
@@ -334,17 +346,6 @@ export default function DayNavigator({
               }`}
             >
               Records
-            </button>
-            <button
-              id="view-mode-tasks"
-              onClick={() => setViewMode('tasks')}
-              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer whitespace-nowrap ${
-                viewMode === 'tasks'
-                  ? 'bg-emerald-500 text-black'
-                  : 'text-stone-500 hover:text-stone-300'
-              }`}
-            >
-              Tasks
             </button>
             <button
               id="view-mode-hub"

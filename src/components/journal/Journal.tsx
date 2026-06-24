@@ -554,6 +554,8 @@ export default function Journal({
   const overdueTasks = React.useMemo(() => {
     return entries.filter((e) => {
       if (e.type !== 'task' || e.status !== 'todo') return false;
+      // Exclude dateless tasks from overdue check
+      if (!e.scheduled_at) return false;
       const taskDayStr = toLocalDateString(getEffectiveDate(e));
       return taskDayStr < activeDayStr;
     }) as Task[];
