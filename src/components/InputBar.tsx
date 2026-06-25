@@ -353,6 +353,10 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
       const finalTitle = cleanTitle || title.trim();
       if (!finalTitle) return;
 
+      const activeListId = localStorage.getItem('flowday-tasks-selected-list');
+      const autoListIds =
+        viewMode === 'tasks' && activeListId && activeListId !== 'all' ? [activeListId] : [];
+
       newEntry = {
         id: entryId,
         type: 'task',
@@ -361,6 +365,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
         time_spent: 0,
         created_at: getBaseCompletedDate(),
         // In 'tasks' mode, tasks are dateless (no scheduled_at) unless the user explicitly typed a date keyword
+        ...(autoListIds.length > 0 ? { category_ids: autoListIds } : {}),
         ...(viewMode === 'tasks' ? {} : { scheduled_at: finalDate }),
       };
     } else if (activeType === 'log') {

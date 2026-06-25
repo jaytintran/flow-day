@@ -878,7 +878,9 @@ export default function TasksView({
     return 'inbox';
   });
 
-  const [selectedListId, setSelectedListId] = useState<string>('all');
+  const [selectedListId, setSelectedListId] = useState<string>(() => {
+    return localStorage.getItem('flowday-tasks-selected-list') ?? 'all';
+  });
   const [isListManagerOpen, setIsListManagerOpen] = useState(false);
 
   const rawTaskLists = (useLiveQuery(
@@ -1108,6 +1110,7 @@ export default function TasksView({
     setDatelessPageMap({});
     setCompletedDatelessPage(0);
     setSelectedListId('all');
+    localStorage.setItem('flowday-tasks-selected-list', 'all');
   }, [statusFilter, searchQuery]);
 
   // Starred selection modal state
@@ -1448,6 +1451,7 @@ export default function TasksView({
           selectedId={selectedListId}
           onSelect={(id) => {
             setSelectedListId(id);
+            localStorage.setItem('flowday-tasks-selected-list', id);
             setDatelessPageMap((prev) => ({ ...prev, [id]: 0 }));
           }}
           onManage={() => setIsListManagerOpen(true)}
@@ -1493,7 +1497,7 @@ export default function TasksView({
       {statusFilter === 'inbox' &&
         (displayDateless.length > 0 || displayCompletedDateless.length > 0) && (
           <TaskSection
-            label="Completed"
+            label="Dateless Completed"
             icon={<Check className="w-3.5 h-3.5 text-emerald-400" />}
             accentColor="emerald"
             tasks={displayCompletedDateless}
