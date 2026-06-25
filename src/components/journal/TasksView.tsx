@@ -44,6 +44,39 @@ import { MoreHorizontal } from 'lucide-react';
 import TaskListManagerModal from '../TaskListManagerModal'; // adjust path as needed
 import { TASK_LIST_SCOPE } from '../../utils';
 
+// ─── Starred Meta Helpers ────────────────────────────────────────────────────
+
+const STARRED_META_ID = 'flowday-starred-meta-singleton';
+
+async function getStarredIdsFromDexie(): Promise<string[]> {
+  try {
+    const row = await db.categories.get(STARRED_META_ID);
+    if (!row) return [];
+    return JSON.parse((row as any).name ?? '[]');
+  } catch {
+    return [];
+  }
+}
+
+async function saveStarredIdsToDexie(ids: string[]): Promise<void> {
+  try {
+    const existing = await db.categories.get(STARRED_META_ID);
+    if (existing) {
+      await db.categories.update(STARRED_META_ID, { name: JSON.stringify(ids) } as any);
+    } else {
+      await db.categories.add({
+        id: STARRED_META_ID,
+        name: JSON.stringify(ids),
+        color: 'amber',
+        scope: 'starred-meta' as any,
+        created_at: new Date(),
+      } as any);
+    }
+  } catch {
+    // fail silently
+  }
+}
+
 interface TasksViewProps {
   entries: TimelineEntry[];
   deletingId: string | null;
@@ -799,24 +832,39 @@ function ListStrip({ lists, selectedId, onSelect, onManage }: ListStripProps) {
 
   return (
     <div className="relative flex items-center gap-1 mt-1 mb-2">
-      {/* Scrollable pill strip */}
-      <div
-        ref={scrollRef}
-        className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-1 min-w-0 pr-8"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-      >
-        {/* All tab — permanent */}
+      {/* Pinned left: All + None */}
+      <div className="flex items-center gap-1 shrink-0">
         <button
           onClick={() => onSelect('all')}
-          className={`shrink-0 px-2.5 py-1 rounded-full border text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+          className={`shrink-0 px-2.5 py-1 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
             selectedId === 'all'
               ? 'bg-stone-700 border-stone-600 text-stone-100'
-              : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:border-stone-700'
+              : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800'
           }`}
         >
           All
         </button>
+        <button
+          onClick={() => onSelect('none')}
+          className={`shrink-0 px-2.5 py-1 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+            selectedId === 'none'
+              ? 'bg-stone-700 border-stone-600 text-stone-100'
+              : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800'
+          }`}
+        >
+          None
+        </button>
 
+        {/* Divider */}
+        {lists.length > 0 && <div className="w-px h-4 bg-stone-800 mx-0.5 shrink-0" />}
+      </div>
+
+      {/* Scrollable list pills */}
+      <div
+        ref={scrollRef}
+        className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0 pr-1"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
         {lists.map((list) => {
           const cs = COLORS[list.color] ?? COLORS['violet'];
           const isActive = selectedId === list.id;
@@ -842,7 +890,7 @@ function ListStrip({ lists, selectedId, onSelect, onManage }: ListStripProps) {
         <div className="absolute right-7 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0a0a0a] to-transparent pointer-events-none" />
       )}
 
-      {/* Manage button */}
+      {/* Pinned right: Manage button */}
       <button
         onClick={onManage}
         className="shrink-0 p-1.5 rounded-lg border border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer"
@@ -899,15 +947,29 @@ export default function TasksView({
     localStorage.setItem('flowday-tasks-status-filter', filter);
   };
 
-  // ─── Starred Tasks (stored in localStorage) ────────────────────────────────
-  const [starredIds, setStarredIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('flowday-starred-task-ids');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  // ─── Starred Tasks (stored in dexie) ────────────────────────────────
+  const [starredIds, setStarredIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    getStarredIdsFromDexie().then((ids) => {
+      if (ids.length > 0) {
+        setStarredIds(ids);
+      } else {
+        // One-time migration from localStorage if Dexie is empty
+        try {
+          const saved = localStorage.getItem('flowday-starred-task-ids');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            setStarredIds(parsed);
+            saveStarredIdsToDexie(parsed);
+            localStorage.removeItem('flowday-starred-task-ids');
+          }
+        } catch {
+          // ignore
+        }
+      }
+    });
+  }, []);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const triggerToast = (msg: string) => {
@@ -923,15 +985,15 @@ export default function TasksView({
         return prev;
       }
       const next = [...prev, taskId];
-      localStorage.setItem('flowday-starred-task-ids', JSON.stringify(next));
+      saveStarredIdsToDexie(next);
       return next;
     });
   }, []);
 
   const handleUnstarTask = useCallback((taskId: string) => {
     setStarredIds((prev) => {
-      const next = prev.filter((id) => id !== taskId);
-      localStorage.setItem('flowday-starred-task-ids', JSON.stringify(next));
+      const next = prev.filter((id: string) => id !== taskId);
+      saveStarredIdsToDexie(next);
       return next;
     });
   }, []);
@@ -946,10 +1008,11 @@ export default function TasksView({
   }, [entries]);
 
   React.useEffect(() => {
+    if (starredIds.length === 0) return;
     const validStarred = starredIds.filter((id) => activeDatelessTasksLookup.has(id));
     if (validStarred.length !== starredIds.length) {
       setStarredIds(validStarred);
-      localStorage.setItem('flowday-starred-task-ids', JSON.stringify(validStarred));
+      saveStarredIdsToDexie(validStarred);
     }
   }, [activeDatelessTasksLookup, starredIds]);
 
@@ -1093,8 +1156,13 @@ export default function TasksView({
   const baseDisplayDateless = optimisticDateless ?? datelessTasks;
   const displayDateless = useMemo(() => {
     if (selectedListId === 'all') return baseDisplayDateless;
+    if (selectedListId === 'none')
+      return baseDisplayDateless.filter((t) => {
+        const ids = t.category_ids ?? [];
+        return ids.length === 0 || !taskLists.some((l) => ids.includes(l.id));
+      });
     return baseDisplayDateless.filter((t) => (t.category_ids ?? []).includes(selectedListId));
-  }, [baseDisplayDateless, selectedListId]);
+  }, [baseDisplayDateless, selectedListId, taskLists]);
 
   // ─── Pagination ────────────────────────────────────────────────────────────
   const scheduledTotalPages = Math.max(1, Math.ceil(displayScheduled.length / PAGE_SIZE));
@@ -1405,6 +1473,7 @@ export default function TasksView({
       </div>
 
       {/* Task count summary */}
+      {/* 
       {(displayScheduled.length > 0 ||
         displayDateless.length > 0 ||
         (statusFilter === 'inbox' && displayCompletedDateless.length > 0)) && (
@@ -1431,6 +1500,7 @@ export default function TasksView({
           </span>
         </div>
       )}
+      */}
 
       {/* Starred Section (Only renders in Inbox view) */}
       {statusFilter === 'inbox' && (

@@ -40,6 +40,10 @@
   ::-webkit-scrollbar-thumb:hover {
     background: #404040;
   }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @keyframes slide-up {
@@ -53,4 +57,8 @@
 
 @utility animate-slide-up {
   animation: slide-up 0.3s ease-out;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }

@@ -355,7 +355,9 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
 
       const activeListId = localStorage.getItem('flowday-tasks-selected-list');
       const autoListIds =
-        viewMode === 'tasks' && activeListId && activeListId !== 'all' ? [activeListId] : [];
+        viewMode === 'tasks' && activeListId && activeListId !== 'all' && activeListId !== 'none'
+          ? [activeListId]
+          : [];
 
       newEntry = {
         id: entryId,
