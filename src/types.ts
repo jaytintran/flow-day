@@ -36,6 +36,7 @@ export interface Task extends BaseEntry {
   achievements?: TaskAchievement[];
   content?: string;
   sort_order?: number; // display ordering (used by TasksView DnD)
+  category_ids?: string[]; // add this
 }
 
 export interface Event extends BaseEntry {
@@ -112,7 +113,7 @@ export interface HabitLog extends BaseEntry {
   timestamp: Date; // exact completion time (shown in time gutter)
 }
 
-export type CategoryScope = 'goal' | 'objective';
+export type CategoryScope = 'goal' | 'objective' | 'task-list';
 
 // Category — tags for goals or objectives
 export interface Category {

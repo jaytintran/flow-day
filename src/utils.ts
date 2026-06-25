@@ -117,3 +117,56 @@ export function toLocalDateString(date: Date): string {
   const dd = d.getDate().toString().padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
+
+import { db } from './db';
+import { Category } from './types';
+
+export const TASK_LIST_SCOPE = 'task-list' as const;
+
+/** Fetch all task-list categories, sorted by sort_order then created_at */
+export async function getTaskLists(): Promise<Category[]> {
+  const lists = await db.categories.where('scope').equals(TASK_LIST_SCOPE).toArray();
+
+  return lists.sort((a, b) => {
+    const aO = (a as any).sort_order ?? Date.parse(a.created_at.toString());
+    const bO = (b as any).sort_order ?? Date.parse(b.created_at.toString());
+    return aO - bO;
+  });
+}
+
+/** Assign a task to a list (toggle: adds if absent, removes if present) */
+export async function toggleTaskList(taskId: string, listId: string, currentIds: string[]) {
+  const next = currentIds.includes(listId)
+    ? currentIds.filter((id) => id !== listId)
+    : [...currentIds, listId];
+  await db.entries.update(taskId, { category_ids: next } as any);
+}
+
+/** When deleting a list, strip its id from all tasks that reference it */
+export async function migrateTasksOnListDelete(listId: string) {
+  const affected = await db.entries.where('category_ids').equals(listId).toArray();
+
+  await db.transaction('rw', db.entries, async () => {
+    for (const entry of affected) {
+      const current = (entry as any).category_ids ?? [];
+      await db.entries.update(entry.id, {
+        category_ids: current.filter((id: string) => id !== listId),
+      } as any);
+    }
+  });
+}
+
+/** Create a new task-list category */
+export async function createTaskList(name: string, color: Category['color']): Promise<Category> {
+  const existing = await getTaskLists();
+  const list: Category = {
+    id: crypto.randomUUID(),
+    name,
+    color,
+    scope: TASK_LIST_SCOPE,
+    created_at: new Date(),
+  };
+  // store sort_order by casting — Category type doesn't have it but Dexie schema does
+  await db.categories.add({ ...list, sort_order: existing.length } as any);
+  return list;
+}

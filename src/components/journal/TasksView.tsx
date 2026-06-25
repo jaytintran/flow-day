@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   Search,
   Play,
@@ -37,7 +37,12 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 import SortableRow from '../SortableRow';
 import { db } from '../../db';
-import { TimelineEntry, Task, TaskAchievement } from '../../types';
+import { TimelineEntry, Task, TaskAchievement, Category } from '../../types';
+
+import { useLiveQuery } from 'dexie-react-hooks';
+import { MoreHorizontal } from 'lucide-react';
+import TaskListManagerModal from '../TaskListManagerModal'; // adjust path as needed
+import { TASK_LIST_SCOPE } from '../../utils';
 
 interface TasksViewProps {
   entries: TimelineEntry[];
@@ -263,6 +268,96 @@ interface TaskSectionProps {
   handleMoveToPage: (taskId: string, targetPage: number) => void;
   formatScheduledBadge: (task: Task) => { label: string; isOverdue: boolean } | null;
   setActiveDate: (date: Date) => void;
+  taskLists: Category[];
+  listPickerTaskId: string | null;
+  setListPickerTaskId: (id: string | null) => void;
+}
+
+// ─── List Picker Popover ─────────────────────────────────────────────────────
+
+interface ListPickerPopoverProps {
+  task: Task;
+  lists: Category[];
+  onClose: () => void;
+}
+
+function ListPickerPopover({ task, lists, onClose }: ListPickerPopoverProps) {
+  const currentIds = task.category_ids ?? [];
+
+  const COLORS: Record<string, { dot: string; active: string }> = {
+    violet: {
+      dot: 'bg-violet-500',
+      active: 'text-violet-300 border-violet-500/40 bg-violet-500/10',
+    },
+    sky: { dot: 'bg-sky-500', active: 'text-sky-300 border-sky-500/40 bg-sky-500/10' },
+    emerald: {
+      dot: 'bg-emerald-500',
+      active: 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10',
+    },
+    amber: { dot: 'bg-amber-500', active: 'text-amber-300 border-amber-500/40 bg-amber-500/10' },
+    rose: { dot: 'bg-rose-500', active: 'text-rose-300 border-rose-500/40 bg-rose-500/10' },
+    indigo: {
+      dot: 'bg-indigo-500',
+      active: 'text-indigo-300 border-indigo-500/40 bg-indigo-500/10',
+    },
+    teal: { dot: 'bg-teal-500', active: 'text-teal-300 border-teal-500/40 bg-teal-500/10' },
+    orange: {
+      dot: 'bg-orange-500',
+      active: 'text-orange-300 border-orange-500/40 bg-orange-500/10',
+    },
+  };
+
+  const handleToggle = async (listId: string) => {
+    const next = currentIds.includes(listId)
+      ? currentIds.filter((id) => id !== listId)
+      : [...currentIds, listId];
+    await db.entries.update(task.id, { category_ids: next } as any);
+  };
+
+  if (lists.length === 0) {
+    return (
+      <div
+        className="absolute top-full mt-1.5 right-0 bg-[#141414] border border-stone-700 rounded-lg p-3 shadow-xl z-50 w-44"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-[10px] font-mono text-stone-500 text-center">
+          No lists yet — create one via ···
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="absolute top-full mt-1.5 right-0 bg-[#141414] border border-stone-700 rounded-lg p-2 shadow-xl z-50 min-w-[160px]"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <p className="text-[9px] font-mono text-stone-500 uppercase tracking-wider mb-1.5 px-0.5">
+        Assign to list
+      </p>
+      <div className="flex flex-col gap-0.5">
+        {lists.map((list) => {
+          const cs = COLORS[list.color] ?? COLORS['violet'];
+          const isAssigned = currentIds.includes(list.id);
+          return (
+            <button
+              key={list.id}
+              onClick={() => handleToggle(list.id)}
+              className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg border text-[11px] font-mono transition-all cursor-pointer ${
+                isAssigned
+                  ? cs.active
+                  : 'border-transparent text-stone-400 hover:bg-stone-800 hover:text-stone-200'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full shrink-0 ${cs.dot}`} />
+              <span className="truncate flex-1 text-left">{list.name}</span>
+              {isAssigned && <Check className="w-3 h-3 shrink-0 stroke-[3]" />}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function TaskSection({
@@ -290,6 +385,9 @@ function TaskSection({
   handleMoveToPage,
   formatScheduledBadge,
   setActiveDate,
+  taskLists,
+  listPickerTaskId,
+  setListPickerTaskId,
 }: TaskSectionProps) {
   const safePage = Math.min(page, totalPages - 1);
   const pageTasks = tasks.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
@@ -386,7 +484,7 @@ function TaskSection({
           ) : null}
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-1.5 opacity-100 md:opacity-0 md:group-hover/row:opacity-100 transition-opacity shrink-0">
+          <div className="flex items-center gap-1.5 opacity-100 md:opacity-0 md:group-hover/row:opacity-100 transition-opacity shrink-0 relative">
             {/* Activate */}
             {!isDone && !isActive && (
               <button
@@ -412,6 +510,34 @@ function TaskSection({
             >
               <Calendar className="w-3.5 h-3.5" />
             </button>
+
+            {/* List picker — only for dateless tasks */}
+            {!task.scheduled_at && taskLists.length > 0 && (
+              <div className="relative" data-list-picker>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setListPickerTaskId(listPickerTaskId === task.id ? null : task.id);
+                  }}
+                  className={`p-1.5 bg-transparent rounded border transition-colors cursor-pointer ${
+                    (task.category_ids ?? []).some((id) => taskLists.some((l) => l.id === id))
+                      ? 'border-violet-700/60 text-violet-400 hover:bg-violet-950/20'
+                      : 'border-stone-800 hover:bg-stone-800 text-stone-400 hover:text-violet-400'
+                  }`}
+                  title="Assign to list"
+                >
+                  <ListTodo className="w-3.5 h-3.5" />
+                </button>
+
+                {listPickerTaskId === task.id && (
+                  <ListPickerPopover
+                    task={task}
+                    lists={taskLists}
+                    onClose={() => setListPickerTaskId(null)}
+                  />
+                )}
+              </div>
+            )}
 
             {/* Move to Page (only when multiple pages exist) */}
             {totalPages > 1 && (
@@ -615,6 +741,119 @@ function TaskSection({
   );
 }
 
+// ─── List Strip ──────────────────────────────────────────────────────────────
+
+interface ListStripProps {
+  lists: Category[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  onManage: () => void;
+}
+
+function ListStrip({ lists, selectedId, onSelect, onManage }: ListStripProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showFade, setShowFade] = useState(false);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const check = () =>
+      setShowFade(
+        el.scrollWidth > el.clientWidth && el.scrollLeft < el.scrollWidth - el.clientWidth - 2,
+      );
+    check();
+
+    el.addEventListener('scroll', check);
+    window.addEventListener('resize', check);
+    return () => {
+      el.removeEventListener('scroll', check);
+      window.removeEventListener('resize', check);
+    };
+  }, [lists]);
+
+  const COLORS: Record<string, { active: string; dot: string }> = {
+    violet: {
+      active: 'bg-violet-500/15 border-violet-500/40 text-violet-300',
+      dot: 'bg-violet-500',
+    },
+    sky: { active: 'bg-sky-500/15 border-sky-500/40 text-sky-300', dot: 'bg-sky-500' },
+    emerald: {
+      active: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300',
+      dot: 'bg-emerald-500',
+    },
+    amber: { active: 'bg-amber-500/15 border-amber-500/40 text-amber-300', dot: 'bg-amber-500' },
+    rose: { active: 'bg-rose-500/15 border-rose-500/40 text-rose-300', dot: 'bg-rose-500' },
+    indigo: {
+      active: 'bg-indigo-500/15 border-indigo-500/40 text-indigo-300',
+      dot: 'bg-indigo-500',
+    },
+    teal: { active: 'bg-teal-500/15 border-teal-500/40 text-teal-300', dot: 'bg-teal-500' },
+    orange: {
+      active: 'bg-orange-500/15 border-orange-500/40 text-orange-300',
+      dot: 'bg-orange-500',
+    },
+  };
+
+  // if (lists.length === 0) return null;
+
+  return (
+    <div className="relative flex items-center gap-1 mt-1 mb-2">
+      {/* Scrollable pill strip */}
+      <div
+        ref={scrollRef}
+        className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-1 min-w-0 pr-8"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        {/* All tab — permanent */}
+        <button
+          onClick={() => onSelect('all')}
+          className={`shrink-0 px-2.5 py-1 rounded-full border text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+            selectedId === 'all'
+              ? 'bg-stone-700 border-stone-600 text-stone-100'
+              : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:border-stone-700'
+          }`}
+        >
+          All
+        </button>
+
+        {lists.map((list) => {
+          const cs = COLORS[list.color] ?? COLORS['violet'];
+          const isActive = selectedId === list.id;
+          return (
+            <button
+              key={list.id}
+              onClick={() => onSelect(list.id)}
+              className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                isActive
+                  ? cs.active
+                  : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:border-stone-700'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cs.dot}`} />
+              {list.name}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Right fade overlay */}
+      {showFade && (
+        <div className="absolute right-7 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0a0a0a] to-transparent pointer-events-none" />
+      )}
+
+      {/* Manage button */}
+      <button
+        onClick={onManage}
+        className="shrink-0 p-1.5 rounded-lg border border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer"
+        title="Manage lists"
+      >
+        <MoreHorizontal className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function TasksView({
@@ -639,12 +878,26 @@ export default function TasksView({
     return 'inbox';
   });
 
+  const [selectedListId, setSelectedListId] = useState<string>('all');
+  const [isListManagerOpen, setIsListManagerOpen] = useState(false);
+
+  const rawTaskLists = (useLiveQuery(
+    () => db.categories.where('scope').equals(TASK_LIST_SCOPE).toArray(),
+    [],
+  ) ?? []) as Category[];
+
+  const taskLists = [...rawTaskLists].sort((a, b) => {
+    const aO = (a as any).sort_order ?? Date.parse(a.created_at.toString());
+    const bO = (b as any).sort_order ?? Date.parse(b.created_at.toString());
+    return aO - bO;
+  });
+
   const handleStatusFilterChange = (filter: 'inbox' | 'todo' | 'done') => {
     setStatusFilter(filter);
     localStorage.setItem('flowday-tasks-status-filter', filter);
   };
 
-// ─── Starred Tasks (stored in localStorage) ────────────────────────────────
+  // ─── Starred Tasks (stored in localStorage) ────────────────────────────────
   const [starredIds, setStarredIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('flowday-starred-task-ids');
@@ -664,7 +917,7 @@ export default function TasksView({
     setStarredIds((prev) => {
       if (prev.includes(taskId)) return prev;
       if (prev.length >= 3) {
-        triggerToast("Maximum 3 highlighted tasks allowed in Starred section!");
+        triggerToast('Maximum 3 highlighted tasks allowed in Starred section!');
         return prev;
       }
       const next = [...prev, taskId];
@@ -683,7 +936,11 @@ export default function TasksView({
 
   // Sync / clean up completed or non-existent starred tasks
   const activeDatelessTasksLookup = useMemo(() => {
-    return new Set(entries.filter((e) => e.type === 'task' && !e.scheduled_at && e.status !== 'done').map((e) => e.id));
+    return new Set(
+      entries
+        .filter((e) => e.type === 'task' && !e.scheduled_at && e.status !== 'done')
+        .map((e) => e.id),
+    );
   }, [entries]);
 
   React.useEffect(() => {
@@ -701,7 +958,16 @@ export default function TasksView({
 
   // Pagination per section
   const [scheduledPage, setScheduledPage] = useState(0);
-  const [datelessPage, setDatelessPage] = useState(0);
+  const [datelessPageMap, setDatelessPageMap] = useState<Record<string, number>>({});
+
+  const datelessPage = datelessPageMap[selectedListId] ?? 0;
+  const setDatelessPage: React.Dispatch<React.SetStateAction<number>> = (value) => {
+    setDatelessPageMap((prev) => {
+      const current = prev[selectedListId] ?? 0;
+      const next = typeof value === 'function' ? value(current) : value;
+      return { ...prev, [selectedListId]: next };
+    });
+  };
   const [completedDatelessPage, setCompletedDatelessPage] = useState(0);
 
   // Optimistic state per section
@@ -819,8 +1085,14 @@ export default function TasksView({
 
   // ─── Display lists (optimistic override) ──────────────────────────────────
   const displayScheduled = optimisticScheduled ?? scheduledTasks;
-  const displayDateless = optimisticDateless ?? datelessTasks;
   const displayCompletedDateless = optimisticCompletedDateless ?? completedDatelessTasks;
+
+  // Apply list filter to dateless tasks
+  const baseDisplayDateless = optimisticDateless ?? datelessTasks;
+  const displayDateless = useMemo(() => {
+    if (selectedListId === 'all') return baseDisplayDateless;
+    return baseDisplayDateless.filter((t) => (t.category_ids ?? []).includes(selectedListId));
+  }, [baseDisplayDateless, selectedListId]);
 
   // ─── Pagination ────────────────────────────────────────────────────────────
   const scheduledTotalPages = Math.max(1, Math.ceil(displayScheduled.length / PAGE_SIZE));
@@ -833,8 +1105,9 @@ export default function TasksView({
   // Reset pages when filters change
   React.useEffect(() => {
     setScheduledPage(0);
-    setDatelessPage(0);
+    setDatelessPageMap({});
     setCompletedDatelessPage(0);
+    setSelectedListId('all');
   }, [statusFilter, searchQuery]);
 
   // Starred selection modal state
@@ -1019,6 +1292,21 @@ export default function TasksView({
     return () => document.removeEventListener('mousedown', handler);
   }, [movePopoverTaskId]);
 
+  // ─── Close list picker on outside click ───────────────────────────────────
+  const [listPickerTaskId, setListPickerTaskId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!listPickerTaskId) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-list-picker]')) {
+        setListPickerTaskId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [listPickerTaskId]);
+
   // ─── Schedule Modal Handlers ──────────────────────────────────────────────
   const handleSelectDate = async (taskId: string, date: Date) => {
     onCarryTask(taskId, date);
@@ -1153,6 +1441,19 @@ export default function TasksView({
         />
       )}
 
+      {/* List strip — only in inbox mode where dateless tasks live */}
+      {statusFilter === 'inbox' && (
+        <ListStrip
+          lists={taskLists}
+          selectedId={selectedListId}
+          onSelect={(id) => {
+            setSelectedListId(id);
+            setDatelessPageMap((prev) => ({ ...prev, [id]: 0 }));
+          }}
+          onManage={() => setIsListManagerOpen(true)}
+        />
+      )}
+
       {/* Dateless Tasks Section (renders in 'inbox' mode as active dateless, and in todo/done filters as dateless matches) */}
       {(statusFilter !== 'inbox' ||
         displayDateless.length > 0 ||
@@ -1182,6 +1483,9 @@ export default function TasksView({
           handleMoveToPage={handleDatelessMoveToPage}
           formatScheduledBadge={formatScheduledBadge}
           setActiveDate={setActiveDate}
+          taskLists={taskLists}
+          listPickerTaskId={listPickerTaskId}
+          setListPickerTaskId={setListPickerTaskId}
         />
       )}
 
@@ -1213,6 +1517,9 @@ export default function TasksView({
             handleMoveToPage={handleCompletedDatelessMoveToPage}
             formatScheduledBadge={formatScheduledBadge}
             setActiveDate={setActiveDate}
+            taskLists={taskLists}
+            listPickerTaskId={listPickerTaskId}
+            setListPickerTaskId={setListPickerTaskId}
           />
         )}
 
@@ -1243,6 +1550,9 @@ export default function TasksView({
           handleMoveToPage={handleScheduledMoveToPage}
           formatScheduledBadge={formatScheduledBadge}
           setActiveDate={setActiveDate}
+          taskLists={[]}
+          listPickerTaskId={null}
+          setListPickerTaskId={() => {}}
         />
       )}
 
@@ -1292,6 +1602,8 @@ export default function TasksView({
           onSelect={handleStarTask}
         />
       )}
+
+      {isListManagerOpen && <TaskListManagerModal onClose={() => setIsListManagerOpen(false)} />}
     </div>
   );
 }
@@ -1407,7 +1719,7 @@ function StarredTaskCard({
   };
 
   return (
-    <div 
+    <div
       onClick={() => onOpenDetail(task)}
       className="group relative flex flex-col bg-[#141414]/90 border border-stone-850 hover:border-stone-800 rounded-xl p-4 shadow-md transition-all animate-in fade-in zoom-in-95 duration-150 cursor-pointer"
     >
@@ -1524,7 +1836,7 @@ function StarredSelectModal({ allTasks, starredIds, onClose, onSelect }: Starred
   // Get active dateless tasks that are NOT already starred
   const candidateTasks = useMemo(() => {
     return allTasks.filter(
-      (t) => !t.scheduled_at && t.status !== 'done' && !starredIds.includes(t.id)
+      (t) => !t.scheduled_at && t.status !== 'done' && !starredIds.includes(t.id),
     );
   }, [allTasks, starredIds]);
 
@@ -1616,9 +1928,7 @@ function StarredSelectModal({ allTasks, starredIds, onClose, onSelect }: Starred
                       {t.title}
                     </p>
                     {t.content && (
-                      <p className="text-[10px] text-stone-500 line-clamp-1 mt-0.5">
-                        {t.content}
-                      </p>
+                      <p className="text-[10px] text-stone-500 line-clamp-1 mt-0.5">{t.content}</p>
                     )}
                   </div>
                   {t.time_spent > 0 && (
@@ -1635,4 +1945,3 @@ function StarredSelectModal({ allTasks, starredIds, onClose, onSelect }: Starred
     </AnimatePresence>
   );
 }
-

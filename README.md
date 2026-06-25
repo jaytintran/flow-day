@@ -10,6 +10,19 @@
 [![Dexie.js](https://img.shields.io/badge/Dexie-4-4B32C3?)](https://dexie.org/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue)](LICENSE)
 
+## 🧘 Productivity Philosophy
+
+Flow Day is built on a hybrid productivity design that bridges the gap between structured time management and cognitive flexibility:
+
+1. **Capturing vs. Scheduling (Temporal Separation)**
+   * Strict calendar/timeline tools create anxiety when a schedule slips, leading to "overdue task fatigue."
+   * Flow Day implements **Dateless (Transient) Tasks** inside the **Inbox** view. You capture tasks based on *what* needs to be done, leaving them untethered from dates until you are ready to schedule.
+2. **The Starred Focus (Rule of 3 / WIP Limits)**
+   * To combat choice paralysis, you can "Star" up to **3 dateless tasks**.
+   * These tasks are promoted into premium visual focus cards, complete with inline achievement logging, direct click-to-detail views, and integrated play buttons to track timespent.
+3. **Execution Pipeline**
+   * **Capture** (NLP Input Bar) $\rightarrow$ **Prioritize** (Inbox Starred Cards) $\rightarrow$ **Schedule** (Assign Date to Timeline) $\rightarrow$ **Execute** (Top Pomodoro Tracker Bar).
+
 ---
 
 ## ✨ Features
