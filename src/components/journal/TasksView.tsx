@@ -1426,7 +1426,7 @@ export default function TasksView({
       </AnimatePresence>
 
       {/* Sticky search and filter control header */}
-      <div className="z-20 bg-[#0a0a0a] py-0 border-b border-stone-900/60 flex items-center justify-between gap-3">
+      <div className="z-20 bg-[#0a0a0a] py-0 flex items-center justify-between gap-3">
         <div className="relative flex items-center flex-1 max-w-[200px] sm:max-w-xs">
           <Search className="absolute left-2.5 w-3.5 h-3.5 text-stone-500 pointer-events-none" />
           <input
@@ -1503,7 +1503,7 @@ export default function TasksView({
       */}
 
       {/* Starred Section (Only renders in Inbox view) */}
-      {statusFilter === 'inbox' && (
+      {/* {statusFilter === 'inbox' && (
         <StarredSection
           tasks={starredTasks}
           onUnstar={handleUnstarTask}
@@ -1512,7 +1512,7 @@ export default function TasksView({
           onOpenDetail={onOpenDetail}
           onActivateTask={onActivateTask}
         />
-      )}
+      )} */}
 
       {/* List strip — only in inbox mode where dateless tasks live */}
       {statusFilter === 'inbox' && (
@@ -1827,16 +1827,23 @@ function StarredTaskCard({
 
       {/* Content preview if exists */}
       {task.content && (
-        <p className="text-xs font-sans text-stone-400 line-clamp-2 leading-relaxed mb-3">
+        <p className="text-xs font-sans text-stone-400 line-clamp-2 leading-relaxed mb-1.25">
           {task.content}
         </p>
       )}
 
       {/* Time spent & Play button */}
-      <div className="flex items-center justify-between text-[10px] font-mono text-stone-500 mb-4">
-        <div className="flex items-center gap-1.5">
-          <Clock className="w-3 h-3 text-stone-600" />
-          <span>{formatMinSpent(task.time_spent)}</span>
+      <div className="flex items-center justify-between text-[10px] font-mono text-stone-500 mb-2">
+        <div className="flex gap-1">
+          <div className="flex items-center gap-1.5">
+            <Clock className="w-3 h-3 text-stone-600" />
+            <span>{formatMinSpent(task.time_spent)}</span>
+          </div>
+          {task.achievements && task.achievements.length > 0 && (
+            <span className="shrink-0 flex items-center gap-1 px-2 py-1 text-amber-400 text-xs font-mono font-bold">
+              🏆 {task.achievements.length} achievement{task.achievements.length !== 1 ? 's' : ''}
+            </span>
+          )}
         </div>
         <button
           onClick={(e) => {
@@ -1853,43 +1860,24 @@ function StarredTaskCard({
 
       {/* Achievements Section */}
       <div className="flex-1 flex flex-col justify-end" onClick={(e) => e.stopPropagation()}>
-        {/* Achievements list */}
-        {task.achievements && task.achievements.length > 0 && (
-          <div className="space-y-1 mb-2.5 max-h-24 overflow-y-auto pr-1">
-            {task.achievements.map((sub) => (
-              <div
-                key={sub.id}
-                className="flex items-center justify-between gap-1.5 px-2 py-1 rounded bg-[#0d0d0d] border border-stone-900/60 text-[11px] font-mono text-stone-300 group/sub"
-              >
-                <span className="line-clamp-1 flex-1">{sub.text}</span>
-                <button
-                  onClick={() => handleToggleAchievement(sub.id)}
-                  className="opacity-0 group-hover/sub:opacity-100 text-stone-650 hover:text-stone-400 transition-opacity cursor-pointer text-[9px]"
-                  title="Remove achievement"
-                >
-                  ✓
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Add Achievement Input Form */}
-        <form onSubmit={handleAddAchievement} className="flex gap-1.5">
-          <input
-            type="text"
-            placeholder="Add achievement..."
-            value={achievementInput}
-            onChange={(e) => setAchievementInput(e.target.value)}
-            className="flex-1 bg-[#0a0a0a] border border-stone-850 rounded-lg px-2.5 py-1 text-[11px] font-mono text-stone-300 placeholder-stone-650 focus:outline-none focus:border-stone-750 transition-colors"
-          />
-          <button
-            type="submit"
-            className="px-2.5 py-1 text-[11px] font-mono font-bold bg-stone-800 text-stone-200 border border-stone-700 hover:bg-stone-750 rounded-lg transition-colors cursor-pointer"
-          >
-            +
-          </button>
-        </form>
+        {/* Achievement count chip + add input row */}
+        <div className="flex items-center gap-2">
+          <form onSubmit={handleAddAchievement} className="flex gap-1.5 flex-1">
+            <input
+              type="text"
+              placeholder="Add achievement..."
+              value={achievementInput}
+              onChange={(e) => setAchievementInput(e.target.value)}
+              className="flex-1 min-w-0 bg-[#0a0a0a] border border-stone-850 rounded-lg px-2.5 py-1 text-[11px] font-mono text-stone-300 placeholder-stone-650 focus:outline-none focus:border-stone-750 transition-colors"
+            />
+            <button
+              type="submit"
+              className="px-2.5 py-1 text-[11px] font-mono font-bold bg-stone-800 text-stone-200 border border-stone-700 hover:bg-stone-750 rounded-lg transition-colors cursor-pointer shrink-0"
+            >
+              +
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
