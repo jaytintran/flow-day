@@ -19,6 +19,7 @@ import HabitsSheet from '../HabitsSheet';
 
 import FocusSheet from '../FocusSheet';
 import { Purpose } from '../../types';
+import { Delete, Trash } from 'lucide-react';
 
 interface JournalProps {
   activeDate: Date;
@@ -274,6 +275,104 @@ function EditableChip({
       >
         ✕
       </button>
+    </div>
+  );
+}
+
+// ─── AchievementRow ─────────────────────────────────────────────────────────
+
+interface AchievementRowProps {
+  achievement: TaskAchievement;
+  formatTime: (d: Date | string) => string;
+  onSave: (text: string) => Promise<void>;
+  onDelete: () => Promise<void>;
+}
+
+function AchievementRow({ achievement, formatTime, onSave, onDelete }: AchievementRowProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState(achievement.text);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const open = () => {
+    setDraft(achievement.text);
+    setIsEditing(true);
+    setTimeout(() => {
+      const el = inputRef.current;
+      if (el) {
+        el.focus();
+        el.style.height = 'auto';
+        el.style.height = el.scrollHeight + 'px';
+      }
+    }, 0);
+  };
+
+  const commit = async () => {
+    const text = draft.trim();
+    if (!text || text === achievement.text) {
+      setIsEditing(false);
+      return;
+    }
+    await onSave(text);
+    setIsEditing(false);
+  };
+
+  const handleDelete = async () => {
+    if (confirmDelete) {
+      await onDelete();
+      return;
+    }
+    setConfirmDelete(true);
+    setTimeout(() => setConfirmDelete(false), 3000);
+  };
+
+  return (
+    <div className="group flex items-start gap-2 text-xs font-mono text-stone-300 bg-stone-900/60 border border-stone-800 rounded-lg px-3 py-2">
+      <div className="flex-1 min-w-0 flex items-center justify-between">
+        <div>
+          {isEditing ? (
+            <input
+              value={draft}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                const el = e.currentTarget;
+                el.style.height = 'auto';
+                el.style.height = el.scrollHeight + 'px';
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  commit();
+                }
+                if (e.key === 'Escape') setIsEditing(false);
+              }}
+              onBlur={commit}
+              className="w-full bg-[#0a0a0a] border border-amber-500/40 rounded px-2 py-1 text-xs font-mono text-amber-300 focus:outline-none focus:border-amber-500 resize-none overflow-hidden"
+            />
+          ) : (
+            <p
+              className="break-words cursor-text hover:text-amber-300 transition-colors"
+              onClick={open}
+            >
+              {achievement.text}
+            </p>
+          )}
+          <p className="text-[9px] text-stone-600 mt-0.5">
+            {formatTime(new Date(achievement.created_at))}
+          </p>
+        </div>
+        {!isEditing && (
+          <button
+            onClick={handleDelete}
+            className={`shrink-0 text-xs font-mono px-1 transition-colors cursor-pointer ${
+              confirmDelete ? 'text-red-400' : 'text-stone-600'
+            }`}
+            title={confirmDelete ? 'Click again to delete' : 'Delete achievement'}
+          >
+            {confirmDelete ? 'Confirm' : <Trash width={15} height={15} />}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -974,7 +1073,7 @@ export default function Journal({
                       ? 'Time Block Title'
                       : 'Note Title'
               }
-              className="w-full bg-transparent text-stone-100 font-serif font-bold text-xl focus:outline-none placeholder-stone-700 pb-2 border-b border-stone-900/60 resize-none overflow-hidden"
+              className="w-full bg-transparent text-stone-100 font-serif font-bold text-xl focus:outline-none placeholder-stone-700 border-b border-stone-900/60 resize-none overflow-hidden"
               onInput={(e) => {
                 const el = e.currentTarget;
                 el.style.height = 'auto';
@@ -1055,18 +1154,25 @@ export default function Journal({
                   (selectedEntry as Task).achievements!.length > 0 && (
                     <div className="space-y-1.5">
                       {((selectedEntry as Task).achievements ?? []).map((a) => (
-                        <div
+                        <AchievementRow
                           key={a.id}
-                          className="flex items-start gap-2 text-xs font-mono text-stone-300 bg-stone-900/60 border border-stone-800 rounded-lg px-3 py-2"
-                        >
-                          <span className="text-amber-500 mt-0.5 shrink-0">🏆</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="break-words">{a.text}</p>
-                            <p className="text-[9px] text-stone-600 mt-0.5">
-                              {formatTime(new Date(a.created_at))}
-                            </p>
-                          </div>
-                        </div>
+                          achievement={a}
+                          formatTime={formatTime}
+                          onSave={async (text) => {
+                            const task = selectedEntry as Task;
+                            const updated = (task.achievements ?? []).map((x) =>
+                              x.id === a.id ? { ...x, text } : x,
+                            );
+                            await db.entries.update(task.id, { achievements: updated } as any);
+                            setSelectedEntry({ ...task, achievements: updated });
+                          }}
+                          onDelete={async () => {
+                            const task = selectedEntry as Task;
+                            const updated = (task.achievements ?? []).filter((x) => x.id !== a.id);
+                            await db.entries.update(task.id, { achievements: updated } as any);
+                            setSelectedEntry({ ...task, achievements: updated });
+                          }}
+                        />
                       ))}
                     </div>
                   )}

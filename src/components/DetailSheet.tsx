@@ -86,7 +86,7 @@ export default function DetailSheet({
         ) : (
           /* MODAL FOR DESKTOP */
           <div
-            className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-[999] p-4 font-sans"
+            className="fixed inset-0 bg-black/75 backdrop-blur-sm flex flex-1 overflow-y-auto items-center justify-center z-[999] p-4 font-sans"
             onClick={onClose}
           >
             <motion.div
@@ -94,7 +94,7 @@ export default function DetailSheet({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-[#121212] border border-stone-800 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl relative flex flex-col max-h-[85vh]"
+              className="bg-[#121212] border border-stone-800 rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl relative flex flex-col h-full max-h-[85vh]"
             >
               {/* Header section */}
               <div className="flex items-center justify-between border-b border-stone-850 p-4 relative">

@@ -1,8 +1,3 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   Search,
@@ -44,39 +39,6 @@ import { MoreHorizontal } from 'lucide-react';
 import TaskListManagerModal from '../TaskListManagerModal'; // adjust path as needed
 import { TASK_LIST_SCOPE } from '../../utils';
 
-// ─── Starred Meta Helpers ────────────────────────────────────────────────────
-
-const STARRED_META_ID = 'flowday-starred-meta-singleton';
-
-async function getStarredIdsFromDexie(): Promise<string[]> {
-  try {
-    const row = await db.categories.get(STARRED_META_ID);
-    if (!row) return [];
-    return JSON.parse((row as any).name ?? '[]');
-  } catch {
-    return [];
-  }
-}
-
-async function saveStarredIdsToDexie(ids: string[]): Promise<void> {
-  try {
-    const existing = await db.categories.get(STARRED_META_ID);
-    if (existing) {
-      await db.categories.update(STARRED_META_ID, { name: JSON.stringify(ids) } as any);
-    } else {
-      await db.categories.add({
-        id: STARRED_META_ID,
-        name: JSON.stringify(ids),
-        color: 'amber',
-        scope: 'starred-meta' as any,
-        created_at: new Date(),
-      } as any);
-    }
-  } catch {
-    // fail silently
-  }
-}
-
 interface TasksViewProps {
   entries: TimelineEntry[];
   deletingId: string | null;
@@ -92,6 +54,89 @@ interface TasksViewProps {
 }
 
 const PAGE_SIZE = 9;
+
+// ─── Move to Page Modal ──────────────────────────────────────────────────────
+
+interface MoveToPageModalProps {
+  task: Task;
+  currentPage: number;
+  totalPages: number;
+  onClose: () => void;
+  onSelectPage: (taskId: string, page: number) => void;
+}
+
+function MoveToPageModal({
+  task,
+  currentPage,
+  totalPages,
+  onClose,
+  onSelectPage,
+}: MoveToPageModalProps) {
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 8 }}
+          transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+          className="bg-[#141414] border border-stone-800 rounded-2xl shadow-2xl w-[300px] max-w-[90vw] overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 pt-4 pb-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-mono text-stone-500 uppercase tracking-widest mb-1">
+                Move to Page
+              </p>
+              <p className="text-sm font-serif font-semibold text-stone-200 line-clamp-1">
+                {task.title}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-stone-500 hover:text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer shrink-0 ml-2"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Page buttons */}
+          <div className="px-5 pb-5 pt-2">
+            <div className="grid grid-cols-4 gap-1.5">
+              {Array.from({ length: totalPages }, (_, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    onSelectPage(task.id, i);
+                    onClose();
+                  }}
+                  disabled={i === currentPage}
+                  className={`py-1.5 px-2 rounded border text-xs font-mono font-bold transition-all cursor-pointer active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed ${
+                    i === currentPage
+                      ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+                      : 'border-stone-700 bg-stone-900/50 text-stone-300 hover:bg-stone-800 hover:border-stone-600'
+                  }`}
+                  title={`Page ${i + 1}${i === currentPage ? ' (current)' : ''}`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
 
 // ─── Calendar Modal ──────────────────────────────────────────────────────────
 
@@ -162,6 +207,7 @@ function ScheduleCalendarModal({
         exit={{ opacity: 0 }}
         transition={{ duration: 0.15 }}
         className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={onClose}
       >
         <motion.div
@@ -296,14 +342,15 @@ interface TaskSectionProps {
   formatTime: (dateInput: Date | string) => string;
   sensors: ReturnType<typeof useSensors>;
   onDragEnd: (event: DragEndEvent) => void;
-  movePopoverTaskId: string | null;
-  setMovePopoverTaskId: (id: string | null) => void;
   handleMoveToPage: (taskId: string, targetPage: number) => void;
   formatScheduledBadge: (task: Task) => { label: string; isOverdue: boolean } | null;
   setActiveDate: (date: Date) => void;
+  showContent: boolean;
   taskLists: Category[];
   listPickerTaskId: string | null;
   setListPickerTaskId: (id: string | null) => void;
+  moveToPageModalTask: Task | null;
+  setMoveToPageModalTask: (task: Task | null) => void;
 }
 
 // ─── List Picker Popover ─────────────────────────────────────────────────────
@@ -347,49 +394,69 @@ function ListPickerPopover({ task, lists, onClose }: ListPickerPopoverProps) {
     await db.entries.update(task.id, { category_ids: next } as any);
   };
 
-  if (lists.length === 0) {
-    return (
-      <div
-        className="absolute top-full mt-1.5 right-0 bg-[#141414] border border-stone-700 rounded-lg p-3 shadow-xl z-50 w-44"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p className="text-[10px] font-mono text-stone-500 text-center">
-          No lists yet — create one via ···
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div
-      className="absolute top-full mt-1.5 right-0 bg-[#141414] border border-stone-700 rounded-lg p-2 shadow-xl z-50 min-w-[160px]"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <p className="text-[9px] font-mono text-stone-500 uppercase tracking-wider mb-1.5 px-0.5">
-        Assign to list
-      </p>
-      <div className="flex flex-col gap-0.5">
-        {lists.map((list) => {
-          const cs = COLORS[list.color] ?? COLORS['violet'];
-          const isAssigned = currentIds.includes(list.id);
-          return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[1100] flex items-center justify-center p-4 font-sans"
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.93, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.93, y: 12 }}
+          transition={{ type: 'spring', damping: 26, stiffness: 260 }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-xs bg-[#131313] border border-stone-800 rounded-2xl shadow-2xl overflow-hidden"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-stone-800/60">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-stone-400">
+              Assign to List
+            </span>
             <button
-              key={list.id}
-              onClick={() => handleToggle(list.id)}
-              className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg border text-[11px] font-mono transition-all cursor-pointer ${
-                isAssigned
-                  ? cs.active
-                  : 'border-transparent text-stone-400 hover:bg-stone-800 hover:text-stone-200'
-              }`}
+              onClick={onClose}
+              className="p-1 text-stone-500 hover:text-stone-300 rounded-lg transition-colors cursor-pointer"
             >
-              <span className={`w-2 h-2 rounded-full shrink-0 ${cs.dot}`} />
-              <span className="truncate flex-1 text-left">{list.name}</span>
-              {isAssigned && <Check className="w-3 h-3 shrink-0 stroke-[3]" />}
+              <X className="w-4 h-4" />
             </button>
-          );
-        })}
-      </div>
-    </div>
+          </div>
+
+          {/* Content */}
+          <div className="p-4">
+            {lists.length === 0 ? (
+              <p className="text-xs font-mono text-stone-500 text-center py-6">
+                No lists yet — create one via ···
+              </p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {lists.map((list) => {
+                  const cs = COLORS[list.color] ?? COLORS['violet'];
+                  const isAssigned = currentIds.includes(list.id);
+                  return (
+                    <button
+                      key={list.id}
+                      onClick={() => handleToggle(list.id)}
+                      className={`flex items-center gap-2.5 w-full px-3 py-2.5 rounded-lg border text-xs font-mono transition-all cursor-pointer ${
+                        isAssigned
+                          ? cs.active
+                          : 'border-transparent text-stone-400 hover:bg-stone-800 hover:text-stone-200'
+                      }`}
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${cs.dot}`} />
+                      <span className="truncate flex-1 text-left">{list.name}</span>
+                      {isAssigned && <Check className="w-3.5 h-3.5 shrink-0 stroke-[3]" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 
@@ -413,14 +480,15 @@ function TaskSection({
   formatTime,
   sensors,
   onDragEnd,
-  movePopoverTaskId,
-  setMovePopoverTaskId,
   handleMoveToPage,
   formatScheduledBadge,
   setActiveDate,
+  showContent,
   taskLists,
   listPickerTaskId,
   setListPickerTaskId,
+  moveToPageModalTask,
+  setMoveToPageModalTask,
 }: TaskSectionProps) {
   const safePage = Math.min(page, totalPages - 1);
   const pageTasks = tasks.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
@@ -485,6 +553,11 @@ function TaskSection({
                 </span>
               )}
             </div>
+            {showContent && task.content && task.content.trim() && (
+              <p className="text-[10px] font-mono text-stone-500 mt-1 line-clamp-1 leading-relaxed">
+                {task.content}
+              </p>
+            )}
           </div>
 
           {/* Scheduled Date Badge / Assign Date */}
@@ -574,47 +647,16 @@ function TaskSection({
 
             {/* Move to Page (only when multiple pages exist) */}
             {totalPages > 1 && (
-              <div className="relative" data-move-popover>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMovePopoverTaskId(movePopoverTaskId === task.id ? null : task.id);
-                  }}
-                  className="p-1.5 bg-transparent rounded border border-stone-800 hover:bg-stone-800 text-stone-400 hover:text-amber-400 transition-colors cursor-pointer"
-                  title="Move to page"
-                >
-                  <ArrowRightLeft className="w-3.5 h-3.5" />
-                </button>
-
-                {/* Page picker popover */}
-                {movePopoverTaskId === task.id && (
-                  <div
-                    className="absolute bottom-full mb-1.5 right-0 bg-[#141414] border border-stone-700 rounded-lg p-2 shadow-xl z-50"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <p className="text-[9px] font-mono text-stone-500 uppercase tracking-wider mb-1.5 px-0.5">
-                      Move to page
-                    </p>
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: totalPages }, (_, i) => (
-                        <button
-                          key={i}
-                          onClick={() => handleMoveToPage(task.id, i)}
-                          disabled={i === safePage}
-                          className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-mono font-bold transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
-                            i === safePage
-                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-stone-800 text-stone-400 hover:bg-stone-700 hover:text-stone-200 border border-stone-700'
-                          }`}
-                          title={`Page ${i + 1}${i === safePage ? ' (current)' : ''}`}
-                        >
-                          {i + 1}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMoveToPageModalTask(task);
+                }}
+                className="p-1.5 bg-transparent rounded border border-stone-800 hover:bg-stone-800 text-stone-400 hover:text-amber-400 transition-colors cursor-pointer"
+                title="Move to page"
+              >
+                <ArrowRightLeft className="w-3.5 h-3.5" />
+              </button>
             )}
 
             {/* Delete */}
@@ -862,7 +904,7 @@ function ListStrip({ lists, selectedId, onSelect, onManage }: ListStripProps) {
       {/* Scrollable list pills */}
       <div
         ref={scrollRef}
-        className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0 pr-1"
+        className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0 pr-1 scrollbar-none"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {lists.map((list) => {
@@ -918,6 +960,7 @@ export default function TasksView({
   formatDateStringLabel,
 }: TasksViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const showContent = localStorage.getItem('flowday_show_note_event_content') !== 'false';
   const [statusFilter, setStatusFilter] = useState<'inbox' | 'todo' | 'done'>(() => {
     const saved = localStorage.getItem('flowday-tasks-status-filter');
     if (saved === 'inbox' || saved === 'todo' || saved === 'done') {
@@ -947,75 +990,6 @@ export default function TasksView({
     localStorage.setItem('flowday-tasks-status-filter', filter);
   };
 
-  // ─── Starred Tasks (stored in dexie) ────────────────────────────────
-  const [starredIds, setStarredIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    getStarredIdsFromDexie().then((ids) => {
-      if (ids.length > 0) {
-        setStarredIds(ids);
-      } else {
-        // One-time migration from localStorage if Dexie is empty
-        try {
-          const saved = localStorage.getItem('flowday-starred-task-ids');
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            setStarredIds(parsed);
-            saveStarredIdsToDexie(parsed);
-            localStorage.removeItem('flowday-starred-task-ids');
-          }
-        } catch {
-          // ignore
-        }
-      }
-    });
-  }, []);
-
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
-
-  const handleStarTask = useCallback((taskId: string) => {
-    setStarredIds((prev) => {
-      if (prev.includes(taskId)) return prev;
-      if (prev.length >= 3) {
-        triggerToast('Maximum 3 highlighted tasks allowed in Starred section!');
-        return prev;
-      }
-      const next = [...prev, taskId];
-      saveStarredIdsToDexie(next);
-      return next;
-    });
-  }, []);
-
-  const handleUnstarTask = useCallback((taskId: string) => {
-    setStarredIds((prev) => {
-      const next = prev.filter((id: string) => id !== taskId);
-      saveStarredIdsToDexie(next);
-      return next;
-    });
-  }, []);
-
-  // Sync / clean up completed or non-existent starred tasks
-  const activeDatelessTasksLookup = useMemo(() => {
-    return new Set(
-      entries
-        .filter((e) => e.type === 'task' && !e.scheduled_at && e.status !== 'done')
-        .map((e) => e.id),
-    );
-  }, [entries]);
-
-  React.useEffect(() => {
-    if (starredIds.length === 0) return;
-    const validStarred = starredIds.filter((id) => activeDatelessTasksLookup.has(id));
-    if (validStarred.length !== starredIds.length) {
-      setStarredIds(validStarred);
-      saveStarredIdsToDexie(validStarred);
-    }
-  }, [activeDatelessTasksLookup, starredIds]);
-
   // Section collapse state
   const [scheduledCollapsed, setScheduledCollapsed] = useState(false);
   const [datelessCollapsed, setDatelessCollapsed] = useState(false);
@@ -1042,8 +1016,8 @@ export default function TasksView({
     null,
   );
 
-  // Move popover per section
-  const [movePopoverTaskId, setMovePopoverTaskId] = useState<string | null>(null);
+  // Move to page modal
+  const [moveToPageModalTask, setMoveToPageModalTask] = useState<Task | null>(null);
 
   // Schedule calendar modal
   const [scheduleModalTask, setScheduleModalTask] = useState<Task | null>(null);
@@ -1140,13 +1114,6 @@ export default function TasksView({
       completedDatelessTasks: completedDateless,
     };
   }, [filteredTasks, statusFilter]);
-
-  // Starred tasks list derived
-  const starredTasks = useMemo(() => {
-    return starredIds
-      .map((id) => allTasks.find((t) => t.id === id))
-      .filter((t): t is Task => !!t && t.status !== 'done');
-  }, [starredIds, allTasks]);
 
   // ─── Display lists (optimistic override) ──────────────────────────────────
   const displayScheduled = optimisticScheduled ?? scheduledTasks;
@@ -1278,14 +1245,14 @@ export default function TasksView({
     ) =>
       async (taskId: string, targetPage: number) => {
         if (targetPage === safePage) {
-          setMovePopoverTaskId(null);
+          setMoveToPageModalTask(null);
           return;
         }
 
         const fullList = [...displayList];
         const movedIdx = fullList.findIndex((t) => t.id === taskId);
         if (movedIdx === -1) {
-          setMovePopoverTaskId(null);
+          setMoveToPageModalTask(null);
           return;
         }
 
@@ -1311,10 +1278,10 @@ export default function TasksView({
         });
 
         setPageFn(targetPage);
-        setMovePopoverTaskId(null);
+        setMoveToPageModalTask(null);
         setTimeout(() => setOptimistic(null), 2000);
       },
-    [],
+    [setMoveToPageModalTask],
   );
 
   const handleScheduledMoveToPage = useMemo(
@@ -1350,19 +1317,6 @@ export default function TasksView({
     [createMoveToPageHandler, displayCompletedDateless, completedDatelessSafePage],
   );
 
-  // ─── Close move popover on outside click ──────────────────────────────────
-  React.useEffect(() => {
-    if (!movePopoverTaskId) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest(`[data-move-popover]`)) {
-        setMovePopoverTaskId(null);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [movePopoverTaskId]);
-
   // ─── Close list picker on outside click ───────────────────────────────────
   const [listPickerTaskId, setListPickerTaskId] = useState<string | null>(null);
 
@@ -1371,11 +1325,12 @@ export default function TasksView({
     const handler = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target.closest('[data-list-picker]')) {
+        e.stopPropagation();
         setListPickerTaskId(null);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('mousedown', handler, true);
+    return () => document.removeEventListener('mousedown', handler, true);
   }, [listPickerTaskId]);
 
   // ─── Schedule Modal Handlers ──────────────────────────────────────────────
@@ -1410,21 +1365,6 @@ export default function TasksView({
 
   return (
     <div className="space-y-0" id="tasks-view-dashboard">
-      {/* Toast Announcement */}
-      <AnimatePresence>
-        {toastMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className="fixed top-6 left-1/2 -translate-x-1/2 z-[999] px-4 py-2.5 rounded-xl bg-red-950/90 border border-red-800/60 shadow-2xl text-red-200 text-xs font-mono font-semibold uppercase tracking-wider flex items-center gap-2 backdrop-blur-md"
-          >
-            <span>⚠️</span>
-            {toastMessage}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Sticky search and filter control header */}
       <div className="z-20 bg-[#0a0a0a] py-0 flex items-center justify-between gap-3">
         <div className="relative flex items-center flex-1 max-w-[200px] sm:max-w-xs">
@@ -1472,48 +1412,6 @@ export default function TasksView({
         </div>
       </div>
 
-      {/* Task count summary */}
-      {/* 
-      {(displayScheduled.length > 0 ||
-        displayDateless.length > 0 ||
-        (statusFilter === 'inbox' && displayCompletedDateless.length > 0)) && (
-        <div className="px-1 py-0.5 text-[10px] font-mono text-stone-500 tracking-wider mt-3 mb-1.5">
-          <span>
-            {displayScheduled.length +
-              displayDateless.length +
-              (statusFilter === 'inbox' ? displayCompletedDateless.length : 0)}{' '}
-            task
-            {displayScheduled.length +
-              displayDateless.length +
-              (statusFilter === 'inbox' ? displayCompletedDateless.length : 0) !==
-            1
-              ? 's'
-              : ''}
-            {statusFilter === 'todo'
-              ? ' to do'
-              : statusFilter === 'done'
-                ? ' completed'
-                : statusFilter === 'inbox'
-                  ? ' in inbox'
-                  : ' total'}
-            {searchQuery.trim() ? ` matching "${searchQuery.trim()}"` : ''}
-          </span>
-        </div>
-      )}
-      */}
-
-      {/* Starred Section (Only renders in Inbox view) */}
-      {/* {statusFilter === 'inbox' && (
-        <StarredSection
-          tasks={starredTasks}
-          onUnstar={handleUnstarTask}
-          onToggleTaskStatus={onToggleTaskStatus}
-          onOpenSelectModal={() => setIsStarModalOpen(true)}
-          onOpenDetail={onOpenDetail}
-          onActivateTask={onActivateTask}
-        />
-      )} */}
-
       {/* List strip — only in inbox mode where dateless tasks live */}
       {statusFilter === 'inbox' && (
         <ListStrip
@@ -1552,14 +1450,15 @@ export default function TasksView({
           formatTime={formatTime}
           sensors={sensors}
           onDragEnd={handleDatelessDragEnd}
-          movePopoverTaskId={movePopoverTaskId}
-          setMovePopoverTaskId={setMovePopoverTaskId}
           handleMoveToPage={handleDatelessMoveToPage}
           formatScheduledBadge={formatScheduledBadge}
           setActiveDate={setActiveDate}
           taskLists={taskLists}
           listPickerTaskId={listPickerTaskId}
           setListPickerTaskId={setListPickerTaskId}
+          moveToPageModalTask={moveToPageModalTask}
+          setMoveToPageModalTask={setMoveToPageModalTask}
+          showContent={showContent}
         />
       )}
 
@@ -1586,14 +1485,15 @@ export default function TasksView({
             formatTime={formatTime}
             sensors={sensors}
             onDragEnd={handleCompletedDatelessDragEnd}
-            movePopoverTaskId={movePopoverTaskId}
-            setMovePopoverTaskId={setMovePopoverTaskId}
             handleMoveToPage={handleCompletedDatelessMoveToPage}
             formatScheduledBadge={formatScheduledBadge}
             setActiveDate={setActiveDate}
             taskLists={taskLists}
             listPickerTaskId={listPickerTaskId}
             setListPickerTaskId={setListPickerTaskId}
+            moveToPageModalTask={moveToPageModalTask}
+            setMoveToPageModalTask={setMoveToPageModalTask}
+            showContent={showContent}
           />
         )}
 
@@ -1619,14 +1519,15 @@ export default function TasksView({
           formatTime={formatTime}
           sensors={sensors}
           onDragEnd={handleScheduledDragEnd}
-          movePopoverTaskId={movePopoverTaskId}
-          setMovePopoverTaskId={setMovePopoverTaskId}
           handleMoveToPage={handleScheduledMoveToPage}
           formatScheduledBadge={formatScheduledBadge}
           setActiveDate={setActiveDate}
           taskLists={[]}
           listPickerTaskId={null}
           setListPickerTaskId={() => {}}
+          moveToPageModalTask={moveToPageModalTask}
+          setMoveToPageModalTask={setMoveToPageModalTask}
+          showContent={showContent}
         />
       )}
 
@@ -1667,343 +1568,38 @@ export default function TasksView({
         />
       )}
 
-      {/* Starred Selection Modal */}
-      {isStarModalOpen && (
-        <StarredSelectModal
-          allTasks={allTasks}
-          starredIds={starredIds}
-          onClose={() => setIsStarModalOpen(false)}
-          onSelect={handleStarTask}
+      {/* Move to Page Modal */}
+      {moveToPageModalTask && (
+        <MoveToPageModal
+          task={moveToPageModalTask}
+          currentPage={
+            moveToPageModalTask.scheduled_at
+              ? Math.min(scheduledPage, scheduledTotalPages - 1)
+              : moveToPageModalTask.status === 'done'
+                ? Math.min(completedDatelessPage, completedDatelessTotalPages - 1)
+                : Math.min(datelessPage, datelessTotalPages - 1)
+          }
+          totalPages={
+            moveToPageModalTask.scheduled_at
+              ? scheduledTotalPages
+              : moveToPageModalTask.status === 'done'
+                ? completedDatelessTotalPages
+                : datelessTotalPages
+          }
+          onClose={() => setMoveToPageModalTask(null)}
+          onSelectPage={(taskId, page) => {
+            if (moveToPageModalTask.scheduled_at) {
+              handleScheduledMoveToPage(taskId, page);
+            } else if (moveToPageModalTask.status === 'done') {
+              handleCompletedDatelessMoveToPage(taskId, page);
+            } else {
+              handleDatelessMoveToPage(taskId, page);
+            }
+          }}
         />
       )}
 
       {isListManagerOpen && <TaskListManagerModal onClose={() => setIsListManagerOpen(false)} />}
     </div>
-  );
-}
-
-// ─── Starred Section Component ───────────────────────────────────────────────
-
-import { Star, Clock, Plus } from 'lucide-react';
-
-interface StarredSectionProps {
-  tasks: Task[];
-  onUnstar: (id: string) => void;
-  onToggleTaskStatus: (task: Task) => void;
-  onOpenSelectModal: () => void;
-  onOpenDetail: (entry: TimelineEntry) => void;
-  onActivateTask: (taskId: string) => void;
-}
-
-function StarredSection({
-  tasks,
-  onUnstar,
-  onToggleTaskStatus,
-  onOpenSelectModal,
-  onOpenDetail,
-  onActivateTask,
-}: StarredSectionProps) {
-  return (
-    <div className="mb-6 p-4 rounded-2xl border bg-stone-900/10 border-stone-900/60 transition-all duration-300">
-      {/* Section Header */}
-      <div className="flex items-center gap-2 mb-3.5">
-        <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
-        <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-stone-400">
-          Starred Tasks
-        </span>
-        <span className="text-[10px] font-mono text-stone-600 ml-2">
-          ({tasks.length} / 3 slots)
-        </span>
-        <button
-          onClick={onOpenSelectModal}
-          className="ml-auto px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider rounded border border-stone-850 hover:bg-stone-900 text-stone-400 hover:text-amber-400 transition-colors flex items-center gap-1 cursor-pointer"
-        >
-          <Plus className="w-3 h-3" />
-          Add
-        </button>
-      </div>
-
-      {tasks.length === 0 ? (
-        <div className="border border-dashed border-stone-800/80 rounded-xl py-8 px-6 text-center text-stone-650 transition-colors">
-          <p className="text-xs font-sans mb-2">No highlighted tasks</p>
-          <button
-            onClick={onOpenSelectModal}
-            className="text-[10px] font-mono uppercase tracking-wider text-amber-400 hover:underline"
-          >
-            Choose a task
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {tasks.map((task) => (
-            <StarredTaskCard
-              key={task.id}
-              task={task}
-              onUnstar={onUnstar}
-              onToggleTaskStatus={onToggleTaskStatus}
-              onOpenDetail={onOpenDetail}
-              onActivateTask={onActivateTask}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface StarredTaskCardProps {
-  task: Task;
-  onUnstar: (id: string) => void;
-  onToggleTaskStatus: (task: Task) => void;
-  onOpenDetail: (entry: TimelineEntry) => void;
-  onActivateTask: (taskId: string) => void;
-}
-
-function StarredTaskCard({
-  task,
-  onUnstar,
-  onToggleTaskStatus,
-  onOpenDetail,
-  onActivateTask,
-}: StarredTaskCardProps) {
-  const [achievementInput, setAchievementInput] = useState('');
-
-  const handleAddAchievement = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!achievementInput.trim()) return;
-
-    const newSub: TaskAchievement = {
-      id: crypto.randomUUID(),
-      text: achievementInput.trim(),
-      created_at: new Date(),
-    };
-
-    const achievements = [...(task.achievements ?? []), newSub];
-    await db.entries.update(task.id, { achievements } as any);
-    setAchievementInput('');
-  };
-
-  const handleToggleAchievement = async (subtaskId: string) => {
-    const achievements = (task.achievements ?? []).filter((a) => a.id !== subtaskId);
-    await db.entries.update(task.id, { achievements } as any);
-  };
-
-  const formatMinSpent = (ms: number) => {
-    return `${Math.floor(ms / 60000)}m spent`;
-  };
-
-  return (
-    <div
-      onClick={() => onOpenDetail(task)}
-      className="group relative flex flex-col bg-[#141414]/90 border border-stone-850 hover:border-stone-800 rounded-xl p-4 shadow-md transition-all animate-in fade-in zoom-in-95 duration-150 cursor-pointer"
-    >
-      {/* Card Header (Checkbox + Title + Unstar) */}
-      <div className="flex items-start gap-2.5 mb-2.5">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleTaskStatus(task);
-          }}
-          className="w-5 h-5 rounded-full border border-stone-700 bg-[#0a0a0a] hover:bg-stone-900 text-transparent hover:text-stone-400 flex items-center justify-center shrink-0 mt-0.5 cursor-pointer"
-        >
-          <Check className="w-3 h-3 stroke-[3]" />
-        </button>
-
-        <span className="flex-1 text-sm font-serif font-semibold text-stone-200 line-clamp-2 leading-snug">
-          {task.title}
-        </span>
-
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onUnstar(task.id);
-          }}
-          className="p-1 rounded-lg text-stone-500 hover:text-red-400 hover:bg-stone-900/60 transition-all cursor-pointer"
-          title="Unhighlight task"
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
-      </div>
-
-      {/* Content preview if exists */}
-      {task.content && (
-        <p className="text-xs font-sans text-stone-400 line-clamp-2 leading-relaxed mb-1.25">
-          {task.content}
-        </p>
-      )}
-
-      {/* Time spent & Play button */}
-      <div className="flex items-center justify-between text-[10px] font-mono text-stone-500 mb-2">
-        <div className="flex gap-1">
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3 h-3 text-stone-600" />
-            <span>{formatMinSpent(task.time_spent)}</span>
-          </div>
-          {task.achievements && task.achievements.length > 0 && (
-            <span className="shrink-0 flex items-center gap-1 px-2 py-1 text-amber-400 text-xs font-mono font-bold">
-              🏆 {task.achievements.length} achievement{task.achievements.length !== 1 ? 's' : ''}
-            </span>
-          )}
-        </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onActivateTask(task.id);
-          }}
-          className="p-1 bg-stone-850 hover:bg-stone-800 border border-stone-800 text-stone-400 hover:text-amber-400 rounded transition-colors flex items-center gap-1 cursor-pointer font-bold uppercase tracking-wider text-[9px]"
-          title="Activate task to track time"
-        >
-          <Play className="w-2.5 h-2.5 fill-current" />
-          Play
-        </button>
-      </div>
-
-      {/* Achievements Section */}
-      <div className="flex-1 flex flex-col justify-end" onClick={(e) => e.stopPropagation()}>
-        {/* Achievement count chip + add input row */}
-        <div className="flex items-center gap-2">
-          <form onSubmit={handleAddAchievement} className="flex gap-1.5 flex-1">
-            <input
-              type="text"
-              placeholder="Add achievement..."
-              value={achievementInput}
-              onChange={(e) => setAchievementInput(e.target.value)}
-              className="flex-1 min-w-0 bg-[#0a0a0a] border border-stone-850 rounded-lg px-2.5 py-1 text-[11px] font-mono text-stone-300 placeholder-stone-650 focus:outline-none focus:border-stone-750 transition-colors"
-            />
-            <button
-              type="submit"
-              className="px-2.5 py-1 text-[11px] font-mono font-bold bg-stone-800 text-stone-200 border border-stone-700 hover:bg-stone-750 rounded-lg transition-colors cursor-pointer shrink-0"
-            >
-              +
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Starred Task Selection Modal ───────────────────────────────────────────
-
-interface StarredSelectModalProps {
-  allTasks: Task[];
-  starredIds: string[];
-  onClose: () => void;
-  onSelect: (id: string) => void;
-}
-
-function StarredSelectModal({ allTasks, starredIds, onClose, onSelect }: StarredSelectModalProps) {
-  const [search, setSearch] = useState('');
-
-  // Get active dateless tasks that are NOT already starred
-  const candidateTasks = useMemo(() => {
-    return allTasks.filter(
-      (t) => !t.scheduled_at && t.status !== 'done' && !starredIds.includes(t.id),
-    );
-  }, [allTasks, starredIds]);
-
-  const filtered = useMemo(() => {
-    if (!search.trim()) return candidateTasks;
-    const q = search.toLowerCase();
-    return candidateTasks.filter((t) => t.title.toLowerCase().includes(q));
-  }, [candidateTasks, search]);
-
-  const handleSelect = (id: string) => {
-    onSelect(id);
-    // Don't close if they can still add, but if we hit the limit, close it.
-    if (starredIds.length + 1 >= 3) {
-      onClose();
-    }
-  };
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.15 }}
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 8 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 8 }}
-          transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-          className="bg-[#141414] border border-stone-800 rounded-2xl shadow-2xl w-[400px] max-w-[90vw] overflow-hidden flex flex-col max-h-[70vh]"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 pt-4 pb-2 border-b border-stone-900/60">
-            <div>
-              <p className="text-[10px] font-mono text-stone-500 uppercase tracking-widest mb-1">
-                Choose Starred Task
-              </p>
-              <p className="text-sm font-serif font-semibold text-stone-200">
-                Inbox Highlight ({starredIds.length} / 3 slots filled)
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-stone-500 hover:text-stone-300 hover:bg-stone-805 transition-colors cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Search bar */}
-          <div className="p-4 border-b border-stone-900/40">
-            <div className="relative flex items-center">
-              <Search className="absolute left-3 w-3.5 h-3.5 text-stone-500 pointer-events-none" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search dateless tasks..."
-                autoFocus
-                className="w-full pl-9 pr-3 py-2 text-xs font-mono bg-[#0a0a0a] border border-stone-850 rounded-xl text-stone-300 placeholder-stone-650 focus:outline-none focus:border-stone-700 transition-colors"
-              />
-            </div>
-          </div>
-
-          {/* Tasks List */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-1">
-            {filtered.length === 0 ? (
-              <div className="py-12 text-center text-stone-600 select-none">
-                <p className="text-xs font-sans">
-                  {candidateTasks.length === 0
-                    ? 'No dateless tasks available to star'
-                    : 'No matching dateless tasks'}
-                </p>
-              </div>
-            ) : (
-              filtered.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => handleSelect(t.id)}
-                  className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-stone-900/60 border border-transparent hover:border-stone-850 flex items-center gap-3 transition-all cursor-pointer group"
-                >
-                  <Star className="w-3.5 h-3.5 text-stone-700 group-hover:text-amber-400 transition-colors shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-sans font-medium text-stone-300 line-clamp-1 group-hover:text-stone-100 transition-colors">
-                      {t.title}
-                    </p>
-                    {t.content && (
-                      <p className="text-[10px] text-stone-500 line-clamp-1 mt-0.5">{t.content}</p>
-                    )}
-                  </div>
-                  {t.time_spent > 0 && (
-                    <span className="text-[9px] font-mono text-stone-600 shrink-0">
-                      {Math.floor(t.time_spent / 60000)}m
-                    </span>
-                  )}
-                </button>
-              ))
-            )}
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
   );
 }

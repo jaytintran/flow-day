@@ -113,7 +113,7 @@ export interface HabitLog extends BaseEntry {
   timestamp: Date; // exact completion time (shown in time gutter)
 }
 
-export type CategoryScope = 'goal' | 'objective' | 'task-list' | 'starred-meta';
+export type CategoryScope = 'goal' | 'objective' | 'task-list';
 
 // Category — tags for goals or objectives
 export interface Category {
