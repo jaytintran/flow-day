@@ -130,7 +130,7 @@ function SortableListRow({ list, deletingId, onDelete, onRename }: SortableListR
       <button
         {...attributes}
         {...listeners}
-        className="p-0.5 text-stone-700 hover:text-stone-400 cursor-grab active:cursor-grabbing transition-colors shrink-0"
+        className="p-0.5 text-stone-700 hover:text-stone-400 cursor-grab active:cursor-grabbing touch-none transition-colors shrink-0"
       >
         <GripVertical className="w-3.5 h-3.5" />
       </button>

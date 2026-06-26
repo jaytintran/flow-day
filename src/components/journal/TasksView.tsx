@@ -460,6 +460,111 @@ function ListPickerPopover({ task, lists, onClose }: ListPickerPopoverProps) {
   );
 }
 
+// ─── Swipeable Row ───────────────────────────────────────────────────────────
+
+interface SwipeableRowProps {
+  id: string;
+  isOpen: boolean;
+  onOpen: (id: string) => void;
+  onClose: () => void;
+  actions: React.ReactNode;
+  children: React.ReactNode;
+  actionsWidth?: number;
+}
+
+function SwipeableRow({
+  id,
+  isOpen,
+  onOpen,
+  onClose,
+  actions,
+  children,
+  actionsWidth = 180,
+}: SwipeableRowProps) {
+  const touchStartX = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
+  const isDraggingHorizontal = useRef<boolean>(false);
+  const dragOffset = useRef<number>(0);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Apply transform directly to the DOM node — no React re-render during drag
+  const setTranslate = (px: number, animated: boolean) => {
+    const el = contentRef.current;
+    if (!el) return;
+    el.style.transition = animated ? 'transform 200ms ease-out' : 'none';
+    el.style.transform = `translateX(${px}px)`;
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    isDraggingHorizontal.current = false;
+    // Start offset is where the row currently rests
+    dragOffset.current = isOpen ? -actionsWidth : 0;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const dx = e.touches[0].clientX - touchStartX.current;
+    const dy = Math.abs(e.touches[0].clientY - touchStartY.current);
+
+    // Lock axis on first significant move
+    if (!isDraggingHorizontal.current) {
+      if (dy > Math.abs(dx)) return; // vertical scroll — ignore
+      if (Math.abs(dx) < 4) return; // too small to decide yet
+      isDraggingHorizontal.current = true;
+    }
+
+    // Clamp: can't slide right past 0, or left past -actionsWidth
+    const raw = dragOffset.current + dx;
+    const clamped = Math.min(0, Math.max(-actionsWidth, raw));
+    setTranslate(clamped, false);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!isDraggingHorizontal.current) return;
+
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const totalOffset = dragOffset.current + dx;
+    // Snap open if dragged more than halfway, otherwise snap closed
+    const threshold = actionsWidth / 2;
+
+    if (totalOffset < -threshold) {
+      setTranslate(-actionsWidth, true);
+      onOpen(id);
+    } else {
+      setTranslate(0, true);
+      onClose();
+    }
+  };
+
+  // Keep DOM in sync when isOpen changes from outside (e.g. another row opens)
+  React.useEffect(() => {
+    setTranslate(isOpen ? -actionsWidth : 0, true);
+  }, [isOpen, actionsWidth]);
+
+  return (
+    <div
+      className="relative overflow-hidden"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Action buttons layer — sits on the right */}
+      <div
+        className="absolute right-0 top-0 bottom-0 flex items-center justify-end pr-2 gap-1"
+        style={{ width: actionsWidth }}
+      >
+        {actions}
+      </div>
+
+      {/* Row content — follows the finger, snaps on release */}
+      <div ref={contentRef} className="relative bg-[#0a0a0a]">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function TaskSection({
   label,
   icon,
@@ -493,235 +598,227 @@ function TaskSection({
   const safePage = Math.min(page, totalPages - 1);
   const pageTasks = tasks.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
-  const renderTaskRow = (task: Task) => {
+  const [openRowId, setOpenRowId] = useState<string | null>(null);
+
+  const renderTaskRow = (
+    task: Task,
+    rowOpenId: string | null,
+    setRowOpenId: (id: string | null) => void,
+  ) => {
     const isActive = activeTaskId === task.id;
     const isDone = task.status === 'done';
     const hasAchievements = task.achievements && task.achievements.length > 0;
     const badge = formatScheduledBadge(task);
     const isDateless = !task.scheduled_at;
+    const isOpen = rowOpenId === task.id;
 
-    return (
-      <SortableRow key={task.id} id={task.id}>
-        <div
-          id={`tasks-view-row-${task.id}`}
-          onClick={() => onOpenDetail(task)}
-          className={`group/row relative flex items-center gap-3 px-3 py-2.5 last:border-b-0 hover:bg-stone-900/40 transition-colors cursor-pointer ${
-            isActive ? 'border-l-2 border-l-amber-500 bg-amber-500/5' : ''
-          }`}
-        >
-          {/* Checkbox */}
+    const actionButtons = (
+      <>
+        {/* Activate */}
+        {!isDone && !isActive && (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onToggleTaskStatus(task);
+              onActivateTask(task.id);
             }}
-            className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
-              isDone
-                ? 'bg-stone-800 border-stone-700 text-stone-400'
-                : 'border-stone-700 bg-[#0a0a0a] text-transparent hover:text-stone-400 hover:bg-stone-900/60'
+            className="p-1.5 bg-stone-900 rounded border border-stone-700 hover:bg-stone-800 text-stone-400 hover:text-stone-200 transition-colors cursor-pointer"
+            title="Activate as Working Task"
+          >
+            <Play className="w-3.5 h-3.5 fill-current" />
+          </button>
+        )}
+
+        {/* Schedule */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenScheduleModal(task);
+          }}
+          className="p-1.5 bg-stone-900 rounded border border-stone-700 hover:bg-stone-800 text-stone-400 hover:text-amber-400 transition-colors cursor-pointer"
+          title="Schedule date"
+        >
+          <Calendar className="w-3.5 h-3.5" />
+        </button>
+
+        {/* List picker — only for dateless tasks */}
+        {!task.scheduled_at && taskLists.length > 0 && (
+          <div className="relative" data-list-picker>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setListPickerTaskId(listPickerTaskId === task.id ? null : task.id);
+              }}
+              className={`p-1.5 bg-stone-900 rounded border transition-colors cursor-pointer ${
+                (task.category_ids ?? []).some((id) => taskLists.some((l) => l.id === id))
+                  ? 'border-violet-700/60 text-violet-400 hover:bg-violet-950/20'
+                  : 'border-stone-700 hover:bg-stone-800 text-stone-400 hover:text-violet-400'
+              }`}
+              title="Assign to list"
+            >
+              <ListTodo className="w-3.5 h-3.5" />
+            </button>
+
+            {listPickerTaskId === task.id && (
+              <ListPickerPopover
+                task={task}
+                lists={taskLists}
+                onClose={() => setListPickerTaskId(null)}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Move to Page (only when multiple pages exist) */}
+        {totalPages > 1 && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setMoveToPageModalTask(task);
+            }}
+            className="p-1.5 bg-stone-900 rounded border border-stone-700 hover:bg-stone-800 text-stone-400 hover:text-amber-400 transition-colors cursor-pointer"
+            title="Move to page"
+          >
+            <ArrowRightLeft className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {/* Delete */}
+        {deletingId === task.id ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteEntry(task.id);
+            }}
+            className="px-2 py-1 text-[10px] bg-red-950/80 border border-red-800/80 rounded text-red-400 font-mono font-bold hover:bg-red-900 transition-colors cursor-pointer"
+            title="Confirm delete"
+          >
+            Sure?
+          </button>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteEntry(task.id);
+            }}
+            className="p-1.5 bg-stone-900 rounded border border-stone-700 hover:bg-stone-800 text-stone-500 hover:text-red-400 transition-colors cursor-pointer"
+            title="Delete Task"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </>
+    );
+
+    return (
+      <SortableRow key={task.id} id={task.id}>
+        <SwipeableRow
+          id={task.id}
+          isOpen={isOpen}
+          onOpen={(id) => setRowOpenId(id)}
+          onClose={() => setRowOpenId(null)}
+          actions={actionButtons}
+        >
+          <div
+            id={`tasks-view-row-${task.id}`}
+            onClick={() => {
+              if (isOpen) {
+                setRowOpenId(null);
+                return;
+              }
+              onOpenDetail(task);
+            }}
+            className={`group/row relative flex items-center gap-3 px-3 py-2.5 last:border-b-0 hover:bg-stone-900/40 transition-colors cursor-pointer ${
+              isActive ? 'border-l-2 border-l-amber-500 bg-amber-500/5' : ''
             }`}
           >
-            <Check className="w-3.5 h-3.5 stroke-[3]" />
-          </button>
-
-          {/* Title + info row */}
-          <div className="flex-1 min-w-0">
-            <p
-              className={`font-serif text-sm font-semibold line-clamp-1 ${
+            {/* Checkbox */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleTaskStatus(task);
+              }}
+              className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
                 isDone
-                  ? hasAchievements
-                    ? 'text-amber-400/80 line-through'
-                    : 'text-stone-600 line-through'
-                  : 'text-stone-200'
+                  ? 'bg-stone-800 border-stone-700 text-stone-400'
+                  : 'border-stone-700 bg-[#0a0a0a] text-transparent hover:text-stone-400 hover:bg-stone-900/60'
               }`}
             >
-              {isDone && hasAchievements && <span className="mr-1.5 not-italic">🏆</span>}
-              {task.title}
-            </p>
-            <div className="flex items-center gap-x-1.5 mt-1">
-              <span className="flex items-center gap-1 text-[10px] font-mono text-stone-500">
-                Created: {formatTime(task.created_at)}
-              </span>
-              {task.time_spent > 0 && (
-                <span className="text-[10px] font-mono text-stone-600">
-                  · {Math.floor(task.time_spent / 60000)}m spent
-                </span>
-              )}
-              {isDone && task.completed_at && (
-                <span className="flex items-center gap-0.5 text-[10px] font-mono text-emerald-500">
-                  · ✓ {formatTime(task.completed_at)}
-                </span>
-              )}
-            </div>
-            {showContent && task.content && task.content.trim() && (
-              <p className="text-[10px] font-mono text-stone-500 mt-1 line-clamp-1 leading-relaxed">
-                {task.content}
-              </p>
-            )}
-          </div>
-
-          {/* Scheduled Date Badge / Assign Date */}
-          {badge ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenScheduleModal(task);
-              }}
-              title="Change scheduled date"
-              className={`shrink-0 px-2 py-0.5 rounded-full border text-[10px] font-mono font-semibold uppercase tracking-wider transition-colors cursor-pointer hidden sm:inline-block ${
-                badge.isOverdue
-                  ? 'bg-red-950/20 border-red-800/30 text-red-400 hover:text-red-300 hover:border-red-700/50'
-                  : 'bg-stone-900 border-stone-800 text-stone-400 hover:text-emerald-400 hover:border-emerald-500/30'
-              }`}
-            >
-              {badge.label}
+              <Check className="w-3.5 h-3.5 stroke-[3]" />
             </button>
-          ) : isDateless ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenScheduleModal(task);
-              }}
-              title="Assign a date"
-              className="shrink-0 px-2 py-0.5 rounded-full border border-dashed border-stone-700 text-[10px] font-mono font-semibold uppercase tracking-wider text-stone-500 hover:text-amber-400 hover:border-amber-500/30 transition-colors cursor-pointer hidden sm:inline-block"
-            >
-              + Date
-            </button>
-          ) : null}
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-1.5 opacity-100 md:opacity-0 md:group-hover/row:opacity-100 transition-opacity shrink-0 relative">
-            {/* Activate */}
-            {!isDone && !isActive && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onActivateTask(task.id);
-                }}
-                className="p-1.5 bg-transparent rounded border border-stone-800 hover:bg-stone-800 text-stone-400 hover:text-stone-200 transition-colors cursor-pointer"
-                title="Activate as Working Task"
+            {/* Title + info row */}
+            <div className="flex-1 min-w-0">
+              <p
+                className={`font-serif text-sm font-semibold line-clamp-1 ${
+                  isDone
+                    ? hasAchievements
+                      ? 'text-amber-400/80 line-through'
+                      : 'text-stone-600 line-through'
+                    : 'text-stone-200'
+                }`}
               >
-                <Play className="w-3.5 h-3.5 fill-current" />
-              </button>
-            )}
-
-            {/* Schedule (mobile calendar icon) */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenScheduleModal(task);
-              }}
-              className="p-1.5 bg-transparent rounded border border-stone-800 hover:bg-stone-800 text-stone-400 hover:text-amber-400 transition-colors cursor-pointer sm:hidden"
-              title="Schedule date"
-            >
-              <Calendar className="w-3.5 h-3.5" />
-            </button>
-
-            {/* List picker — only for dateless tasks */}
-            {!task.scheduled_at && taskLists.length > 0 && (
-              <div className="relative" data-list-picker>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setListPickerTaskId(listPickerTaskId === task.id ? null : task.id);
-                  }}
-                  className={`p-1.5 bg-transparent rounded border transition-colors cursor-pointer ${
-                    (task.category_ids ?? []).some((id) => taskLists.some((l) => l.id === id))
-                      ? 'border-violet-700/60 text-violet-400 hover:bg-violet-950/20'
-                      : 'border-stone-800 hover:bg-stone-800 text-stone-400 hover:text-violet-400'
-                  }`}
-                  title="Assign to list"
-                >
-                  <ListTodo className="w-3.5 h-3.5" />
-                </button>
-
-                {listPickerTaskId === task.id && (
-                  <ListPickerPopover
-                    task={task}
-                    lists={taskLists}
-                    onClose={() => setListPickerTaskId(null)}
-                  />
+                {isDone && hasAchievements && <span className="mr-1.5 not-italic">🏆</span>}
+                {task.title}
+              </p>
+              <div className="flex items-center gap-x-1.5 mt-1">
+                <span className="flex items-center gap-1 text-[10px] font-mono text-stone-500">
+                  Created: {formatTime(task.created_at)}
+                </span>
+                {task.time_spent > 0 && (
+                  <span className="text-[10px] font-mono text-stone-600">
+                    · {Math.floor(task.time_spent / 60000)}m spent
+                  </span>
+                )}
+                {isDone && task.completed_at && (
+                  <span className="flex items-center gap-0.5 text-[10px] font-mono text-emerald-500">
+                    · ✓ {formatTime(task.completed_at)}
+                  </span>
                 )}
               </div>
-            )}
+              {showContent && task.content && task.content.trim() && (
+                <p className="text-[10px] font-mono text-stone-500 mt-1 line-clamp-1 leading-relaxed">
+                  {task.content}
+                </p>
+              )}
+            </div>
 
-            {/* Move to Page (only when multiple pages exist) */}
-            {totalPages > 1 && (
+            {/* Scheduled Date Badge / Assign Date */}
+            {badge ? (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setMoveToPageModalTask(task);
+                  onOpenScheduleModal(task);
                 }}
-                className="p-1.5 bg-transparent rounded border border-stone-800 hover:bg-stone-800 text-stone-400 hover:text-amber-400 transition-colors cursor-pointer"
-                title="Move to page"
+                title="Change scheduled date"
+                className={`shrink-0 px-2 py-0.5 rounded-full border text-[10px] font-mono font-semibold uppercase tracking-wider transition-colors cursor-pointer hidden sm:inline-block ${
+                  badge.isOverdue
+                    ? 'bg-red-950/20 border-red-800/30 text-red-400 hover:text-red-300 hover:border-red-700/50'
+                    : 'bg-stone-900 border-stone-800 text-stone-400 hover:text-emerald-400 hover:border-emerald-500/30'
+                }`}
               >
-                <ArrowRightLeft className="w-3.5 h-3.5" />
+                {badge.label}
               </button>
-            )}
+            ) : isDateless ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenScheduleModal(task);
+                }}
+                title="Assign a date"
+                className="shrink-0 px-2 py-0.5 rounded-full border border-dashed border-stone-700 text-[10px] font-mono font-semibold uppercase tracking-wider text-stone-500 hover:text-amber-400 hover:border-amber-500/30 transition-colors cursor-pointer hidden sm:inline-block"
+              >
+                + Date
+              </button>
+            ) : null}
 
-            {/* Delete */}
-            {deletingId === task.id ? (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeleteEntry(task.id);
-                }}
-                className="px-2 py-1 text-[10px] bg-red-950/80 border border-red-800/80 rounded text-red-400 font-mono font-bold hover:bg-red-900 transition-colors cursor-pointer"
-                title="Confirm delete"
-              >
-                Sure?
-              </button>
-            ) : (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeleteEntry(task.id);
-                }}
-                className="p-1.5 bg-transparent rounded border border-stone-800 hover:bg-stone-800 text-stone-500 hover:text-red-400 transition-colors cursor-pointer"
-                title="Delete Task"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )}
+            {/* Desktop Action Buttons */}
+            <div className="hidden sm:flex items-center gap-1.5 shrink-0 opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity ml-2">
+              {actionButtons}
+            </div>
           </div>
-        </div>
+        </SwipeableRow>
       </SortableRow>
     );
-  };
-
-  // Touch drag/swipe handlers for page navigation
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
-
-  // Minimum distance required for a swipe gesture to trigger (in pixels)
-  const minSwipeDistance = 50;
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
-
-  const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
-
-    if (isLeftSwipe) {
-      // Swipe left -> next page
-      if (safePage < totalPages - 1) {
-        setPage(safePage + 1);
-      }
-    } else if (isRightSwipe) {
-      // Swipe right -> previous page
-      if (safePage > 0) {
-        setPage(safePage - 1);
-      }
-    }
   };
 
   return (
@@ -783,27 +880,20 @@ function TaskSection({
             style={{ overflow: 'hidden' }}
           >
             {pageTasks.length > 0 ? (
-              <div
-                onTouchStart={onTouchStart}
-                onTouchMove={onTouchMove}
-                onTouchEnd={onTouchEnd}
-                className="touch-pan-y"
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={onDragEnd}
               >
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={onDragEnd}
+                <SortableContext
+                  items={pageTasks.map((t) => t.id)}
+                  strategy={verticalListSortingStrategy}
                 >
-                  <SortableContext
-                    items={pageTasks.map((t) => t.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <div className="border border-stone-900/60 rounded-xl overflow-hidden">
-                      {pageTasks.map((task) => renderTaskRow(task))}
-                    </div>
-                  </SortableContext>
-                </DndContext>
-              </div>
+                  <div className="border border-stone-900/60 rounded-xl overflow-hidden">
+                    {pageTasks.map((task) => renderTaskRow(task, openRowId, setOpenRowId))}
+                  </div>
+                </SortableContext>
+              </DndContext>
             ) : (
               <div className="py-8 px-6 text-center text-stone-600 select-none">
                 <p className="text-xs font-sans">No tasks in this section</p>
@@ -1257,17 +1347,8 @@ export default function TasksView({
         }
 
         const [movedTask] = fullList.splice(movedIdx, 1);
-        const targetStart = targetPage * PAGE_SIZE;
-        const targetEnd = targetStart + PAGE_SIZE - 1;
-
-        if (targetEnd < fullList.length) {
-          const [bumpedTask] = fullList.splice(targetStart, 1);
-          fullList.splice(movedIdx, 0, bumpedTask);
-          fullList.splice(targetEnd, 0, movedTask);
-        } else {
-          const insertAt = Math.min(targetEnd, fullList.length);
-          fullList.splice(insertAt, 0, movedTask);
-        }
+        const insertAt = targetPage * PAGE_SIZE;
+        fullList.splice(insertAt, 0, movedTask);
 
         setOptimistic(fullList);
 
