@@ -13,6 +13,7 @@ import {
   CalendarClock,
   Inbox,
   X,
+  ClipboardList,
 } from 'lucide-react';
 import {
   DndContext,
@@ -449,6 +450,135 @@ function ListPickerPopover({ task, lists, onClose }: ListPickerPopoverProps) {
                       <span className="truncate flex-1 text-left">{list.name}</span>
                       {isAssigned && <Check className="w-3.5 h-3.5 shrink-0 stroke-[3]" />}
                     </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+// ─── Paper List Modal ─────────────────────────────────────────────────────────
+
+interface PaperListModalProps {
+  tasks: Task[];
+  onClose: () => void;
+  onToggleTaskStatus: (task: Task) => void;
+  onDeleteEntry: (id: string) => void;
+  deletingId: string | null;
+}
+
+function PaperListModal({
+  tasks,
+  onClose,
+  onToggleTaskStatus,
+  onDeleteEntry,
+  deletingId,
+}: PaperListModalProps) {
+  const doneCount = tasks.filter((t) => t.status === 'done').length;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 80 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 80 }}
+          transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+          className="bg-[#111] border border-stone-800 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:w-[480px] sm:max-w-[90vw] flex flex-col max-h-[85vh] sm:max-h-[80vh] overflow-hidden pb-10"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-stone-900/60 shrink-0">
+            <div>
+              <p className="text-[10px] font-mono text-stone-500 uppercase tracking-widest mb-0.5">
+                Paper List
+              </p>
+              <p className="text-[10px] font-mono text-stone-600">
+                {doneCount}/{tasks.length} done
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-stone-500 hover:text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Task list */}
+          <div className="flex-1 overflow-y-auto">
+            {tasks.length === 0 ? (
+              <div className="py-12 text-center text-stone-600">
+                <p className="text-xs font-mono">No dateless tasks</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-stone-900/30">
+                {tasks.map((task) => {
+                  const isDone = task.status === 'done';
+                  const isDeleting = deletingId === task.id;
+                  return (
+                    <div
+                      key={task.id}
+                      className={`flex items-center gap-2.5 px-4 py-[7px] group/line hover:bg-stone-900/30 transition-colors ${
+                        isDone ? 'opacity-45' : ''
+                      }`}
+                    >
+                      {/* Complete */}
+                      <button
+                        onClick={() => onToggleTaskStatus(task)}
+                        className={`w-[15px] h-[15px] rounded-full border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+                          isDone
+                            ? 'bg-stone-700 border-stone-600 text-stone-400'
+                            : 'border-stone-700 bg-transparent text-transparent hover:text-stone-500 hover:border-stone-500'
+                        }`}
+                      >
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </button>
+
+                      {/* Title */}
+                      <span
+                        className={`flex-1 min-w-0 text-[12px] font-mono truncate leading-tight ${
+                          isDone ? 'line-through text-stone-600' : 'text-stone-300'
+                        }`}
+                      >
+                        {task.title}
+                      </span>
+
+                      {/* Delete */}
+                      {isDeleting ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteEntry(task.id);
+                          }}
+                          className="px-1.5 py-0.5 text-[9px] bg-red-950/80 border border-red-800/80 rounded text-red-400 font-mono font-bold hover:bg-red-900 transition-colors cursor-pointer shrink-0"
+                        >
+                          Sure?
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteEntry(task.id);
+                          }}
+                          className="p-1 rounded text-stone-800 hover:text-red-400 transition-all cursor-pointer shrink-0"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -1109,6 +1239,9 @@ export default function TasksView({
   // Move to page modal
   const [moveToPageModalTask, setMoveToPageModalTask] = useState<Task | null>(null);
 
+  // Paper list modal
+  const [isPaperListOpen, setIsPaperListOpen] = useState(false);
+
   // Schedule calendar modal
   const [scheduleModalTask, setScheduleModalTask] = useState<Task | null>(null);
 
@@ -1120,6 +1253,18 @@ export default function TasksView({
 
   // ─── Extract tasks ────────────────────────────────────────────────────────
   const allTasks = useMemo(() => entries.filter((e): e is Task => e.type === 'task'), [entries]);
+
+  // All dateless tasks for the Paper List (ignores status filter and list filter)
+  const paperListTasks = useMemo(() => {
+    return allTasks
+      .filter((t) => !t.scheduled_at)
+      .sort((a, b) => {
+        const aSort = a.sort_order ?? Infinity;
+        const bSort = b.sort_order ?? Infinity;
+        if (aSort !== bSort) return aSort - bSort;
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
+  }, [allTasks]);
 
   // ─── Filter ──────────────────────────────────────────────────────────────
   const filteredTasks = useMemo(() => {
@@ -1459,37 +1604,51 @@ export default function TasksView({
           />
         </div>
 
-        <div className="flex items-center gap-1 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 w-fit">
+        {/* Actions */}
+        <div className="flex gap-2">
+          {/* Paper List trigger */}
           <button
-            onClick={() => handleStatusFilterChange('inbox')}
-            className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-              statusFilter === 'inbox'
-                ? 'bg-stone-800 text-stone-200 shadow-sm'
-                : 'text-stone-500 hover:text-stone-300'
-            }`}
+            onClick={() => setIsPaperListOpen(true)}
+            className="p-1.5 rounded-lg border border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer"
+            title="Paper List"
           >
-            Inbox
+            <ClipboardList className="w-3.5 h-3.5" />
           </button>
-          <button
-            onClick={() => handleStatusFilterChange('todo')}
-            className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-              statusFilter === 'todo'
-                ? 'bg-stone-800 text-stone-200 shadow-sm'
-                : 'text-stone-500 hover:text-stone-300'
-            }`}
-          >
-            Todo
-          </button>
-          <button
-            onClick={() => handleStatusFilterChange('done')}
-            className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-              statusFilter === 'done'
-                ? 'bg-emerald-900/60 text-emerald-300 shadow-sm'
-                : 'text-stone-500 hover:text-stone-300'
-            }`}
-          >
-            Done
-          </button>
+
+          {/* Status filter */}
+          <div className="flex items-center gap-1 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 w-fit">
+            <button
+              onClick={() => handleStatusFilterChange('inbox')}
+              className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
+                statusFilter === 'inbox'
+                  ? 'bg-stone-800 text-stone-200 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-300'
+              }`}
+            >
+              Inbox
+            </button>
+
+            <button
+              onClick={() => handleStatusFilterChange('todo')}
+              className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
+                statusFilter === 'todo'
+                  ? 'bg-stone-800 text-stone-200 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-300'
+              }`}
+            >
+              Todo
+            </button>
+            <button
+              onClick={() => handleStatusFilterChange('done')}
+              className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
+                statusFilter === 'done'
+                  ? 'bg-emerald-900/60 text-emerald-300 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-300'
+              }`}
+            >
+              Done
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1681,6 +1840,17 @@ export default function TasksView({
       )}
 
       {isListManagerOpen && <TaskListManagerModal onClose={() => setIsListManagerOpen(false)} />}
+
+      {/* Paper List Modal */}
+      {isPaperListOpen && (
+        <PaperListModal
+          tasks={paperListTasks}
+          onClose={() => setIsPaperListOpen(false)}
+          onToggleTaskStatus={onToggleTaskStatus}
+          onDeleteEntry={onDeleteEntry}
+          deletingId={deletingId}
+        />
+      )}
     </div>
   );
 }
