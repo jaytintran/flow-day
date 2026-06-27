@@ -105,6 +105,15 @@ export default function DayTimeline({
     }
   });
 
+  const [sleepEnabled, setSleepEnabled] = useState(() => {
+    try {
+      const stored = localStorage.getItem('flowday_sleep_enabled');
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  });
+
   useEffect(() => {
     const handleSettingsChange = () => {
       try {
@@ -112,6 +121,8 @@ export default function DayTimeline({
         setShowTimelineContent(storedShow === null ? true : storedShow === 'true');
         const storedSleep = localStorage.getItem('flowday_sleep_time');
         setSleepTime(storedSleep || '23:00');
+        const storedSleepEnabled = localStorage.getItem('flowday_sleep_enabled');
+        setSleepEnabled(storedSleepEnabled === null ? true : storedSleepEnabled === 'true');
       } catch {}
     };
     window.addEventListener('flowday-settings-change', handleSettingsChange);
@@ -119,7 +130,7 @@ export default function DayTimeline({
   }, []);
 
   const enrichedItems = useMemo(() => {
-    if (!sleepTime) return items;
+    if (!sleepEnabled || !sleepTime) return items;
 
     // Parse sleepTime (e.g. "23:00" -> hours=23, minutes=0)
     const [hoursStr, minutesStr] = sleepTime.split(':');
@@ -763,16 +774,16 @@ export default function DayTimeline({
                 <>
                   <div className="flex items-center gap-3 px-3 py-2">
                     <button
-                       onClick={() =>
-                         setHabitsCollapsed((v) => {
-                           const next = !v;
-                           try {
-                             localStorage.setItem(HABITS_COLLAPSE_KEY, String(next));
-                           } catch {}
-                           return next;
-                         })
-                       }
-                       className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] text-emerald-600 hover:text-emerald-400 transition-colors cursor-pointer shrink-0"
+                      onClick={() =>
+                        setHabitsCollapsed((v) => {
+                          const next = !v;
+                          try {
+                            localStorage.setItem(HABITS_COLLAPSE_KEY, String(next));
+                          } catch {}
+                          return next;
+                        })
+                      }
+                      className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] text-emerald-600 hover:text-emerald-400 transition-colors cursor-pointer shrink-0"
                     >
                       <Repeat2 className="w-3 h-3" />
                       <span>

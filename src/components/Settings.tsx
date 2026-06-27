@@ -1,9 +1,4 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Settings as SettingsIcon,
   X,
@@ -55,6 +50,23 @@ export default function Settings() {
     setSleepTime(val);
     try {
       localStorage.setItem('flowday_sleep_time', val);
+      window.dispatchEvent(new CustomEvent('flowday-settings-change'));
+    } catch {}
+  };
+
+  const [sleepEnabled, setSleepEnabled] = useState(() => {
+    try {
+      const stored = localStorage.getItem('flowday_sleep_enabled');
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const handleToggleSleepEnabled = (val: boolean) => {
+    setSleepEnabled(val);
+    try {
+      localStorage.setItem('flowday_sleep_enabled', String(val));
       window.dispatchEvent(new CustomEvent('flowday-settings-change'));
     } catch {}
   };
@@ -185,9 +197,9 @@ export default function Settings() {
                           current local database.
                         </li>
                         <li>
-                          On your other device (mobile/web), enter the same PAT &amp; Gist ID, and click{' '}
-                          <strong className="text-stone-300">Pull from Cloud</strong> to load your
-                          data.
+                          On your other device (mobile/web), enter the same PAT &amp; Gist ID, and
+                          click <strong className="text-stone-300">Pull from Cloud</strong> to load
+                          your data.
                         </li>
                       </ol>
                     </motion.div>
@@ -196,13 +208,15 @@ export default function Settings() {
 
                 {/* PREFERENCES SECTION */}
                 <div className="space-y-4 border-b border-stone-850 pb-6">
-                  <h3 className="text-stone-200 font-serif font-bold text-sm">
-                    Preferences
-                  </h3>
+                  <h3 className="text-stone-200 font-serif font-bold text-sm">Preferences</h3>
                   <div className="flex items-center justify-between p-3.5 bg-stone-900/40 border border-stone-850 rounded-xl">
                     <div className="flex flex-col gap-1 pr-4">
-                      <span className="text-xs text-stone-200 font-semibold font-sans">Show Entry Details</span>
-                      <span className="text-[10px] font-mono text-stone-500">Show content details under task, note, and event titles on the timeline.</span>
+                      <span className="text-xs text-stone-200 font-semibold font-sans">
+                        Show Entry Details
+                      </span>
+                      <span className="text-[10px] font-mono text-stone-500">
+                        Show content details under task, note, and event titles on the timeline.
+                      </span>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer select-none">
                       <input
@@ -215,17 +229,40 @@ export default function Settings() {
                     </label>
                   </div>
 
-                  <div className="flex items-center justify-between p-3.5 bg-stone-900/40 border border-stone-850 rounded-xl">
-                    <div className="flex flex-col gap-1 pr-4">
-                      <span className="text-xs text-stone-200 font-semibold font-sans">When Do You Sleep?</span>
-                      <span className="text-[10px] font-mono text-stone-500">Specify your bedtime to display countdown on the timeline.</span>
+                  <div className="flex flex-col bg-stone-900/40 border border-stone-850 rounded-xl overflow-hidden">
+                    {/* Sleep toggle row */}
+                    <div className="flex items-center justify-between p-3.5">
+                      <div className="flex flex-col gap-1 pr-4">
+                        <span className="text-xs text-stone-200 font-semibold font-sans">
+                          Show Sleep Marker
+                        </span>
+                        <span className="text-[10px] font-mono text-stone-500">
+                          Display a bedtime marker with countdown on the timeline.
+                        </span>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={sleepEnabled}
+                          onChange={(e) => handleToggleSleepEnabled(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-stone-800 rounded-full peer peer-focus:outline-none peer-checked:bg-amber-500/80 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-stone-500 peer-checked:after:bg-stone-950 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
+                      </label>
                     </div>
-                    <input
-                      type="time"
-                      value={sleepTime}
-                      onChange={(e) => handleSaveSleepTime(e.target.value)}
-                      className="bg-[#0a0a0a] border border-stone-850 hover:border-stone-800 focus:border-amber-500/35 rounded-xl px-3 py-2 text-xs text-stone-100 font-mono focus:outline-none focus:bg-stone-950 transition-all cursor-pointer"
-                    />
+
+                    {/* Bedtime picker — only when enabled */}
+                    {sleepEnabled && (
+                      <div className="flex items-center justify-between px-3.5 pb-3.5 pt-0 border-t border-stone-850">
+                        <span className="text-[10px] font-mono text-stone-500 pt-3">Bedtime</span>
+                        <input
+                          type="time"
+                          value={sleepTime}
+                          onChange={(e) => handleSaveSleepTime(e.target.value)}
+                          className="mt-3 bg-[#0a0a0a] border border-stone-850 hover:border-stone-800 focus:border-amber-500/35 rounded-xl px-3 py-2 text-xs text-stone-100 font-mono focus:outline-none focus:bg-stone-950 transition-all cursor-pointer"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 
