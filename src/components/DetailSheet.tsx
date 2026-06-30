@@ -5,13 +5,15 @@
 
 import React, { ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 
 export type LabelColor = 'blue' | 'indigo' | 'amber' | 'emerald' | 'stone';
 
 interface DetailSheetProps {
   open: boolean;
   onClose: () => void;
+  onAccept?: () => void;
+  onCancel?: () => void;
   label: string;
   labelColor?: LabelColor;
   isMobile: boolean;
@@ -29,12 +31,16 @@ const colorClasses: Record<LabelColor, string> = {
 export default function DetailSheet({
   open,
   onClose,
+  onAccept,
+  onCancel,
   label,
   labelColor = 'blue',
   isMobile,
   children,
 }: DetailSheetProps) {
   const chipClass = colorClasses[labelColor];
+  const handleAccept = onAccept || onClose;
+  const handleCancel = onCancel || onClose;
 
   return (
     <AnimatePresence>
@@ -56,7 +62,7 @@ export default function DetailSheet({
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-              className="relative w-full min-h-[85vh] max-h-[100vh] bg-[#121212] border-t border-stone-850 rounded-t-2xl shadow-2xl z-10 flex flex-col overflow-hidden pb-6"
+              className="relative w-full h-[85vh] bg-[#121212] border-t border-stone-850 rounded-t-2xl shadow-2xl z-10 flex flex-col overflow-hidden pb-6"
             >
               {/* Drag Handle & Close header */}
               <div className="flex-none flex flex-col items-center pt-3 pb-2 border-b border-stone-850/60 relative">
@@ -70,12 +76,22 @@ export default function DetailSheet({
                   >
                     {label}
                   </span>
-                  <button
-                    onClick={onClose}
-                    className="p-1 text-stone-500 hover:text-stone-300 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={handleAccept}
+                      title="Accept changes"
+                      className="p-1 text-emerald-500 hover:text-emerald-400 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <Check className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={handleCancel}
+                      title="Cancel changes"
+                      className="p-1 text-rose-500 hover:text-rose-400 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -104,13 +120,24 @@ export default function DetailSheet({
                   {label}
                 </span>
 
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="p-1 text-stone-500 hover:text-stone-300 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={handleAccept}
+                    title="Accept changes"
+                    className="p-1 text-emerald-500 hover:text-emerald-400 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <Check className="w-5 h-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    title="Cancel changes"
+                    className="p-1 text-rose-500 hover:text-rose-400 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               {/* Content area */}

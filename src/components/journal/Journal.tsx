@@ -20,6 +20,7 @@ import HabitsSheet from '../HabitsSheet';
 import FocusSheet from '../FocusSheet';
 import { Purpose } from '../../types';
 import { Delete, Trash } from 'lucide-react';
+import MarkdownPreview from '../MarkdownPreview';
 
 interface JournalProps {
   activeDate: Date;
@@ -394,6 +395,8 @@ export default function Journal({
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
+  const [isEditingContent, setIsEditingContent] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTimestamp, setEditTimestamp] = useState('');
   const [editStartAt, setEditStartAt] = useState('');
   const [editEndAt, setEditEndAt] = useState('');
@@ -432,20 +435,23 @@ export default function Journal({
   // Sync edit state when selectedEntry changes
   useEffect(() => {
     if (!selectedEntry) return;
-    setEditTitle(
-      selectedEntry.type === 'note'
-        ? (selectedEntry as Note).title || ''
-        : selectedEntry.title || '',
-    );
+    const titleVal = selectedEntry.type === 'note'
+      ? (selectedEntry as Note).title || ''
+      : selectedEntry.title || '';
+    setEditTitle(titleVal);
+    setIsEditingTitle(titleVal.trim() === '');
 
     if (
       selectedEntry.type === 'note' ||
       selectedEntry.type === 'event' ||
       selectedEntry.type === 'task'
     ) {
-      setEditContent((selectedEntry as Note | Event | Task).content || '');
+      const contentVal = (selectedEntry as Note | Event | Task).content || '';
+      setEditContent(contentVal);
+      setIsEditingContent(contentVal.trim() === '');
     } else {
       setEditContent('');
+      setIsEditingContent(false);
     }
 
     if (selectedEntry.type === 'event' || selectedEntry.type === 'note') {
@@ -511,6 +517,11 @@ export default function Journal({
       }
     }
 
+    setIsDetailOpen(false);
+    setSelectedEntry(null);
+  };
+
+  const handleCancelDetail = () => {
     setIsDetailOpen(false);
     setSelectedEntry(null);
   };
@@ -1039,10 +1050,12 @@ export default function Journal({
         )}
       </div>
 
-      {/* GENERALIZED DETAIL SHEET — EDIT ANY ENTRY TYPE */}
+       {/* GENERALIZED DETAIL SHEET — EDIT ANY ENTRY TYPE */}
       <DetailSheet
         open={isDetailOpen && selectedEntry !== null}
         onClose={handleCloseDetail}
+        onAccept={handleCloseDetail}
+        onCancel={handleCancelDetail}
         label={
           selectedEntry?.type === 'task'
             ? 'Edit Task'
@@ -1069,26 +1082,50 @@ export default function Journal({
       >
         {selectedEntry && (
           <>
-            {/* Title field */}
-            <textarea
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              placeholder={
-                selectedEntry.type === 'task'
-                  ? 'Task Title'
-                  : selectedEntry.type === 'event'
-                    ? 'Event Title'
-                    : selectedEntry.type === 'time-block'
-                      ? 'Time Block Title'
-                      : 'Note Title'
-              }
-              className="w-full bg-transparent text-stone-100 font-serif font-bold text-xl focus:outline-none placeholder-stone-700 border-b border-stone-900/60 resize-none overflow-hidden"
-              onInput={(e) => {
-                const el = e.currentTarget;
-                el.style.height = 'auto';
-                el.style.height = el.scrollHeight + 'px';
-              }}
-            />
+            {/* Title Header Container */}
+            <div className="border-b border-stone-900/60 pb-2 mb-3">
+              {!isEditingTitle ? (
+                <div
+                  onClick={() => setIsEditingTitle(true)}
+                  className="w-full text-stone-100 font-serif font-bold text-xl cursor-pointer hover:text-stone-300 transition-colors break-words py-0.5"
+                >
+                  {editTitle.trim() || (
+                    <span className="text-stone-700 italic">
+                      {selectedEntry.type === 'task'
+                        ? 'Task Title'
+                        : selectedEntry.type === 'event'
+                          ? 'Event Title'
+                          : selectedEntry.type === 'time-block'
+                            ? 'Time Block Title'
+                            : 'Note Title'}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  autoFocus
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onBlur={() => setIsEditingTitle(false)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setIsEditingTitle(false);
+                    }
+                  }}
+                  placeholder={
+                    selectedEntry.type === 'task'
+                      ? 'Task Title'
+                      : selectedEntry.type === 'event'
+                        ? 'Event Title'
+                        : selectedEntry.type === 'time-block'
+                          ? 'Time Block Title'
+                          : 'Note Title'
+                  }
+                  className="w-full bg-transparent text-stone-100 font-serif font-bold text-xl focus:outline-none placeholder-stone-700 py-0.5 border-none"
+                />
+              )}
+            </div>
 
             {/* ── TASK ── */}
             {selectedEntry.type === 'task' && (
@@ -1208,12 +1245,25 @@ export default function Journal({
                   />
                 </div>
 
-                <textarea
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  placeholder="Add context, links, notes about this task..."
-                  className="w-full bg-transparent text-stone-300 font-serif text-sm focus:outline-none resize-none leading-relaxed placeholder-stone-700 flex-1 border-t border-stone-900 pt-3"
-                />
+                {isEditingContent ? (
+                  <textarea
+                    autoFocus
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    onBlur={() => setIsEditingContent(false)}
+                    placeholder="Add context, links, notes about this task..."
+                    className="w-full bg-transparent text-stone-300 font-serif text-sm focus:outline-none resize-none leading-relaxed placeholder-stone-700 flex-1 border-t border-stone-900 pt-3 min-h-[120px]"
+                  />
+                ) : (
+                  <div className="flex-1 border-t border-stone-900 pt-1 flex flex-col">
+                    <MarkdownPreview
+                      text={editContent}
+                      placeholder="Add context, links, notes about this task..."
+                      onClick={() => setIsEditingContent(true)}
+                    />
+                    <span className="text-[10px] text-stone-600 font-mono mt-1 select-none">Click content to edit</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1236,12 +1286,25 @@ export default function Journal({
                     }}
                   />
                 </div>
-                <textarea
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  placeholder="Tap to start typing your thoughts..."
-                  className="w-full bg-transparent text-stone-300 font-serif text-sm focus:outline-none resize-none leading-relaxed placeholder-stone-700 flex-1"
-                />
+                {isEditingContent ? (
+                  <textarea
+                    autoFocus
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    onBlur={() => setIsEditingContent(false)}
+                    placeholder="Tap to start typing your thoughts..."
+                    className="w-full bg-transparent text-stone-300 font-serif text-sm focus:outline-none resize-none leading-relaxed placeholder-stone-700 flex-1 min-h-[150px]"
+                  />
+                ) : (
+                  <div className="flex-1 flex flex-col">
+                    <MarkdownPreview
+                      text={editContent}
+                      placeholder="Tap to start typing your thoughts..."
+                      onClick={() => setIsEditingContent(true)}
+                    />
+                    <span className="text-[10px] text-stone-600 font-mono mt-1 select-none">Click content to edit</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1264,12 +1327,25 @@ export default function Journal({
                     }}
                   />
                 </div>
-                <textarea
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  placeholder="Event description, notes, or details..."
-                  className="w-full bg-transparent text-stone-300 font-serif text-sm focus:outline-none resize-none leading-relaxed placeholder-stone-700 flex-1"
-                />
+                {isEditingContent ? (
+                  <textarea
+                    autoFocus
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    onBlur={() => setIsEditingContent(false)}
+                    placeholder="Event description, notes, or details..."
+                    className="w-full bg-transparent text-stone-300 font-serif text-sm focus:outline-none resize-none leading-relaxed placeholder-stone-700 flex-1 min-h-[120px]"
+                  />
+                ) : (
+                  <div className="flex-1 flex flex-col">
+                    <MarkdownPreview
+                      text={editContent}
+                      placeholder="Event description, notes, or details..."
+                      onClick={() => setIsEditingContent(true)}
+                    />
+                    <span className="text-[10px] text-stone-600 font-mono mt-1 select-none">Click content to edit</span>
+                  </div>
+                )}
               </div>
             )}
 
