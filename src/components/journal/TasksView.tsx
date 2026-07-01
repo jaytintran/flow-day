@@ -352,6 +352,7 @@ interface TaskSectionProps {
   setListPickerTaskId: (id: string | null) => void;
   moveToPageModalTask: Task | null;
   setMoveToPageModalTask: (task: Task | null) => void;
+  selectedListId?: string;
 }
 
 // ─── List Picker Popover ─────────────────────────────────────────────────────
@@ -695,6 +696,17 @@ function SwipeableRow({
   );
 }
 
+const CATEGORY_COLORS: Record<string, string> = {
+  violet: 'bg-violet-500/10 border-violet-500/20 text-violet-400',
+  sky: 'bg-sky-500/10 border-sky-500/20 text-sky-400',
+  emerald: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
+  amber: 'bg-amber-500/10 border-amber-500/20 text-amber-400',
+  rose: 'bg-rose-500/10 border-rose-500/20 text-rose-400',
+  indigo: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400',
+  teal: 'bg-teal-500/10 border-teal-500/20 text-teal-400',
+  orange: 'bg-orange-500/10 border-orange-500/20 text-orange-400',
+};
+
 function TaskSection({
   label,
   icon,
@@ -724,6 +736,7 @@ function TaskSection({
   setListPickerTaskId,
   moveToPageModalTask,
   setMoveToPageModalTask,
+  selectedListId,
 }: TaskSectionProps) {
   const safePage = Math.min(page, totalPages - 1);
   const pageTasks = tasks.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
@@ -741,6 +754,9 @@ function TaskSection({
     const badge = formatScheduledBadge(task);
     const isDateless = !task.scheduled_at;
     const isOpen = rowOpenId === task.id;
+    const taskCategories = (task.category_ids ?? [])
+      .map((id) => taskLists.find((list) => list.id === id))
+      .filter((list): list is Category => !!list && list.id !== selectedListId);
 
     const actionButtons = (
       <>
@@ -890,8 +906,22 @@ function TaskSection({
                 {isDone && hasAchievements && <span className="mr-1.5 not-italic">🏆</span>}
                 {task.title}
               </p>
-              <div className="flex items-center gap-x-1.5 mt-1">
+              <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 mt-1">
+                {isDateless && !isDone && taskCategories.map((cat) => {
+                  const colorClass = CATEGORY_COLORS[cat.color] ?? CATEGORY_COLORS.violet;
+                  return (
+                    <span
+                      key={cat.id}
+                      className={`px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider border shrink-0 ${colorClass}`}
+                    >
+                      {cat.name}
+                    </span>
+                  );
+                })}
                 <span className="flex items-center gap-1 text-[10px] font-mono text-stone-500">
+                  {isDateless && !isDone && taskCategories.length > 0 && (
+                    <span className="text-stone-700 mr-0.5">·</span>
+                  )}
                   Created: {formatTime(task.created_at)}
                 </span>
                 {task.time_spent > 0 && (
@@ -1699,6 +1729,7 @@ export default function TasksView({
           moveToPageModalTask={moveToPageModalTask}
           setMoveToPageModalTask={setMoveToPageModalTask}
           showContent={showContent}
+          selectedListId={selectedListId}
         />
       )}
 
@@ -1734,6 +1765,7 @@ export default function TasksView({
             moveToPageModalTask={moveToPageModalTask}
             setMoveToPageModalTask={setMoveToPageModalTask}
             showContent={showContent}
+            selectedListId={selectedListId}
           />
         )}
 
@@ -1768,6 +1800,7 @@ export default function TasksView({
           moveToPageModalTask={moveToPageModalTask}
           setMoveToPageModalTask={setMoveToPageModalTask}
           showContent={showContent}
+          selectedListId={selectedListId}
         />
       )}
 
