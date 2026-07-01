@@ -14,6 +14,8 @@ import {
   Repeat2,
   Check,
   ListTodo,
+  Trophy,
+  Star,
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'motion/react';
@@ -39,11 +41,49 @@ export default function DayNavigator({
   setActiveHubTab,
 }: DayNavigatorProps) {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isTrophyOpen, setIsTrophyOpen] = useState(false);
   const [displayedMonth, setDisplayedMonth] = useState<Date>(new Date(activeDate));
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Load entries reactively
   const entries = useLiveQuery(() => db.entries.toArray()) || [];
+
+  // Load achievements / starred tasks reactively
+  const starredTasks = (useLiveQuery(() => 
+    db.entries.where('type').equals('task').toArray()
+  ) || []) as Task[];
+
+  const groupedAchievementsList = React.useMemo(() => {
+    const completedStarred = starredTasks
+      .filter((t) => t.status === 'done' && (t.starred || (t.achievements && t.achievements.length > 0)))
+      .sort((a, b) => {
+        const dateA = a.completed_at ? new Date(a.completed_at).getTime() : new Date(a.created_at).getTime();
+        const dateB = b.completed_at ? new Date(b.completed_at).getTime() : new Date(b.created_at).getTime();
+        return dateB - dateA;
+      });
+
+    const groupsMap: { [key: string]: { label: string; year: number; month: number; tasks: Task[] } } = {};
+    completedStarred.forEach((task) => {
+      const date = task.completed_at ? new Date(task.completed_at) : new Date(task.created_at);
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const monthName = date.toLocaleString('en-US', { month: 'long' });
+      const key = `${year}-${String(month).padStart(2, '0')}`;
+      if (!groupsMap[key]) {
+        groupsMap[key] = {
+          label: `${monthName} ${year}`,
+          year,
+          month,
+          tasks: [],
+        };
+      }
+      groupsMap[key].tasks.push(task);
+    });
+
+    return Object.keys(groupsMap)
+      .sort((a, b) => b.localeCompare(a))
+      .map((key) => groupsMap[key]);
+  }, [starredTasks]);
 
   // Habits for quick-tick strip (sorted by sort_order)
   const activeHabits = (useLiveQuery(() => db.habits.where('status').equals('active').toArray()) ||
@@ -140,11 +180,12 @@ export default function DayNavigator({
     }
   }, [isCalendarOpen, activeDate]);
 
-  // Click outside listener to close calendar
+  // Click outside listener to close calendar & trophy drawers
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsCalendarOpen(false);
+        setIsTrophyOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -209,7 +250,10 @@ export default function DayNavigator({
     <div className="flex items-center gap-0.5 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 shrink-0">
       <button
         id="toggle-calendar-btn"
-        onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+        onClick={() => {
+          setIsCalendarOpen(!isCalendarOpen);
+          setIsTrophyOpen(false);
+        }}
         className={`p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
           isCalendarOpen
             ? 'bg-amber-500/10 text-amber-500'
@@ -218,6 +262,21 @@ export default function DayNavigator({
         title="Choose specific date"
       >
         <Calendar className="w-[18px] h-[18px]" />
+      </button>
+      <button
+        id="toggle-trophy-btn"
+        onClick={() => {
+          setIsTrophyOpen(!isTrophyOpen);
+          setIsCalendarOpen(false);
+        }}
+        className={`p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
+          isTrophyOpen
+            ? 'bg-amber-500/10 text-amber-500'
+            : 'text-stone-500 hover:text-stone-300 hover:bg-stone-800/50'
+        }`}
+        title="Achievements & Highlighted wins"
+      >
+        <Trophy className="w-[18px] h-[18px]" />
       </button>
     </div>
   );
@@ -588,6 +647,92 @@ export default function DayNavigator({
                   );
                 })}
               </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* FULL-WIDTH TROPHY DRAWER */}
+      <AnimatePresence initial={false}>
+        {isTrophyOpen && (
+          <motion.div
+            id="trophy-drawer"
+            key="trophy-drawer"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+            style={{ overflow: 'hidden' }}
+            className="border-t border-stone-850 bg-[#0e0e0e]"
+          >
+            <div className="max-w-4xl mx-auto px-5 md:px-6 py-5">
+              {/* Header */}
+              <div className="flex items-center gap-2 mb-4">
+                <Trophy className="w-4 h-4 text-amber-400 animate-bounce" />
+                <span className="font-mono text-xs text-stone-300 uppercase tracking-widest font-bold">
+                  Wall of Achievements
+                </span>
+              </div>
+
+              {groupedAchievementsList.length === 0 ? (
+                <div className="text-center py-8 text-stone-500 font-mono text-xs border border-dashed border-stone-800/80 rounded-xl bg-stone-900/10">
+                  <p className="mb-1 text-stone-400">Your achievement wall is empty.</p>
+                  <p className="text-[10px] text-stone-600">Complete tasks and mark them with a ⭐ to build momentum!</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-6 max-h-[60vh] overflow-y-auto pr-1 select-none [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-stone-800 [&::-webkit-scrollbar-track]:bg-transparent">
+                  {groupedAchievementsList.map((group) => (
+                    <div key={group.label} className="flex flex-col gap-2">
+                      <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-500 border-b border-stone-850/60 pb-1.5 flex items-center justify-between">
+                        <span>{group.label}</span>
+                        <span className="text-[9px] text-stone-600 font-semibold">{group.tasks.length} {group.tasks.length === 1 ? 'win' : 'wins'}</span>
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                        {group.tasks.map((task) => {
+                          const dateObj = task.completed_at ? new Date(task.completed_at) : new Date(task.created_at);
+                          const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                          return (
+                            <div
+                              key={task.id}
+                              onClick={() => {
+                                setActiveDate(dateObj);
+                                setIsTrophyOpen(false);
+                              }}
+                              className="group/item flex flex-col gap-1.5 p-3 rounded-xl border border-stone-850/50 bg-[#121212]/80 hover:bg-stone-900/60 hover:border-amber-500/25 transition-all cursor-pointer shadow-sm relative overflow-hidden"
+                            >
+                              {/* Backdrop glow on hover */}
+                              <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/[0.01] to-amber-500/0 opacity-0 group-hover/item:opacity-100 transition-opacity pointer-events-none" />
+
+                              <div className="flex justify-between items-start gap-3">
+                                <div className="flex items-center gap-1.5">
+                                  <Star className="w-3.5 h-3.5 text-amber-400 fill-current shrink-0" />
+                                  <span className="text-xs font-semibold text-stone-200 group-hover/item:text-amber-300 transition-colors line-clamp-1 break-all">
+                                    {task.title}
+                                  </span>
+                                </div>
+                                <span className="text-[9px] font-mono text-stone-500 bg-stone-900 px-2 py-0.5 rounded border border-stone-850/60 shrink-0">
+                                  {dateStr}
+                                </span>
+                              </div>
+
+                              {task.achievements && task.achievements.length > 0 && (
+                                <div className="flex flex-col gap-1 pl-5 pt-0.5">
+                                  {task.achievements.map((ach) => (
+                                    <div key={ach.id} className="flex items-start gap-1 text-[10px] text-stone-400 font-mono">
+                                      <span className="text-amber-500/70 select-none">🏆</span>
+                                      <span className="break-all">{ach.text}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </motion.div>
         )}

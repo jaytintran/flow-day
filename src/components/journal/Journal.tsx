@@ -19,7 +19,7 @@ import HabitsSheet from '../HabitsSheet';
 
 import FocusSheet from '../FocusSheet';
 import { Purpose } from '../../types';
-import { Delete, Trash } from 'lucide-react';
+import { Delete, Trash, Star } from 'lucide-react';
 import MarkdownPreview from '../MarkdownPreview';
 
 interface JournalProps {
@@ -1192,6 +1192,36 @@ export default function Journal({
                         setSelectedEntry({ ...selectedEntry, completed_at: d } as Task);
                       }}
                     />
+
+                    <button
+                      onClick={async () => {
+                        const task = selectedEntry as Task;
+                        const nextStarred = !task.starred;
+                        await db.entries.update(task.id, { starred: nextStarred });
+                        setSelectedEntry({ ...task, starred: nextStarred });
+                      }}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-mono font-bold uppercase tracking-widest cursor-pointer transition-all active:scale-95 ${
+                        (selectedEntry as Task).starred || ((selectedEntry as Task).achievements && (selectedEntry as Task).achievements!.length > 0)
+                          ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                          : 'bg-[#121212] border-stone-800 text-stone-500 hover:text-stone-300 hover:border-stone-750'
+                      }`}
+                      title={
+                        (selectedEntry as Task).achievements && (selectedEntry as Task).achievements!.length > 0
+                          ? 'Auto-starred because it has achievements'
+                          : 'Toggle star achievement status'
+                      }
+                    >
+                      <Star
+                        className={`w-3 h-3 ${
+                          (selectedEntry as Task).starred || ((selectedEntry as Task).achievements && (selectedEntry as Task).achievements!.length > 0)
+                            ? 'fill-current'
+                            : ''
+                        }`}
+                      />
+                      {(selectedEntry as Task).starred || ((selectedEntry as Task).achievements && (selectedEntry as Task).achievements!.length > 0)
+                        ? 'Starred Win'
+                        : 'Star Win'}
+                    </button>
                   </div>
                 )}
 

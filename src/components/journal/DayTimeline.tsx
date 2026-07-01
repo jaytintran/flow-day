@@ -20,6 +20,7 @@ import {
   Undo2,
   Repeat2,
   Hourglass,
+  Star,
 } from 'lucide-react';
 import { TimelineEntry, Task, Log, Event, Note, TimeBlock, HabitLog } from '../../types';
 import { formatDuration, toLocalDateString } from '../../utils';
@@ -389,15 +390,22 @@ export default function DayTimeline({
                     id={`task-title-${entry.id}`}
                     className={`text-xs font-sans break-words line-clamp-1 ${
                       (entry as Task).status === 'done'
-                        ? (entry as Task).achievements?.length
+                        ? ((entry as Task).starred || (entry as Task).achievements?.length)
                           ? 'text-amber-400/80 line-through font-semibold'
                           : 'text-stone-600 line-through font-semibold'
                         : 'text-stone-200 font-semibold'
                     }`}
                   >
-                    {(entry as Task).status === 'done' && (entry as Task).achievements?.length ? (
-                      <span className="mr-1.5 not-italic">🏆</span>
-                    ) : null}
+                    {(entry as Task).status === 'done' && (
+                      <>
+                        {(entry as Task).achievements?.length ? (
+                          <span className="mr-1.5 not-italic" title="Logged Achievements">🏆</span>
+                        ) : null}
+                        {((entry as Task).starred || ((entry as Task).achievements && (entry as Task).achievements!.length > 0)) ? (
+                          <span className="mr-1.5 not-italic text-amber-400" title="Starred Win">⭐</span>
+                        ) : null}
+                      </>
+                    )}
                     {(entry as Task).title}
                   </p>
                   {showTimelineContent && Boolean((entry as Task).content?.trim()) && (
@@ -463,6 +471,36 @@ export default function DayTimeline({
                   title="Activate as Working Task"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
+                </button>
+              )}
+
+              {isTask && (entry as Task).status === 'done' && (
+                <button
+                  id={`star-task-btn-${entry.id}`}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const task = entry as Task;
+                    const isStarred = !task.starred;
+                    await db.entries.update(task.id, { starred: isStarred });
+                  }}
+                  className={`p-1.5 bg-transparent rounded border border-stone-800 hover:bg-stone-850 transition-colors cursor-pointer ${
+                    (entry as Task).starred || ((entry as Task).achievements && (entry as Task).achievements!.length > 0)
+                      ? 'text-amber-400 hover:text-amber-300'
+                      : 'text-stone-500 hover:text-stone-300'
+                  }`}
+                  title={
+                    (entry as Task).starred || ((entry as Task).achievements && (entry as Task).achievements!.length > 0)
+                      ? 'Unstar achievement'
+                      : 'Star achievement'
+                  }
+                >
+                  <Star
+                    className={`w-3.5 h-3.5 ${
+                      (entry as Task).starred || ((entry as Task).achievements && (entry as Task).achievements!.length > 0)
+                        ? 'fill-current'
+                        : ''
+                    }`}
+                  />
                 </button>
               )}
 

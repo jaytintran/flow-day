@@ -37,6 +37,7 @@ export interface Task extends BaseEntry {
   content?: string;
   sort_order?: number; // display ordering (used by TasksView DnD)
   category_ids?: string[]; // add this
+  starred?: boolean;
 }
 
 export interface Event extends BaseEntry {
