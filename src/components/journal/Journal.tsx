@@ -293,7 +293,7 @@ function AchievementRow({ achievement, formatTime, onSave, onDelete }: Achieveme
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(achievement.text);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const open = () => {
     setDraft(achievement.text);
@@ -302,15 +302,18 @@ function AchievementRow({ achievement, formatTime, onSave, onDelete }: Achieveme
       const el = inputRef.current;
       if (el) {
         el.focus();
-        el.style.height = 'auto';
-        el.style.height = el.scrollHeight + 'px';
       }
     }, 0);
   };
 
   const commit = async () => {
     const text = draft.trim();
-    if (!text || text === achievement.text) {
+    if (!text) {
+      await onDelete();
+      setIsEditing(false);
+      return;
+    }
+    if (text === achievement.text) {
       setIsEditing(false);
       return;
     }
@@ -328,27 +331,26 @@ function AchievementRow({ achievement, formatTime, onSave, onDelete }: Achieveme
   };
 
   return (
-    <div className="group flex items-start gap-2 text-xs font-mono text-stone-300 bg-stone-900/60 border border-stone-800 rounded-lg px-3 py-2">
+    <div className="group flex items-start gap-2 text-sm font-mono text-stone-300 bg-stone-900/60 border border-stone-800 rounded-lg px-3 py-2">
       <div className="flex-1 min-w-0 flex items-center justify-between">
-        <div>
+        <div className="flex-1 min-w-0 mr-3">
           {isEditing ? (
             <input
+              ref={inputRef}
+              type="text"
               value={draft}
               onChange={(e) => {
                 setDraft(e.target.value);
-                const el = e.currentTarget;
-                el.style.height = 'auto';
-                el.style.height = el.scrollHeight + 'px';
               }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
+                if (e.key === 'Enter') {
                   e.preventDefault();
                   commit();
                 }
                 if (e.key === 'Escape') setIsEditing(false);
               }}
               onBlur={commit}
-              className="w-full bg-[#0a0a0a] border border-amber-500/40 rounded px-2 py-1 text-xs font-mono text-amber-300 focus:outline-none focus:border-amber-500 resize-none overflow-hidden"
+              className="w-full bg-[#0a0a0a] border border-amber-500/40 rounded px-2 py-1 text-sm font-mono text-amber-300 focus:outline-none focus:border-amber-500"
             />
           ) : (
             <p

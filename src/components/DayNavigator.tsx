@@ -7,6 +7,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Calendar,
   Sparkles,
   Target,
@@ -16,11 +17,13 @@ import {
   ListTodo,
   Trophy,
   Star,
+  Plus,
+  Trash,
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../db';
-import { Task, Habit, HabitLog } from '../types';
+import { Task, Habit, HabitLog, TaskAchievement } from '../types';
 import { formatDateLabel, isSameDay, toLocalDateString } from '../utils';
 
 interface DayNavigatorProps {
@@ -42,6 +45,11 @@ export default function DayNavigator({
 }: DayNavigatorProps) {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isTrophyOpen, setIsTrophyOpen] = useState(false);
+  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+  const [newAchievementText, setNewAchievementText] = useState<Record<string, string>>({});
+  const [logWinText, setLogWinText] = useState('');
+  const [editingAchievementId, setEditingAchievementId] = useState<string | null>(null);
+  const [editingAchievementText, setEditingAchievementText] = useState('');
   const [displayedMonth, setDisplayedMonth] = useState<Date>(new Date(activeDate));
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -674,13 +682,63 @@ export default function DayNavigator({
                 </span>
               </div>
 
+              {/* Log a Win input */}
+              <div className="flex items-center gap-2 mb-4">
+                <input
+                  type="text"
+                  value={logWinText}
+                  onChange={(e) => setLogWinText(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter' && logWinText.trim()) {
+                      const now = new Date();
+                      const newTask = {
+                        id: crypto.randomUUID(),
+                        type: 'task' as const,
+                        title: logWinText.trim(),
+                        status: 'done' as const,
+                        time_spent: 0,
+                        created_at: now,
+                        completed_at: now,
+                        starred: true,
+                      };
+                      await db.entries.add(newTask as any);
+                      setLogWinText('');
+                    }
+                  }}
+                  placeholder="Log a win..."
+                  className="flex-1 bg-[#0a0a0a] border border-stone-800 rounded-lg px-3 py-2 text-xs text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/30 transition-colors font-mono"
+                />
+                <button
+                  onClick={async () => {
+                    if (!logWinText.trim()) return;
+                    const now = new Date();
+                    const newTask = {
+                      id: crypto.randomUUID(),
+                      type: 'task' as const,
+                      title: logWinText.trim(),
+                      status: 'done' as const,
+                      time_spent: 0,
+                      created_at: now,
+                      completed_at: now,
+                      starred: true,
+                    };
+                    await db.entries.add(newTask as any);
+                    setLogWinText('');
+                  }}
+                  className="p-2 rounded-lg border border-stone-800 bg-[#0a0a0a] text-stone-500 hover:text-amber-400 hover:border-amber-500/30 transition-colors cursor-pointer active:scale-95"
+                  title="Log a win"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
               {groupedAchievementsList.length === 0 ? (
                 <div className="text-center py-8 text-stone-500 font-mono text-xs border border-dashed border-stone-800/80 rounded-xl bg-stone-900/10">
                   <p className="mb-1 text-stone-400">Your achievement wall is empty.</p>
                   <p className="text-[10px] text-stone-600">Complete tasks and mark them with a ⭐ to build momentum!</p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-6 max-h-[60vh] overflow-y-auto pr-1 select-none [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-stone-800 [&::-webkit-scrollbar-track]:bg-transparent">
+                <div className="flex flex-col gap-6 max-h-[40vh] overflow-y-auto pr-1 select-none [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-stone-800 [&::-webkit-scrollbar-track]:bg-transparent">
                   {groupedAchievementsList.map((group) => (
                     <div key={group.label} className="flex flex-col gap-2">
                       <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-500 border-b border-stone-850/60 pb-1.5 flex items-center justify-between">
@@ -691,40 +749,181 @@ export default function DayNavigator({
                         {group.tasks.map((task) => {
                           const dateObj = task.completed_at ? new Date(task.completed_at) : new Date(task.created_at);
                           const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                          const isExpanded = expandedCards[task.id] ?? false;
+                          const inputText = newAchievementText[task.id] ?? '';
+
+                          const handleAddAchievement = async () => {
+                            const text = inputText.trim();
+                            if (!text) return;
+                            const entry: TaskAchievement = {
+                              id: crypto.randomUUID(),
+                              text,
+                              created_at: new Date(),
+                            };
+                            const updated = [...(task.achievements ?? []), entry];
+                            await db.entries.update(task.id, { achievements: updated } as any);
+                            setNewAchievementText((prev) => ({ ...prev, [task.id]: '' }));
+                          };
+
                           return (
                             <div
                               key={task.id}
                               onClick={() => {
-                                setActiveDate(dateObj);
-                                setIsTrophyOpen(false);
+                                setExpandedCards((prev) => ({ ...prev, [task.id]: !prev[task.id] }));
                               }}
-                              className="group/item flex flex-col gap-1.5 p-3 rounded-xl border border-stone-850/50 bg-[#121212]/80 hover:bg-stone-900/60 hover:border-amber-500/25 transition-all cursor-pointer shadow-sm relative overflow-hidden"
+                              className={`group/item flex flex-col p-3 rounded-xl border transition-all cursor-pointer shadow-sm relative overflow-hidden ${
+                                isExpanded
+                                  ? 'border-amber-500/20 bg-stone-900/40'
+                                  : 'border-stone-850/50 bg-[#121212]/80 hover:bg-stone-900/60 hover:border-amber-500/25'
+                              }`}
                             >
                               {/* Backdrop glow on hover */}
                               <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/[0.01] to-amber-500/0 opacity-0 group-hover/item:opacity-100 transition-opacity pointer-events-none" />
 
                               <div className="flex justify-between items-start gap-3">
-                                <div className="flex items-center gap-1.5">
-                                  <Star className="w-3.5 h-3.5 text-amber-400 fill-current shrink-0" />
-                                  <span className="text-xs font-semibold text-stone-200 group-hover/item:text-amber-300 transition-colors line-clamp-1 break-all">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <div className="relative shrink-0 mr-0.5">
+                                    <Star className="w-3.5 h-3.5 text-amber-400 fill-current" />
+                                    {task.achievements && task.achievements.length > 0 && (
+                                      <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-[#121212] text-[7.5px] font-sans font-black w-3 h-3 rounded-full flex items-center justify-center border border-[#121212] leading-none">
+                                        {task.achievements.length}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className={`text-xs font-semibold transition-colors break-all ${isExpanded ? 'text-amber-300' : 'text-stone-200 group-hover/item:text-amber-300'} ${isExpanded ? '' : 'line-clamp-1'}`}>
                                     {task.title}
                                   </span>
                                 </div>
-                                <span className="text-[9px] font-mono text-stone-500 bg-stone-900 px-2 py-0.5 rounded border border-stone-850/60 shrink-0">
-                                  {dateStr}
-                                </span>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveDate(dateObj);
+                                      setIsTrophyOpen(false);
+                                    }}
+                                    className="text-[9px] font-mono text-stone-500 bg-stone-900 px-2 py-0.5 rounded border border-stone-850/60 hover:text-amber-400 hover:border-amber-500/30 transition-colors cursor-pointer"
+                                    title="Jump to this day"
+                                  >
+                                    {dateStr}
+                                  </button>
+                                  <ChevronDown className={`w-3.5 h-3.5 text-stone-500 transition-transform duration-200 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                                </div>
                               </div>
 
-                              {task.achievements && task.achievements.length > 0 && (
-                                <div className="flex flex-col gap-1 pl-5 pt-0.5">
-                                  {task.achievements.map((ach) => (
-                                    <div key={ach.id} className="flex items-start gap-1 text-[10px] text-stone-400 font-mono">
-                                      <span className="text-amber-500/70 select-none">🏆</span>
-                                      <span className="break-all">{ach.text}</span>
+                              {/* Collapsible section */}
+                              <AnimatePresence initial={false}>
+                                {isExpanded && (
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                                    style={{ overflow: 'hidden' }}
+                                    className="mt-2"
+                                  >
+                                    {/* Sub-achievements list */}
+                                    {task.achievements && task.achievements.length > 0 && (
+                                      <div className="flex flex-col gap-1.5 pl-5 pb-2">
+                                        {task.achievements.map((ach) => {
+                                          const isEditingThis = editingAchievementId === ach.id;
+                                          
+                                          const commitEdit = async () => {
+                                            const val = editingAchievementText.trim();
+                                            let updated: TaskAchievement[];
+                                            if (!val) {
+                                              updated = (task.achievements ?? []).filter((x) => x.id !== ach.id);
+                                            } else {
+                                              updated = (task.achievements ?? []).map((x) =>
+                                                x.id === ach.id ? { ...x, text: val } : x
+                                              );
+                                            }
+                                            await db.entries.update(task.id, { achievements: updated } as any);
+                                            setEditingAchievementId(null);
+                                          };
+
+                                          const deleteAch = async () => {
+                                            const updated = (task.achievements ?? []).filter((x) => x.id !== ach.id);
+                                            await db.entries.update(task.id, { achievements: updated } as any);
+                                          };
+
+                                          return (
+                                            <div
+                                              key={ach.id}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (!isEditingThis) {
+                                                  setEditingAchievementId(ach.id);
+                                                  setEditingAchievementText(ach.text);
+                                                }
+                                              }}
+                                              className="group/ach flex items-center justify-between gap-2 p-2 rounded-lg border border-stone-850 bg-[#0a0a0a]/50 hover:bg-[#0a0a0a] hover:border-amber-500/20 transition-all text-xs text-stone-300 font-mono"
+                                            >
+                                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                <span className="text-amber-500/70 select-none shrink-0">🏆</span>
+                                                {isEditingThis ? (
+                                                  <input
+                                                    type="text"
+                                                    value={editingAchievementText}
+                                                    onChange={(e) => setEditingAchievementText(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                      if (e.key === 'Enter') commitEdit();
+                                                      if (e.key === 'Escape') setEditingAchievementId(null);
+                                                    }}
+                                                    onBlur={commitEdit}
+                                                    autoFocus
+                                                    className="flex-1 bg-transparent text-amber-300 border-none outline-none p-0 m-0 w-full"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                  />
+                                                ) : (
+                                                  <span className="break-all flex-1">{ach.text}</span>
+                                                )}
+                                              </div>
+                                              {!isEditingThis && (
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deleteAch();
+                                                  }}
+                                                  className="opacity-0 group-hover/ach:opacity-100 p-1 text-stone-500 hover:text-red-400 transition-all cursor-pointer shrink-0"
+                                                  title="Delete sub-achievement"
+                                                >
+                                                  <Trash className="w-3.5 h-3.5" />
+                                                </button>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+
+                                    {/* Inline add achievement input */}
+                                    <div
+                                      className="flex items-center gap-1.5 pl-5 pt-1 border-t border-stone-850/40"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <input
+                                        type="text"
+                                        value={inputText}
+                                        onChange={(e) =>
+                                          setNewAchievementText((prev) => ({ ...prev, [task.id]: e.target.value }))
+                                        }
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') handleAddAchievement();
+                                        }}
+                                        placeholder="Add sub-achievement..."
+                                        className="flex-1 bg-[#0a0a0a] border border-stone-800 rounded-lg px-2.5 py-1.5 text-xs text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/30 transition-colors font-mono"
+                                      />
+                                      <button
+                                        onClick={handleAddAchievement}
+                                        className="p-1.5 rounded-lg border border-stone-800 bg-[#0a0a0a] text-stone-500 hover:text-amber-400 hover:border-amber-500/30 transition-colors cursor-pointer active:scale-95"
+                                        title="Add sub-achievement"
+                                      >
+                                        <Plus className="w-3.5 h-3.5" />
+                                      </button>
                                     </div>
-                                  ))}
-                                </div>
-                              )}
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
                             </div>
                           );
                         })}
