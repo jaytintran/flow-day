@@ -914,8 +914,10 @@ export default function Journal({
       className={`flex-1 px-2 md:px-6 pb-4 md:pb-6 ${
         viewMode === 'hub'
           ? 'overflow-hidden pt-3 flex flex-col h-full'
-          : 'overflow-y-auto pt-4 md:pt-6'
-      } ${viewMode === 'records' ? 'pt-0' : ''}`}
+          : viewMode === 'records'
+            ? 'overflow-y-auto pt-0'
+            : 'overflow-y-auto pt-4 md:pt-6'
+      }`}
       id="timeline-journal-scrollable"
       ref={containerRef}
     >
