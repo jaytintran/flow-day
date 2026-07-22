@@ -11,6 +11,13 @@ export const GIST_STORAGE_KEYS = {
   GIST_ID: 'flow_day_gist_id',
   LAST_SYNC: 'flow_day_last_sync',
   DIRTY: 'flow_day_dirty',
+  /**
+   * Unix-ms timestamp of the Gist's `updated_at` field at the time of the
+   * last successful push or pull. Stored as a string. Used by pushToCloud
+   * to detect whether another device has written to the Gist since our last
+   * sync, preventing silent data loss.
+   */
+  LAST_SYNC_SERVER: 'flow_day_last_sync_server',
 };
 
 export type SyncStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -155,6 +162,12 @@ export function useGistSync() {
     const domains = await db.domains.toArray();
     return {
       version: 1,
+      /**
+       * Monotonically increasing Unix-ms timestamp stamped on every push.
+       * The receiving device can compare this against its own last-seen value
+       * to decide which snapshot is newer.
+       */
+      syncVersion: Date.now(),
       exportedAt: new Date().toISOString(),
       entries,
       habits,
@@ -232,6 +245,25 @@ export function useGistSync() {
     }
     showToast('Uploading to cloud...', 'loading');
     try {
+      // ── Conflict guard ────────────────────────────────────────────────────
+      // Before overwriting the Gist, fetch its current metadata and compare
+      // the server-side `updated_at` against the timestamp we recorded during
+      // the last successful sync. If they differ, another device has pushed
+      // since we last synced — abort to avoid silently destroying that data.
+      const currentGist = await fetchGist(pat.trim(), gistId.trim());
+      const remoteUpdatedAt = new Date(currentGist.updated_at).getTime();
+      const lastKnownServerMs = parseInt(
+        localStorage.getItem(GIST_STORAGE_KEYS.LAST_SYNC_SERVER) || '0',
+        10,
+      );
+      // Allow a 2-second tolerance to absorb clock skew / GitHub timestamp rounding.
+      if (remoteUpdatedAt > lastKnownServerMs + 2000) {
+        throw new Error(
+          'Remote Gist has newer data from another device. Pull first to avoid overwriting those changes.',
+        );
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       const payload = await exportDatabase();
 
       // Serialize without whitespace, then compress if the browser supports it.
@@ -264,6 +296,15 @@ export function useGistSync() {
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+
+      // Capture the server-assigned `updated_at` from the PATCH response so
+      // future conflict checks have an accurate shared baseline.
+      const updatedGist = await res.json();
+      localStorage.setItem(
+        GIST_STORAGE_KEYS.LAST_SYNC_SERVER,
+        String(new Date(updatedGist.updated_at).getTime()),
+      );
+
       const nowStr = new Date().toLocaleString();
       setLastSync(nowStr);
       localStorage.setItem(GIST_STORAGE_KEYS.LAST_SYNC, nowStr);
@@ -307,6 +348,18 @@ export function useGistSync() {
       const nowStr = new Date().toLocaleString();
       setLastSync(nowStr);
       localStorage.setItem(GIST_STORAGE_KEYS.LAST_SYNC, nowStr);
+
+      // Record the Gist's server timestamp so pushToCloud can detect
+      // future conflicts against a shared, device-agnostic baseline.
+      localStorage.setItem(
+        GIST_STORAGE_KEYS.LAST_SYNC_SERVER,
+        String(new Date(gist.updated_at).getTime()),
+      );
+
+      // Clear the dirty flag — local DB now mirrors the cloud snapshot.
+      localStorage.removeItem(GIST_STORAGE_KEYS.DIRTY);
+      setIsDirty(false);
+
       showToast('Successfully restored from cloud!', 'success');
       return true;
     } catch (err: any) {
@@ -326,6 +379,60 @@ export function useGistSync() {
       showToast('Connection successful!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Failed to connect to Gist', 'error');
+    }
+  };
+
+  /**
+   * Smart sync: determines the correct action based on the relative state of
+   * local data and the remote Gist, then executes it automatically.
+   *
+   * | Remote newer? | Local dirty? | Action                          |
+   * |:-------------:|:------------:|:--------------------------------|
+   * | ✅            | ❌           | Auto-pull (safe overwrite)      |
+   * | ❌            | ✅           | Auto-push                       |
+   * | ✅            | ✅           | Conflict — manual resolution    |
+   * | ❌            | ❌           | Already in sync — no-op         |
+   */
+  const syncWithCloud = async (): Promise<boolean> => {
+    if (!pat.trim() || !gistId.trim()) {
+      showToast('PAT and Gist ID are required to sync', 'error');
+      return false;
+    }
+    showToast('Checking sync status...', 'loading');
+    try {
+      const gist = await fetchGist(pat.trim(), gistId.trim());
+      const remoteUpdatedAt = new Date(gist.updated_at).getTime();
+      const lastKnownServerMs = parseInt(
+        localStorage.getItem(GIST_STORAGE_KEYS.LAST_SYNC_SERVER) || '0',
+        10,
+      );
+      const remoteIsNewer = remoteUpdatedAt > lastKnownServerMs + 2000;
+
+      if (remoteIsNewer && isDirty) {
+        // Both sides have independent changes — cannot safely auto-merge.
+        showToast(
+          'Conflict: local and remote both have unsaved changes. Use Push or Pull to resolve manually.',
+          'error',
+        );
+        return false;
+      }
+
+      if (remoteIsNewer) {
+        // Remote has new data; local is clean — safe to overwrite local.
+        return pullFromCloud();
+      }
+
+      if (isDirty) {
+        // Local has new data; remote is stale — push.
+        return pushToCloud();
+      }
+
+      // Nothing to do.
+      showToast('Already in sync with cloud!', 'success');
+      return true;
+    } catch (err: any) {
+      showToast(err.message || 'Sync check failed', 'error');
+      return false;
     }
   };
 
@@ -368,6 +475,14 @@ export function useGistSync() {
       setGistId(gist.id);
       localStorage.setItem(GIST_STORAGE_KEYS.PAT, pat.trim());
       localStorage.setItem(GIST_STORAGE_KEYS.GIST_ID, gist.id);
+      // Anchor the conflict-detection baseline to this Gist's creation timestamp.
+      localStorage.setItem(
+        GIST_STORAGE_KEYS.LAST_SYNC_SERVER,
+        String(new Date(gist.updated_at).getTime()),
+      );
+      // The Gist now holds all local data, so local is clean.
+      localStorage.removeItem(GIST_STORAGE_KEYS.DIRTY);
+      setIsDirty(false);
       showToast('Private Gist created and saved!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Failed to auto-create Gist', 'error');
@@ -394,6 +509,7 @@ export function useGistSync() {
     reload,
     pushToCloud,
     pullFromCloud,
+    syncWithCloud,
     testConnection,
     handleAutoCreateGist,
     handleSaveCredentials,

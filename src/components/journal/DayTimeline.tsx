@@ -27,6 +27,12 @@ import { formatDuration, toLocalDateString } from '../../utils';
 import TimePickerSheet from '../TimePickerSheet';
 import { db } from '../../db';
 
+function truncateText(text?: string, limit = 100): string {
+  if (!text) return '';
+  const trimmed = text.trim();
+  return trimmed.length > limit ? trimmed.substring(0, limit) + '...' : trimmed;
+}
+
 export type RenderItem =
   | {
       type: 'bracket';
@@ -254,7 +260,9 @@ export default function DayTimeline({
         isCompletedTask = true;
       } else {
         primaryTime = formatTime(task.scheduled_at || task.created_at);
-        isScheduledTime = !!task.scheduled_at;
+        isScheduledTime =
+          !!task.scheduled_at &&
+          new Date(task.scheduled_at).getTime() !== new Date(task.created_at).getTime();
       }
     } else if (isLog) {
       primaryTime = formatTime((entry as Log).timestamp);
@@ -410,7 +418,7 @@ export default function DayTimeline({
                   </p>
                   {showTimelineContent && Boolean((entry as Task).content?.trim()) && (
                     <p className="text-[11px] text-stone-400 font-sans mt-0.5 whitespace-pre-wrap break-words leading-relaxed">
-                      {(entry as Task).content}
+                      {truncateText((entry as Task).content)}
                     </p>
                   )}
                 </div>
@@ -426,7 +434,7 @@ export default function DayTimeline({
                   </p>
                   {showTimelineContent && Boolean((entry as Event).content?.trim()) && (
                     <p className="text-[11px] text-stone-400 font-sans mt-0.5 whitespace-pre-wrap break-words leading-relaxed">
-                      {(entry as Event).content}
+                      {truncateText((entry as Event).content)}
                     </p>
                   )}
                 </div>
@@ -442,7 +450,7 @@ export default function DayTimeline({
                   </span>
                   {showTimelineContent && Boolean((entry as Note).content?.trim()) && (
                     <p className="text-[11px] text-stone-400 font-sans mt-0.5 whitespace-pre-wrap break-words leading-relaxed">
-                      {(entry as Note).content}
+                      {truncateText((entry as Note).content)}
                     </p>
                   )}
                 </div>
