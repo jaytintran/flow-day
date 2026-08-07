@@ -463,7 +463,7 @@ export default function DayNavigator({
                   : 'text-stone-500 hover:text-stone-300'
               }`}
             >
-              Tasks
+              Lists
             </button>
             <button
               id="view-mode-day"

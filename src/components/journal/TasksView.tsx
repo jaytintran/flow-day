@@ -907,17 +907,19 @@ function TaskSection({
                 {task.title}
               </p>
               <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 mt-1">
-                {isDateless && !isDone && taskCategories.map((cat) => {
-                  const colorClass = CATEGORY_COLORS[cat.color] ?? CATEGORY_COLORS.violet;
-                  return (
-                    <span
-                      key={cat.id}
-                      className={`px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider border shrink-0 ${colorClass}`}
-                    >
-                      {cat.name}
-                    </span>
-                  );
-                })}
+                {isDateless &&
+                  !isDone &&
+                  taskCategories.map((cat) => {
+                    const colorClass = CATEGORY_COLORS[cat.color] ?? CATEGORY_COLORS.violet;
+                    return (
+                      <span
+                        key={cat.id}
+                        className={`px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider border shrink-0 ${colorClass}`}
+                      >
+                        {cat.name}
+                      </span>
+                    );
+                  })}
                 <span className="flex items-center gap-1 text-[10px] font-mono text-stone-500">
                   {isDateless && !isDone && taskCategories.length > 0 && (
                     <span className="text-stone-700 mr-0.5">·</span>
@@ -1258,11 +1260,15 @@ export default function TasksView({
     });
   };
   const [completedDatelessPage, setCompletedDatelessPage] = useState(0);
+  const [completedScheduledPage, setCompletedScheduledPage] = useState(0);
 
   // Optimistic state per section
   const [optimisticScheduled, setOptimisticScheduled] = useState<Task[] | null>(null);
   const [optimisticDateless, setOptimisticDateless] = useState<Task[] | null>(null);
   const [optimisticCompletedDateless, setOptimisticCompletedDateless] = useState<Task[] | null>(
+    null,
+  );
+  const [optimisticCompletedScheduled, setOptimisticCompletedScheduled] = useState<Task[] | null>(
     null,
   );
 
@@ -1301,11 +1307,11 @@ export default function TasksView({
     let tasks = allTasks;
 
     if (statusFilter === 'todo') {
-      tasks = tasks.filter((t) => t.status === 'todo');
+      // "Scheduled" view - keep scheduled tasks only (both active and completed)
+      tasks = tasks.filter((t) => t.scheduled_at);
     } else if (statusFilter === 'done') {
       tasks = tasks.filter((t) => t.status === 'done');
     }
-    // Note: statusFilter === 'inbox' filters are handled split-wise to separate active vs completed dateless.
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -1320,69 +1326,89 @@ export default function TasksView({
   }, [allTasks, statusFilter, searchQuery]);
 
   // ─── Split into scheduled, active dateless and completed dateless ───────────────────────
-  const { scheduledTasks, datelessTasks, completedDatelessTasks } = useMemo(() => {
-    const scheduled: Task[] = [];
-    const dateless: Task[] = [];
-    const completedDateless: Task[] = [];
+  const { scheduledTasks, datelessTasks, completedDatelessTasks, completedScheduledTasks } =
+    useMemo(() => {
+      const scheduled: Task[] = [];
+      const dateless: Task[] = [];
+      const completedDateless: Task[] = [];
+      const completedScheduled: Task[] = [];
 
-    filteredTasks.forEach((t) => {
-      if (t.scheduled_at) {
-        // Scheduled only matters for Todo and Done filters
-        if (statusFilter !== 'inbox') {
-          scheduled.push(t);
-        }
-      } else {
-        // Dateless tasks logic
-        if (statusFilter === 'inbox') {
-          if (t.status === 'done') {
-            completedDateless.push(t);
-          } else {
-            dateless.push(t);
+      filteredTasks.forEach((t) => {
+        if (t.scheduled_at) {
+          if (statusFilter === 'todo') {
+            // "Scheduled" view contains both active and completed scheduled tasks
+            if (t.status === 'done') {
+              completedScheduled.push(t);
+            } else {
+              scheduled.push(t);
+            }
+          } else if (statusFilter === 'done') {
+            completedScheduled.push(t);
           }
         } else {
-          // Todo/Done filters
-          dateless.push(t);
+          // Dateless tasks logic
+          if (statusFilter === 'inbox') {
+            if (t.status === 'done') {
+              completedDateless.push(t);
+            } else {
+              dateless.push(t);
+            }
+          } else if (statusFilter === 'done') {
+            completedDateless.push(t);
+          }
         }
-      }
-    });
+      });
 
-    // Sort scheduled: sort_order, then scheduled_at, then created_at
-    scheduled.sort((a, b) => {
-      const aSort = a.sort_order ?? Infinity;
-      const bSort = b.sort_order ?? Infinity;
-      if (aSort !== bSort) return aSort - bSort;
-      const aSched = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
-      const bSched = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
-      if (aSched !== bSched) return aSched - bSched;
-      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-    });
+      // Sort scheduled: sort_order, then scheduled_at, then created_at
+      scheduled.sort((a, b) => {
+        const aSort = a.sort_order ?? Infinity;
+        const bSort = b.sort_order ?? Infinity;
+        if (aSort !== bSort) return aSort - bSort;
+        const aSched = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
+        const bSched = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
+        if (aSched !== bSched) return aSched - bSched;
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
 
-    // Sort dateless: sort_order, then created_at
-    dateless.sort((a, b) => {
-      const aSort = a.sort_order ?? Infinity;
-      const bSort = b.sort_order ?? Infinity;
-      if (aSort !== bSort) return aSort - bSort;
-      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-    });
+      // Sort dateless: sort_order, then created_at
+      dateless.sort((a, b) => {
+        const aSort = a.sort_order ?? Infinity;
+        const bSort = b.sort_order ?? Infinity;
+        if (aSort !== bSort) return aSort - bSort;
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
 
-    // Sort completed dateless: sort_order, then created_at
-    completedDateless.sort((a, b) => {
-      const aSort = a.sort_order ?? Infinity;
-      const bSort = b.sort_order ?? Infinity;
-      if (aSort !== bSort) return aSort - bSort;
-      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-    });
+      // Sort completed dateless: sort_order, then created_at
+      completedDateless.sort((a, b) => {
+        const aSort = a.sort_order ?? Infinity;
+        const bSort = b.sort_order ?? Infinity;
+        if (aSort !== bSort) return aSort - bSort;
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
 
-    return {
-      scheduledTasks: scheduled,
-      datelessTasks: dateless,
-      completedDatelessTasks: completedDateless,
-    };
-  }, [filteredTasks, statusFilter]);
+      // Sort completed scheduled: sort_order, then scheduled_at, then created_at
+      completedScheduled.sort((a, b) => {
+        const aSort = a.sort_order ?? Infinity;
+        const bSort = b.sort_order ?? Infinity;
+        if (aSort !== bSort) return aSort - bSort;
+        const aSched = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
+        const bSched = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
+        if (aSched !== bSched) return aSched - bSched;
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
+
+      return {
+        scheduledTasks: scheduled,
+        datelessTasks: dateless,
+        completedDatelessTasks: completedDateless,
+        completedScheduledTasks: completedScheduled,
+      };
+    }, [filteredTasks, statusFilter]);
 
   // ─── Display lists (optimistic override) ──────────────────────────────────
   const displayScheduled = optimisticScheduled ?? scheduledTasks;
   const displayCompletedDateless = optimisticCompletedDateless ?? completedDatelessTasks;
+  const displayCompletedScheduled = optimisticCompletedScheduled ?? completedScheduledTasks;
 
   // Apply list filter to dateless tasks
   const baseDisplayDateless = optimisticDateless ?? datelessTasks;
@@ -1403,12 +1429,17 @@ export default function TasksView({
     1,
     Math.ceil(displayCompletedDateless.length / PAGE_SIZE),
   );
+  const completedScheduledTotalPages = Math.max(
+    1,
+    Math.ceil(displayCompletedScheduled.length / PAGE_SIZE),
+  );
 
   // Reset pages when filters change
   React.useEffect(() => {
     setScheduledPage(0);
     setDatelessPageMap({});
     setCompletedDatelessPage(0);
+    setCompletedScheduledPage(0);
     setSelectedListId('all');
     localStorage.setItem('flowday-tasks-selected-list', 'all');
   }, [statusFilter, searchQuery]);
@@ -1466,6 +1497,10 @@ export default function TasksView({
     completedDatelessPage,
     completedDatelessTotalPages - 1,
   );
+  const completedScheduledSafePage = Math.min(
+    completedScheduledPage,
+    completedScheduledTotalPages - 1,
+  );
 
   const handleScheduledDragEnd = useMemo(
     () =>
@@ -1497,6 +1532,22 @@ export default function TasksView({
       displayCompletedDateless,
       completedDatelessSafePage,
       completedDatelessTasks,
+    ],
+  );
+
+  const handleCompletedScheduledDragEnd = useMemo(
+    () =>
+      createDragEndHandler(
+        displayCompletedScheduled,
+        completedScheduledSafePage,
+        setOptimisticCompletedScheduled,
+        completedScheduledTasks,
+      ),
+    [
+      createDragEndHandler,
+      displayCompletedScheduled,
+      completedScheduledSafePage,
+      completedScheduledTasks,
     ],
   );
 
@@ -1573,6 +1624,17 @@ export default function TasksView({
     [createMoveToPageHandler, displayCompletedDateless, completedDatelessSafePage],
   );
 
+  const handleCompletedScheduledMoveToPage = useMemo(
+    () =>
+      createMoveToPageHandler(
+        displayCompletedScheduled,
+        completedScheduledSafePage,
+        setOptimisticCompletedScheduled,
+        setCompletedScheduledPage,
+      ),
+    [createMoveToPageHandler, displayCompletedScheduled, completedScheduledSafePage],
+  );
+
   // ─── Close list picker on outside click ───────────────────────────────────
   const [listPickerTaskId, setListPickerTaskId] = useState<string | null>(null);
 
@@ -1619,6 +1681,258 @@ export default function TasksView({
     };
   };
 
+  // ─── Per-list task counts for sidebar ────────────────────────────────────
+  const listTaskCounts = useMemo(() => {
+    const counts: Record<string, { active: number; done: number }> = {};
+    const datelessAll = allTasks.filter((t) => !t.scheduled_at);
+
+    // 'all'
+    counts['all'] = {
+      active: datelessAll.filter((t) => t.status !== 'done').length,
+      done: datelessAll.filter((t) => t.status === 'done').length,
+    };
+
+    // 'none' — tasks that belong to no known list
+    const noneTasks = datelessAll.filter((t) => {
+      const ids = t.category_ids ?? [];
+      return ids.length === 0 || !taskLists.some((l) => ids.includes(l.id));
+    });
+    counts['none'] = {
+      active: noneTasks.filter((t) => t.status !== 'done').length,
+      done: noneTasks.filter((t) => t.status === 'done').length,
+    };
+
+    // per-list
+    taskLists.forEach((list) => {
+      const listTasks = datelessAll.filter((t) => (t.category_ids ?? []).includes(list.id));
+      counts[list.id] = {
+        active: listTasks.filter((t) => t.status !== 'done').length,
+        done: listTasks.filter((t) => t.status === 'done').length,
+      };
+    });
+
+    return counts;
+  }, [allTasks, taskLists]);
+
+  const LIST_COLORS: Record<string, { active: string; dot: string; glow: string }> = {
+    violet: {
+      active: 'bg-violet-500/10 border-violet-500/30 text-violet-300',
+      dot: 'bg-violet-500',
+      glow: 'text-violet-400',
+    },
+    sky: {
+      active: 'bg-sky-500/10 border-sky-500/30 text-sky-300',
+      dot: 'bg-sky-500',
+      glow: 'text-sky-400',
+    },
+    emerald: {
+      active: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300',
+      dot: 'bg-emerald-500',
+      glow: 'text-emerald-400',
+    },
+    amber: {
+      active: 'bg-amber-500/10 border-amber-500/30 text-amber-300',
+      dot: 'bg-amber-500',
+      glow: 'text-amber-400',
+    },
+    rose: {
+      active: 'bg-rose-500/10 border-rose-500/30 text-rose-300',
+      dot: 'bg-rose-500',
+      glow: 'text-rose-400',
+    },
+    indigo: {
+      active: 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300',
+      dot: 'bg-indigo-500',
+      glow: 'text-indigo-400',
+    },
+    teal: {
+      active: 'bg-teal-500/10 border-teal-500/30 text-teal-300',
+      dot: 'bg-teal-500',
+      glow: 'text-teal-400',
+    },
+    orange: {
+      active: 'bg-orange-500/10 border-orange-500/30 text-orange-300',
+      dot: 'bg-orange-500',
+      glow: 'text-orange-400',
+    },
+  };
+
+  // ─── Task section content (shared between mobile & desktop right column) ──
+  const taskSectionsContent = (
+    <>
+      {/* Dateless Tasks Section (renders in 'inbox' (Lists) mode) */}
+      {statusFilter === 'inbox' &&
+        (displayDateless.length > 0 || displayCompletedDateless.length > 0) && (
+          <TaskSection
+            label="Dateless"
+            icon={<Inbox className="w-3.5 h-3.5 text-violet-400" />}
+            accentColor="violet"
+            tasks={displayDateless}
+            isCollapsed={datelessCollapsed}
+            onToggleCollapse={() => setDatelessCollapsed((p) => !p)}
+            deletingId={deletingId}
+            activeTaskId={activeTaskId}
+            totalPages={datelessTotalPages}
+            page={datelessPage}
+            setPage={setDatelessPage}
+            onDeleteEntry={onDeleteEntry}
+            onOpenDetail={onOpenDetail}
+            onToggleTaskStatus={onToggleTaskStatus}
+            onActivateTask={onActivateTask}
+            onOpenScheduleModal={setScheduleModalTask}
+            formatTime={formatTime}
+            sensors={sensors}
+            onDragEnd={handleDatelessDragEnd}
+            handleMoveToPage={handleDatelessMoveToPage}
+            formatScheduledBadge={formatScheduledBadge}
+            setActiveDate={setActiveDate}
+            taskLists={taskLists}
+            listPickerTaskId={listPickerTaskId}
+            setListPickerTaskId={setListPickerTaskId}
+            moveToPageModalTask={moveToPageModalTask}
+            setMoveToPageModalTask={setMoveToPageModalTask}
+            showContent={showContent}
+            selectedListId={selectedListId}
+          />
+        )}
+
+      {/* Completed Dateless Tasks Section (Renders in 'inbox' (Lists) or 'done' mode) */}
+      {(statusFilter === 'inbox' || statusFilter === 'done') &&
+        displayCompletedDateless.length > 0 && (
+          <TaskSection
+            label={statusFilter === 'done' ? 'Completed Dateless' : 'Dateless Completed'}
+            icon={<Check className="w-3.5 h-3.5 text-emerald-400" />}
+            accentColor="emerald"
+            tasks={displayCompletedDateless}
+            isCollapsed={completedDatelessCollapsed}
+            onToggleCollapse={() => setCompletedDatelessCollapsed((p) => !p)}
+            deletingId={deletingId}
+            activeTaskId={activeTaskId}
+            totalPages={completedDatelessTotalPages}
+            page={completedDatelessPage}
+            setPage={setCompletedDatelessPage}
+            onDeleteEntry={onDeleteEntry}
+            onOpenDetail={onOpenDetail}
+            onToggleTaskStatus={onToggleTaskStatus}
+            onActivateTask={onActivateTask}
+            onOpenScheduleModal={setScheduleModalTask}
+            formatTime={formatTime}
+            sensors={sensors}
+            onDragEnd={handleCompletedDatelessDragEnd}
+            handleMoveToPage={handleCompletedDatelessMoveToPage}
+            formatScheduledBadge={formatScheduledBadge}
+            setActiveDate={setActiveDate}
+            taskLists={taskLists}
+            listPickerTaskId={listPickerTaskId}
+            setListPickerTaskId={setListPickerTaskId}
+            moveToPageModalTask={moveToPageModalTask}
+            setMoveToPageModalTask={setMoveToPageModalTask}
+            showContent={showContent}
+            selectedListId={selectedListId}
+          />
+        )}
+
+      {/* Scheduled Tasks Section (Renders only when statusFilter is 'todo' (Scheduled)) */}
+      {statusFilter === 'todo' && (
+        <TaskSection
+          label="Scheduled Tasks"
+          icon={<CalendarClock className="w-3.5 h-3.5 text-amber-400" />}
+          accentColor="amber"
+          tasks={displayScheduled}
+          isCollapsed={scheduledCollapsed}
+          onToggleCollapse={() => setScheduledCollapsed((p) => !p)}
+          deletingId={deletingId}
+          activeTaskId={activeTaskId}
+          totalPages={scheduledTotalPages}
+          page={scheduledPage}
+          setPage={setScheduledPage}
+          onDeleteEntry={onDeleteEntry}
+          onOpenDetail={onOpenDetail}
+          onToggleTaskStatus={onToggleTaskStatus}
+          onActivateTask={onActivateTask}
+          onOpenScheduleModal={setScheduleModalTask}
+          formatTime={formatTime}
+          sensors={sensors}
+          onDragEnd={handleScheduledDragEnd}
+          handleMoveToPage={handleScheduledMoveToPage}
+          formatScheduledBadge={formatScheduledBadge}
+          setActiveDate={setActiveDate}
+          taskLists={[]}
+          listPickerTaskId={null}
+          setListPickerTaskId={() => {}}
+          moveToPageModalTask={moveToPageModalTask}
+          setMoveToPageModalTask={setMoveToPageModalTask}
+          showContent={showContent}
+          selectedListId={selectedListId}
+        />
+      )}
+
+      {/* Completed Scheduled Tasks Section (Renders when statusFilter is 'todo' (Scheduled) or 'done') */}
+      {(statusFilter === 'todo' || statusFilter === 'done') &&
+        displayCompletedScheduled.length > 0 && (
+          <TaskSection
+            label={statusFilter === 'done' ? 'Completed Scheduled' : 'Scheduled Completed'}
+            icon={<Check className="w-3.5 h-3.5 text-emerald-400" />}
+            accentColor="emerald"
+            tasks={displayCompletedScheduled}
+            isCollapsed={completedDatelessCollapsed}
+            onToggleCollapse={() => setCompletedDatelessCollapsed((p) => !p)}
+            deletingId={deletingId}
+            activeTaskId={activeTaskId}
+            totalPages={completedScheduledTotalPages}
+            page={completedScheduledPage}
+            setPage={setCompletedScheduledPage}
+            onDeleteEntry={onDeleteEntry}
+            onOpenDetail={onOpenDetail}
+            onToggleTaskStatus={onToggleTaskStatus}
+            onActivateTask={onActivateTask}
+            onOpenScheduleModal={setScheduleModalTask}
+            formatTime={formatTime}
+            sensors={sensors}
+            onDragEnd={handleCompletedScheduledDragEnd}
+            handleMoveToPage={handleCompletedScheduledMoveToPage}
+            formatScheduledBadge={formatScheduledBadge}
+            setActiveDate={setActiveDate}
+            taskLists={[]}
+            listPickerTaskId={null}
+            setListPickerTaskId={() => {}}
+            moveToPageModalTask={moveToPageModalTask}
+            setMoveToPageModalTask={setMoveToPageModalTask}
+            showContent={showContent}
+            selectedListId={selectedListId}
+          />
+        )}
+
+      {/* Empty state */}
+      {displayScheduled.length === 0 &&
+        displayDateless.length === 0 &&
+        displayCompletedDateless.length === 0 &&
+        displayCompletedScheduled.length === 0 && (
+          <div className="py-24 px-6 text-center text-stone-500 select-none">
+            <ListTodo className="w-12 h-12 text-stone-800 mx-auto mb-4" />
+            <h4 className="font-sans font-medium text-sm text-stone-400 mb-1">
+              {searchQuery.trim()
+                ? 'No matching tasks'
+                : statusFilter === 'todo'
+                  ? 'No scheduled tasks'
+                  : statusFilter === 'done'
+                    ? 'No completed tasks'
+                    : 'List is empty'}
+            </h4>
+            <p className="text-xs font-sans max-w-md mx-auto leading-relaxed text-stone-500">
+              {searchQuery.trim()
+                ? 'Try a different search term.'
+                : statusFilter === 'todo'
+                  ? 'You have no scheduled tasks. Schedule tasks using the input engine below.'
+                  : statusFilter === 'done'
+                    ? 'Complete some tasks and they will show up here.'
+                    : 'Start creating dateless tasks using the input engine below to populate your Lists.'}
+            </p>
+          </div>
+        )}
+    </>
+  );
+
   return (
     <div className="space-y-0" id="tasks-view-dashboard">
       {/* Sticky search and filter control header */}
@@ -1655,7 +1969,7 @@ export default function TasksView({
                   : 'text-stone-500 hover:text-stone-300'
               }`}
             >
-              Inbox
+              Lists
             </button>
 
             <button
@@ -1666,7 +1980,7 @@ export default function TasksView({
                   : 'text-stone-500 hover:text-stone-300'
               }`}
             >
-              Todo
+              Scheduled
             </button>
             <button
               onClick={() => handleStatusFilterChange('done')}
@@ -1682,154 +1996,193 @@ export default function TasksView({
         </div>
       </div>
 
-      {/* List strip — only in inbox mode where dateless tasks live */}
-      {statusFilter === 'inbox' && (
-        <ListStrip
-          lists={taskLists}
-          selectedId={selectedListId}
-          onSelect={(id) => {
-            setSelectedListId(id);
-            localStorage.setItem('flowday-tasks-selected-list', id);
-            setDatelessPageMap((prev) => ({ ...prev, [id]: 0 }));
-          }}
-          onManage={() => setIsListManagerOpen(true)}
-        />
-      )}
-
-      {/* Dateless Tasks Section (renders in 'inbox' mode as active dateless, and in todo/done filters as dateless matches) */}
-      {(statusFilter !== 'inbox' ||
-        displayDateless.length > 0 ||
-        displayCompletedDateless.length > 0) && (
-        <TaskSection
-          label={statusFilter === 'inbox' ? 'Dateless' : 'Dateless Tasks'}
-          icon={<Inbox className="w-3.5 h-3.5 text-violet-400" />}
-          accentColor="violet"
-          tasks={displayDateless}
-          isCollapsed={datelessCollapsed}
-          onToggleCollapse={() => setDatelessCollapsed((p) => !p)}
-          deletingId={deletingId}
-          activeTaskId={activeTaskId}
-          totalPages={datelessTotalPages}
-          page={datelessPage}
-          setPage={setDatelessPage}
-          onDeleteEntry={onDeleteEntry}
-          onOpenDetail={onOpenDetail}
-          onToggleTaskStatus={onToggleTaskStatus}
-          onActivateTask={onActivateTask}
-          onOpenScheduleModal={setScheduleModalTask}
-          formatTime={formatTime}
-          sensors={sensors}
-          onDragEnd={handleDatelessDragEnd}
-          handleMoveToPage={handleDatelessMoveToPage}
-          formatScheduledBadge={formatScheduledBadge}
-          setActiveDate={setActiveDate}
-          taskLists={taskLists}
-          listPickerTaskId={listPickerTaskId}
-          setListPickerTaskId={setListPickerTaskId}
-          moveToPageModalTask={moveToPageModalTask}
-          setMoveToPageModalTask={setMoveToPageModalTask}
-          showContent={showContent}
-          selectedListId={selectedListId}
-        />
-      )}
-
-      {/* Completed Dateless Tasks Section (Only renders when statusFilter is 'inbox') */}
-      {statusFilter === 'inbox' &&
-        (displayDateless.length > 0 || displayCompletedDateless.length > 0) && (
-          <TaskSection
-            label="Dateless Completed"
-            icon={<Check className="w-3.5 h-3.5 text-emerald-400" />}
-            accentColor="emerald"
-            tasks={displayCompletedDateless}
-            isCollapsed={completedDatelessCollapsed}
-            onToggleCollapse={() => setCompletedDatelessCollapsed((p) => !p)}
-            deletingId={deletingId}
-            activeTaskId={activeTaskId}
-            totalPages={completedDatelessTotalPages}
-            page={completedDatelessPage}
-            setPage={setCompletedDatelessPage}
-            onDeleteEntry={onDeleteEntry}
-            onOpenDetail={onOpenDetail}
-            onToggleTaskStatus={onToggleTaskStatus}
-            onActivateTask={onActivateTask}
-            onOpenScheduleModal={setScheduleModalTask}
-            formatTime={formatTime}
-            sensors={sensors}
-            onDragEnd={handleCompletedDatelessDragEnd}
-            handleMoveToPage={handleCompletedDatelessMoveToPage}
-            formatScheduledBadge={formatScheduledBadge}
-            setActiveDate={setActiveDate}
-            taskLists={taskLists}
-            listPickerTaskId={listPickerTaskId}
-            setListPickerTaskId={setListPickerTaskId}
-            moveToPageModalTask={moveToPageModalTask}
-            setMoveToPageModalTask={setMoveToPageModalTask}
-            showContent={showContent}
-            selectedListId={selectedListId}
-          />
-        )}
-
-      {/* Scheduled Tasks Section (Renders only when statusFilter is NOT 'inbox') */}
-      {statusFilter !== 'inbox' && (
-        <TaskSection
-          label="Scheduled Tasks"
-          icon={<CalendarClock className="w-3.5 h-3.5 text-amber-400" />}
-          accentColor="amber"
-          tasks={displayScheduled}
-          isCollapsed={scheduledCollapsed}
-          onToggleCollapse={() => setScheduledCollapsed((p) => !p)}
-          deletingId={deletingId}
-          activeTaskId={activeTaskId}
-          totalPages={scheduledTotalPages}
-          page={scheduledPage}
-          setPage={setScheduledPage}
-          onDeleteEntry={onDeleteEntry}
-          onOpenDetail={onOpenDetail}
-          onToggleTaskStatus={onToggleTaskStatus}
-          onActivateTask={onActivateTask}
-          onOpenScheduleModal={setScheduleModalTask}
-          formatTime={formatTime}
-          sensors={sensors}
-          onDragEnd={handleScheduledDragEnd}
-          handleMoveToPage={handleScheduledMoveToPage}
-          formatScheduledBadge={formatScheduledBadge}
-          setActiveDate={setActiveDate}
-          taskLists={[]}
-          listPickerTaskId={null}
-          setListPickerTaskId={() => {}}
-          moveToPageModalTask={moveToPageModalTask}
-          setMoveToPageModalTask={setMoveToPageModalTask}
-          showContent={showContent}
-          selectedListId={selectedListId}
-        />
-      )}
-
-      {/* Empty state */}
-      {displayScheduled.length === 0 &&
-        displayDateless.length === 0 &&
-        (statusFilter !== 'inbox' || displayCompletedDateless.length === 0) && (
-          <div className="py-24 px-6 text-center text-stone-500 select-none">
-            <ListTodo className="w-12 h-12 text-stone-800 mx-auto mb-4" />
-            <h4 className="font-sans font-medium text-sm text-stone-400 mb-1">
-              {searchQuery.trim()
-                ? 'No matching tasks'
-                : statusFilter === 'todo'
-                  ? 'No open tasks'
-                  : statusFilter === 'done'
-                    ? 'No completed tasks'
-                    : 'Inbox is empty'}
-            </h4>
-            <p className="text-xs font-sans max-w-md mx-auto leading-relaxed text-stone-500">
-              {searchQuery.trim()
-                ? 'Try a different search term.'
-                : statusFilter === 'todo'
-                  ? 'All your tasks are done. Create new tasks using the input engine below.'
-                  : statusFilter === 'done'
-                    ? 'Complete some tasks and they will show up here.'
-                    : 'Start creating dateless tasks using the input engine below to populate your Inbox.'}
-            </p>
+      {/* ── LISTS (INBOX) VIEW ──────────────────────────────────────────────── */}
+      {statusFilter === 'inbox' ? (
+        <>
+          {/* ── MOBILE: original strip layout ── */}
+          <div className="md:hidden">
+            <ListStrip
+              lists={taskLists}
+              selectedId={selectedListId}
+              onSelect={(id) => {
+                setSelectedListId(id);
+                localStorage.setItem('flowday-tasks-selected-list', id);
+                setDatelessPageMap((prev) => ({ ...prev, [id]: 0 }));
+              }}
+              onManage={() => setIsListManagerOpen(true)}
+            />
+            {taskSectionsContent}
           </div>
-        )}
+
+          {/* ── DESKTOP: two-column sidebar layout ── */}
+          <div className="hidden md:flex gap-0 mt-3 h-[500px] overflow-hidden">
+            {/* LEFT COLUMN — List sidebar */}
+            <div className="w-[200px] lg:w-[220px] h-[500px] shrink-0 flex flex-col min-h-0 border-r border-stone-800/60 pr-3 mr-3 items-between">
+              {/* Sidebar header: All · None · ··· — pinned, never scrolls */}
+              <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-stone-800/60 shrink-0">
+                <button
+                  onClick={() => {
+                    setSelectedListId('all');
+                    localStorage.setItem('flowday-tasks-selected-list', 'all');
+                    setDatelessPageMap((prev) => ({ ...prev, all: 0 }));
+                  }}
+                  className={`flex-1 px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer border ${
+                    selectedListId === 'all'
+                      ? 'bg-stone-800 border-stone-700 text-stone-100'
+                      : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-900'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedListId('none');
+                    localStorage.setItem('flowday-tasks-selected-list', 'none');
+                    setDatelessPageMap((prev) => ({ ...prev, none: 0 }));
+                  }}
+                  className={`flex-1 px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer border ${
+                    selectedListId === 'none'
+                      ? 'bg-stone-800 border-stone-700 text-stone-100'
+                      : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-900'
+                  }`}
+                >
+                  None
+                </button>
+                <button
+                  onClick={() => setIsListManagerOpen(true)}
+                  className="p-1.5 rounded-lg border border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer shrink-0"
+                  title="Manage lists"
+                >
+                  <MoreHorizontal className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* List rows — scrollable independently */}
+              <div
+                className="flex flex-col gap-0.5 overflow-y-auto flex-1 min-h-0"
+                style={{ scrollbarWidth: 'none' }}
+              >
+                {taskLists.length === 0 && (
+                  <p className="text-[10px] font-mono text-stone-600 text-center py-6 px-2 leading-relaxed">
+                    No lists yet.
+                    <br />
+                    Click ··· to create one.
+                  </p>
+                )}
+                {taskLists.map((list) => {
+                  const cs = LIST_COLORS[list.color] ?? LIST_COLORS['violet'];
+                  const isActive = selectedListId === list.id;
+                  const counts = listTaskCounts[list.id] ?? { active: 0, done: 0 };
+                  return (
+                    <button
+                      key={list.id}
+                      onClick={() => {
+                        setSelectedListId(list.id);
+                        localStorage.setItem('flowday-tasks-selected-list', list.id);
+                        setDatelessPageMap((prev) => ({ ...prev, [list.id]: 0 }));
+                      }}
+                      className={`group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg border text-left transition-all duration-150 cursor-pointer ${
+                        isActive
+                          ? cs.active
+                          : 'bg-transparent border-transparent text-stone-400 hover:bg-stone-900 hover:border-stone-800 hover:text-stone-200'
+                      }`}
+                    >
+                      {/* Color dot */}
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${cs.dot}`} />
+
+                      {/* List name */}
+                      <span className="flex-1 min-w-0 text-[11px] font-mono font-semibold truncate">
+                        {list.name}
+                      </span>
+
+                      {/* Counts */}
+                      <span className="flex items-center gap-1.5 shrink-0">
+                        {/* Active count */}
+                        {counts.active > 0 && (
+                          <span
+                            className={`text-[9px] font-mono font-bold tabular-nums min-w-[14px] text-center ${
+                              isActive
+                                ? 'text-current opacity-80'
+                                : 'text-stone-500 group-hover:text-stone-400'
+                            }`}
+                            title={`${counts.active} active`}
+                          >
+                            {counts.active}
+                          </span>
+                        )}
+                        {/* Done count */}
+                        {counts.done > 0 && (
+                          <span
+                            className={`text-[9px] font-mono font-bold tabular-nums min-w-[14px] text-center opacity-50 ${
+                              isActive
+                                ? 'text-current'
+                                : 'text-stone-600 group-hover:text-stone-500'
+                            }`}
+                            title={`${counts.done} completed`}
+                          >
+                            ✓{counts.done}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Sidebar footer — pinned at bottom, never scrolls */}
+              {taskLists.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-stone-800/60 shrink-0">
+                  <p className="text-[9px] font-mono text-stone-600 tabular-nums">
+                    {listTaskCounts['all']?.active ?? 0} active · {listTaskCounts['all']?.done ?? 0}{' '}
+                    done
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* RIGHT COLUMN — Task sections */}
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+              {/* Active list header */}
+              {(() => {
+                const activeList = taskLists.find((l) => l.id === selectedListId);
+                const cs = activeList
+                  ? (LIST_COLORS[activeList.color] ?? LIST_COLORS['violet'])
+                  : null;
+                const counts = listTaskCounts[selectedListId] ?? { active: 0, done: 0 };
+                return (
+                  <div className="flex items-center gap-2 mb-3 shrink-0">
+                    {cs && activeList && (
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${cs.dot}`} />
+                    )}
+                    <h3 className="text-[11px] font-mono font-bold uppercase tracking-widest text-stone-400">
+                      {selectedListId === 'all'
+                        ? 'All Tasks'
+                        : selectedListId === 'none'
+                          ? 'Uncategorized'
+                          : (activeList?.name ?? 'Tasks')}
+                    </h3>
+                    <span className="text-[9px] font-mono text-stone-600 tabular-nums ml-1">
+                      {counts.active > 0 && `${counts.active} active`}
+                      {counts.active > 0 && counts.done > 0 && ' · '}
+                      {counts.done > 0 && `${counts.done} done`}
+                    </span>
+                  </div>
+                );
+              })()}
+              {/* Scrollable task content — independent from left sidebar */}
+              <div
+                className="flex-1 min-h-0 overflow-y-auto pr-1"
+                style={{ scrollbarWidth: 'thin', scrollbarColor: '#3d3d3d transparent' }}
+              >
+                {taskSectionsContent}
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        /* ── SCHEDULED / DONE VIEWS (unchanged layout) ── */
+        <div>{taskSectionsContent}</div>
+      )}
 
       {/* Schedule Calendar Modal */}
       {scheduleModalTask && (
@@ -1847,14 +2200,18 @@ export default function TasksView({
           task={moveToPageModalTask}
           currentPage={
             moveToPageModalTask.scheduled_at
-              ? Math.min(scheduledPage, scheduledTotalPages - 1)
+              ? moveToPageModalTask.status === 'done'
+                ? Math.min(completedScheduledPage, completedScheduledTotalPages - 1)
+                : Math.min(scheduledPage, scheduledTotalPages - 1)
               : moveToPageModalTask.status === 'done'
                 ? Math.min(completedDatelessPage, completedDatelessTotalPages - 1)
                 : Math.min(datelessPage, datelessTotalPages - 1)
           }
           totalPages={
             moveToPageModalTask.scheduled_at
-              ? scheduledTotalPages
+              ? moveToPageModalTask.status === 'done'
+                ? completedScheduledTotalPages
+                : scheduledTotalPages
               : moveToPageModalTask.status === 'done'
                 ? completedDatelessTotalPages
                 : datelessTotalPages
@@ -1862,7 +2219,11 @@ export default function TasksView({
           onClose={() => setMoveToPageModalTask(null)}
           onSelectPage={(taskId, page) => {
             if (moveToPageModalTask.scheduled_at) {
-              handleScheduledMoveToPage(taskId, page);
+              if (moveToPageModalTask.status === 'done') {
+                handleCompletedScheduledMoveToPage(taskId, page);
+              } else {
+                handleScheduledMoveToPage(taskId, page);
+              }
             } else if (moveToPageModalTask.status === 'done') {
               handleCompletedDatelessMoveToPage(taskId, page);
             } else {

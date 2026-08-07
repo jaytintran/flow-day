@@ -26,7 +26,9 @@ export default function App() {
 
   const setViewMode = useCallback((mode: ViewMode) => {
     setViewModeRaw(mode);
-    try { localStorage.setItem('flowday-view-mode', mode); } catch {}
+    try {
+      localStorage.setItem('flowday-view-mode', mode);
+    } catch {}
   }, []);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [activeHubTab, setActiveHubTab] = useState<'focus' | 'goals' | 'objectives' | 'habits'>(
