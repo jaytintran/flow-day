@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -22,7 +22,9 @@ import {
   Search,
   Edit3,
   X,
+  BarChart2,
 } from 'lucide-react';
+import HabitConsistencyModal from './HabitConsistencyModal';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../db';
@@ -61,6 +63,15 @@ export default function DayNavigator({
   const [filterMonth, setFilterMonth] = useState<string>('All');
   const [displayedMonth, setDisplayedMonth] = useState<Date>(new Date(activeDate));
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Habit strip context menu state
+  const [contextHabit, setContextHabit] = useState<Habit | null>(null);
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [consistencyHabit, setConsistencyHabit] = useState<Habit | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const [stripCanScrollRight, setStripCanScrollRight] = useState(false);
+  const [stripCanScrollLeft, setStripCanScrollLeft] = useState(false);
 
   // Load entries reactively
   const entries = useLiveQuery(() => db.entries.toArray()) || [];
@@ -195,6 +206,46 @@ export default function DayNavigator({
   ) || []) as HabitLog[];
 
   const activeDateStr = toLocalDateString(activeDate);
+
+  // --- Habit strip scroll-fade detection ---
+  const updateStripFade = useCallback(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    setStripCanScrollLeft(el.scrollLeft > 4);
+    setStripCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    updateStripFade();
+    el.addEventListener('scroll', updateStripFade, { passive: true });
+    const ro = new ResizeObserver(updateStripFade);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener('scroll', updateStripFade);
+      ro.disconnect();
+    };
+  }, [updateStripFade, sortedActiveHabits]);
+
+  // --- Habit strip context menu helpers ---
+  const openContextMenu = useCallback((habit: Habit, x: number, y: number) => {
+    setContextHabit(habit);
+    setContextMenuPos({ x, y });
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextHabit(null);
+    setContextMenuPos(null);
+  }, []);
+
+  // Close context menu on outside click
+  useEffect(() => {
+    if (!contextMenuPos) return;
+    const handler = () => closeContextMenu();
+    window.addEventListener('pointerdown', handler);
+    return () => window.removeEventListener('pointerdown', handler);
+  }, [contextMenuPos, closeContextMenu]);
 
   const handleQuickTick = async (habit: Habit) => {
     const todayLogs = habitLogs.filter(
@@ -514,48 +565,162 @@ export default function DayNavigator({
         </div>
 
         {/* Quick-tick Habit strip — only when active habits exist */}
-        {sortedActiveHabits.length > 0 && (
-          <div className="flex items-center gap-2 w-full overflow-x-auto pb-0.5 md:flex-wrap md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {sortedActiveHabits.map((habit) => {
-              const logsToday = habitLogs.filter(
-                (l) =>
-                  l.habit_id === habit.id &&
-                  toLocalDateString(new Date(l.timestamp)) === activeDateStr,
-              );
-              const count = logsToday.length;
-              const isTicked = count > 0;
-              const colorMap: Record<string, string> = {
-                emerald: isTicked
-                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                  : 'border-emerald-500/40 text-emerald-400',
-                sky: isTicked
-                  ? 'bg-sky-500/15 border-sky-500/40 text-sky-300'
-                  : 'border-sky-500/40 text-sky-400',
-                violet: isTicked
-                  ? 'bg-violet-500/15 border-violet-500/40 text-violet-300'
-                  : 'border-violet-500/40 text-violet-400',
-                rose: isTicked
-                  ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
-                  : 'border-rose-500/40 text-rose-400',
-                amber: isTicked
-                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-                  : 'border-amber-500/40 text-amber-400',
-              };
-              const cls = colorMap[habit.color ?? 'emerald'] ?? colorMap.emerald;
-              return (
-                <button
-                  key={habit.id}
-                  onClick={() => handleQuickTick(habit)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-mono font-semibold uppercase tracking-wide transition-all active:scale-95 cursor-pointer shrink-0 ${cls}`}
-                  title={isTicked ? `Uncheck "${habit.title}"` : `Check "${habit.title}"`}
+        {sortedActiveHabits.length > 0 && (() => {
+          const totalHabits = sortedActiveHabits.length;
+          const tickedCount = sortedActiveHabits.filter((h) =>
+            habitLogs.some(
+              (l) =>
+                l.habit_id === h.id &&
+                toLocalDateString(new Date(l.timestamp)) === activeDateStr,
+            ),
+          ).length;
+          const allDone = tickedCount === totalHabits;
+
+          return (
+            <div className="flex items-center gap-2 w-full min-w-0">
+              {/* Scroll-faded strip wrapper */}
+              <div className="relative flex-1 min-w-0">
+                {/* Left fade */}
+                {stripCanScrollLeft && (
+                  <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 z-10 bg-gradient-to-r from-[#0a0a0a] to-transparent" />
+                )}
+                {/* Right fade */}
+                {stripCanScrollRight && (
+                  <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 z-10 bg-gradient-to-l from-[#0a0a0a] to-transparent" />
+                )}
+
+                <div
+                  ref={stripRef}
+                  className="flex items-center gap-2 overflow-x-auto pb-0.5 md:flex-wrap md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                 >
-                  {isTicked && <Check className="w-3 h-3 stroke-[3]" />}
-                  {habit.title}
-                  {count > 1 && <span className="ml-0.5 opacity-70">×{count}</span>}
-                </button>
-              );
-            })}
+                  {sortedActiveHabits.map((habit) => {
+                    const logsToday = habitLogs.filter(
+                      (l) =>
+                        l.habit_id === habit.id &&
+                        toLocalDateString(new Date(l.timestamp)) === activeDateStr,
+                    );
+                    const count = logsToday.length;
+                    const isTicked = count > 0;
+                    const colorMap: Record<string, string> = {
+                      emerald: isTicked
+                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                        : 'border-stone-700/60 text-stone-500 hover:border-emerald-500/30 hover:text-emerald-400',
+                      sky: isTicked
+                        ? 'bg-sky-500/15 border-sky-500/40 text-sky-300'
+                        : 'border-stone-700/60 text-stone-500 hover:border-sky-500/30 hover:text-sky-400',
+                      violet: isTicked
+                        ? 'bg-violet-500/15 border-violet-500/40 text-violet-300'
+                        : 'border-stone-700/60 text-stone-500 hover:border-violet-500/30 hover:text-violet-400',
+                      rose: isTicked
+                        ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
+                        : 'border-stone-700/60 text-stone-500 hover:border-rose-500/30 hover:text-rose-400',
+                      amber: isTicked
+                        ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                        : 'border-stone-700/60 text-stone-500 hover:border-amber-500/30 hover:text-amber-400',
+                    };
+                    const cls = colorMap[habit.color ?? 'emerald'] ?? colorMap.emerald;
+                    return (
+                      <button
+                        key={habit.id}
+                        onClick={() => handleQuickTick(habit)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          openContextMenu(habit, e.clientX, e.clientY);
+                        }}
+                        onPointerDown={(e) => {
+                          if (e.pointerType === 'touch') {
+                            longPressTimerRef.current = setTimeout(() => {
+                              openContextMenu(habit, e.clientX, e.clientY);
+                            }, 500);
+                          }
+                        }}
+                        onPointerUp={() => {
+                          if (longPressTimerRef.current) {
+                            clearTimeout(longPressTimerRef.current);
+                            longPressTimerRef.current = null;
+                          }
+                        }}
+                        onPointerCancel={() => {
+                          if (longPressTimerRef.current) {
+                            clearTimeout(longPressTimerRef.current);
+                            longPressTimerRef.current = null;
+                          }
+                        }}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-mono font-semibold uppercase tracking-wide transition-all active:scale-95 cursor-pointer shrink-0 select-none ${cls}`}
+                        title={isTicked ? `Uncheck "${habit.title}" — right-click for insights` : `Check "${habit.title}" — right-click for insights`}
+                      >
+                        {isTicked && <Check className="w-3 h-3 stroke-[3]" />}
+                        {habit.title}
+                        {count > 1 && <span className="ml-0.5 opacity-70">×{count}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Completion ratio badge */}
+              <span
+                className={`shrink-0 flex items-center gap-1 font-mono text-[9px] px-1.5 py-0.5 rounded border transition-colors select-none ${
+                  allDone
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                    : 'bg-stone-900 border-stone-800 text-stone-500'
+                }`}
+                title={`${tickedCount} of ${totalHabits} habits done today`}
+              >
+                {allDone ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : null}
+                {tickedCount}/{totalHabits}
+              </span>
+            </div>
+          );
+        })()}
+
+        {/* Habit context menu */}
+        {contextMenuPos && contextHabit && (
+          <div
+            className="fixed z-50 min-w-[160px] bg-[#141414] border border-stone-700/80 rounded-lg shadow-2xl py-1 overflow-hidden"
+            style={{ top: contextMenuPos.y, left: contextMenuPos.x }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div className="px-3 py-1.5 border-b border-stone-800 mb-1">
+              <p className="text-[10px] font-mono font-bold text-stone-300 uppercase tracking-widest truncate">
+                {contextHabit.title}
+              </p>
+            </div>
+            <button
+              className="flex items-center gap-2 w-full px-3 py-1.5 text-[11px] font-sans text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer"
+              onClick={() => {
+                setConsistencyHabit(contextHabit);
+                closeContextMenu();
+              }}
+            >
+              <BarChart2 className="w-3.5 h-3.5 text-stone-400" />
+              View consistency
+            </button>
+            <button
+              className="flex items-center gap-2 w-full px-3 py-1.5 text-[11px] font-sans text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer"
+              onClick={() => {
+                handleQuickTick(contextHabit);
+                closeContextMenu();
+              }}
+            >
+              <Check className="w-3.5 h-3.5 text-stone-400" />
+              {habitLogs.some(
+                (l) =>
+                  l.habit_id === contextHabit.id &&
+                  toLocalDateString(new Date(l.timestamp)) === activeDateStr,
+              )
+                ? 'Uncheck for today'
+                : 'Check for today'}
+            </button>
           </div>
+        )}
+
+        {/* Habit Consistency Modal */}
+        {consistencyHabit && (
+          <HabitConsistencyModal
+            habit={consistencyHabit}
+            onClose={() => setConsistencyHabit(null)}
+          />
         )}
 
         {/* Mobile sub-tab switcher for Hub */}

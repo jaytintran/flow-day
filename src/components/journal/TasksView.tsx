@@ -483,9 +483,7 @@ function TaskStatusPickerPopover({ task, onClose }: TaskStatusPickerPopoverProps
                   key={opt.status}
                   onClick={() => handleSelectStatus(opt.status)}
                   className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                    isSelected
-                      ? opt.activeClasses
-                      : `${opt.colorClasses} border-transparent`
+                    isSelected ? opt.activeClasses : `${opt.colorClasses} border-transparent`
                   }`}
                 >
                   <div className="w-5 h-5 flex items-center justify-center shrink-0">
@@ -697,14 +695,19 @@ function PaperListModal({
                           isDone
                             ? 'bg-emerald-600 border-emerald-500 text-stone-950'
                             : isInProgress
-                            ? 'bg-amber-500/20 border-amber-500/60 text-amber-400'
-                            : isDropped
-                            ? 'bg-rose-950/60 border-rose-800 text-rose-400'
-                            : 'border-stone-700 bg-transparent text-transparent hover:text-stone-500 hover:border-stone-500'
+                              ? 'bg-amber-500/20 border-amber-500/60 text-amber-400'
+                              : isDropped
+                                ? 'bg-rose-950/60 border-rose-800 text-rose-400'
+                                : 'border-stone-700 bg-transparent text-transparent hover:text-stone-500 hover:border-stone-500'
                         }`}
                       >
                         {isDone && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                        {isInProgress && <CircleDashed className="w-2.5 h-2.5 animate-spin" style={{ animationDuration: '4s' }} />}
+                        {isInProgress && (
+                          <CircleDashed
+                            className="w-2.5 h-2.5 animate-spin"
+                            style={{ animationDuration: '4s' }}
+                          />
+                        )}
                         {isDropped && <X className="w-2.5 h-2.5 stroke-[3]" />}
                       </button>
 
@@ -714,10 +717,10 @@ function PaperListModal({
                           isDone
                             ? 'line-through text-stone-600'
                             : isDropped
-                            ? 'line-through text-stone-600 opacity-60'
-                            : isInProgress
-                            ? 'text-amber-200/95 font-semibold'
-                            : 'text-stone-300'
+                              ? 'line-through text-stone-600 opacity-60'
+                              : isInProgress
+                                ? 'text-amber-200/95 font-semibold'
+                                : 'text-stone-300'
                         }`}
                       >
                         {task.title}
@@ -1058,10 +1061,10 @@ function TaskSection({
                   isDone
                     ? 'bg-emerald-600 border-emerald-500 text-stone-950 shadow-[0_0_8px_rgba(16,185,129,0.3)]'
                     : isInProgress
-                    ? 'bg-amber-500/20 border-amber-500/60 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
-                    : isDropped
-                    ? 'bg-rose-950/60 border-rose-800 text-rose-400'
-                    : 'border-stone-700 bg-[#0a0a0a] text-transparent hover:border-stone-500 hover:text-stone-500'
+                      ? 'bg-amber-500/20 border-amber-500/60 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
+                      : isDropped
+                        ? 'bg-rose-950/60 border-rose-800 text-rose-400'
+                        : 'border-stone-700 bg-[#0a0a0a] text-transparent hover:border-stone-500 hover:text-stone-500'
                 }`}
                 title="Change status"
               >
@@ -1096,13 +1099,13 @@ function TaskSection({
                 className={`font-serif text-sm font-semibold line-clamp-1 ${
                   isDone
                     ? hasAchievements
-                      ? 'text-amber-400/80 line-through'
-                      : 'text-stone-600 line-through'
+                      ? 'text-amber-400/80'
+                      : 'text-emerald-600'
                     : isDropped
-                    ? 'text-stone-600 line-through opacity-60'
-                    : isInProgress
-                    ? 'text-amber-200/95 font-bold'
-                    : 'text-stone-200'
+                      ? 'text-stone-600 opacity-60'
+                      : isInProgress
+                        ? 'text-amber-200/95 font-bold'
+                        : 'text-stone-200'
                 }`}
               >
                 {isDone && hasAchievements && <span className="mr-1.5 not-italic">🏆</span>}
@@ -1134,9 +1137,12 @@ function TaskSection({
                     );
                   })}
                 <span className="flex items-center gap-1 text-[10px] font-mono text-stone-500">
-                  {isDateless && !isDone && !isDropped && (taskCategories.length > 0 || isInProgress) && (
-                    <span className="text-stone-700 mr-0.5">·</span>
-                  )}
+                  {isDateless &&
+                    !isDone &&
+                    !isDropped &&
+                    (taskCategories.length > 0 || isInProgress) && (
+                      <span className="text-stone-700 mr-0.5">·</span>
+                    )}
                   Created: {formatTime(task.created_at)}
                 </span>
                 {task.time_spent > 0 && (
@@ -1394,827 +1400,744 @@ function ListStrip({ lists, selectedId, onSelect, onManage }: ListStripProps) {
       >
         <MoreHorizontal className="w-3.5 h-3.5" />
       </button>
-      </div>
-    );
-  }
+    </div>
+  );
+}
 
-  // ─── Main Component ──────────────────────────────────────────────────────────
+// ─── Main Component ──────────────────────────────────────────────────────────
 
-  export default function TasksView({
-    entries,
-    deletingId,
-    activeTaskId,
-    setActiveDate,
-    onDeleteEntry,
-    onOpenDetail,
-    onToggleTaskStatus,
-    onActivateTask,
-    onCarryTask,
-    formatTime,
-    formatDateStringLabel,
-  }: TasksViewProps) {
-    const [searchQuery, setSearchQuery] = useState('');
-    const showContent = localStorage.getItem('flowday_show_note_event_content') !== 'false';
-    const [statusFilter, setStatusFilter] = useState<'inbox' | 'todo' | 'done'>(() => {
-      const saved = localStorage.getItem('flowday-tasks-status-filter');
-      if (saved === 'inbox' || saved === 'todo' || saved === 'done') {
-        return saved;
-      }
-      return 'inbox';
+export default function TasksView({
+  entries,
+  deletingId,
+  activeTaskId,
+  setActiveDate,
+  onDeleteEntry,
+  onOpenDetail,
+  onToggleTaskStatus,
+  onActivateTask,
+  onCarryTask,
+  formatTime,
+  formatDateStringLabel,
+}: TasksViewProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const showContent = localStorage.getItem('flowday_show_note_event_content') !== 'false';
+  const [statusFilter, setStatusFilter] = useState<'inbox' | 'todo' | 'done'>(() => {
+    const saved = localStorage.getItem('flowday-tasks-status-filter');
+    if (saved === 'inbox' || saved === 'todo' || saved === 'done') {
+      return saved;
+    }
+    return 'inbox';
+  });
+
+  const [selectedListId, setSelectedListId] = useState<string>(() => {
+    return localStorage.getItem('flowday-tasks-selected-list') ?? 'all';
+  });
+  const [isListManagerOpen, setIsListManagerOpen] = useState(false);
+  const [datelessStateFilter, setDatelessStateFilter] = useState<
+    'all' | 'todo' | 'in_progress' | 'done' | 'dropped'
+  >(() => {
+    const saved = localStorage.getItem('flowday-tasks-dateless-state-filter');
+    if (
+      saved === 'all' ||
+      saved === 'todo' ||
+      saved === 'in_progress' ||
+      saved === 'done' ||
+      saved === 'dropped'
+    ) {
+      return saved;
+    }
+    return 'all';
+  });
+
+  const rawTaskLists = (useLiveQuery(
+    () => db.categories.where('scope').equals(TASK_LIST_SCOPE).toArray(),
+    [],
+  ) ?? []) as Category[];
+
+  const taskLists = [...rawTaskLists].sort((a, b) => {
+    const aO = (a as any).sort_order ?? Date.parse(a.created_at.toString());
+    const bO = (b as any).sort_order ?? Date.parse(b.created_at.toString());
+    return aO - bO;
+  });
+
+  const handleStatusFilterChange = (filter: 'inbox' | 'todo' | 'done') => {
+    setStatusFilter(filter);
+    localStorage.setItem('flowday-tasks-status-filter', filter);
+  };
+
+  // Section collapse state
+  const [scheduledCollapsed, setScheduledCollapsed] = useState(false);
+  const [datelessCollapsed, setDatelessCollapsed] = useState(false);
+  const [completedDatelessCollapsed, setCompletedDatelessCollapsed] = useState(false);
+  const [droppedDatelessCollapsed, setDroppedDatelessCollapsed] = useState(false);
+
+  // Pagination per section
+  const [scheduledPage, setScheduledPage] = useState(0);
+  const [datelessPageMap, setDatelessPageMap] = useState<Record<string, number>>({});
+
+  const datelessPage = datelessPageMap[selectedListId] ?? 0;
+  const setDatelessPage: React.Dispatch<React.SetStateAction<number>> = (value) => {
+    setDatelessPageMap((prev) => {
+      const current = prev[selectedListId] ?? 0;
+      const next = typeof value === 'function' ? value(current) : value;
+      return { ...prev, [selectedListId]: next };
     });
+  };
+  const [completedDatelessPage, setCompletedDatelessPage] = useState(0);
+  const [droppedDatelessPage, setDroppedDatelessPage] = useState(0);
+  const [completedScheduledPage, setCompletedScheduledPage] = useState(0);
 
-    const [selectedListId, setSelectedListId] = useState<string>(() => {
-      return localStorage.getItem('flowday-tasks-selected-list') ?? 'all';
-    });
-    const [isListManagerOpen, setIsListManagerOpen] = useState(false);
-    const [datelessStateFilter, setDatelessStateFilter] = useState<
-      'all' | 'todo' | 'in_progress' | 'done' | 'dropped'
-    >(() => {
-      const saved = localStorage.getItem('flowday-tasks-dateless-state-filter');
-      if (
-        saved === 'all' ||
-        saved === 'todo' ||
-        saved === 'in_progress' ||
-        saved === 'done' ||
-        saved === 'dropped'
-      ) {
-        return saved;
-      }
-      return 'all';
-    });
+  // Optimistic state per section
+  const [optimisticScheduled, setOptimisticScheduled] = useState<Task[] | null>(null);
+  const [optimisticDateless, setOptimisticDateless] = useState<Task[] | null>(null);
+  const [optimisticCompletedDateless, setOptimisticCompletedDateless] = useState<Task[] | null>(
+    null,
+  );
+  const [optimisticDroppedDateless, setOptimisticDroppedDateless] = useState<Task[] | null>(null);
+  const [optimisticCompletedScheduled, setOptimisticCompletedScheduled] = useState<Task[] | null>(
+    null,
+  );
 
-    const rawTaskLists = (useLiveQuery(
-      () => db.categories.where('scope').equals(TASK_LIST_SCOPE).toArray(),
-      [],
-    ) ?? []) as Category[];
+  // Move to page modal
+  const [moveToPageModalTask, setMoveToPageModalTask] = useState<Task | null>(null);
 
-    const taskLists = [...rawTaskLists].sort((a, b) => {
-      const aO = (a as any).sort_order ?? Date.parse(a.created_at.toString());
-      const bO = (b as any).sort_order ?? Date.parse(b.created_at.toString());
-      return aO - bO;
-    });
+  // Status picker modal
+  const [statusPickerTask, setStatusPickerTask] = useState<Task | null>(null);
 
-    const handleStatusFilterChange = (filter: 'inbox' | 'todo' | 'done') => {
-      setStatusFilter(filter);
-      localStorage.setItem('flowday-tasks-status-filter', filter);
-    };
+  // Paper list modal
+  const [isPaperListOpen, setIsPaperListOpen] = useState(false);
 
-    // Section collapse state
-    const [scheduledCollapsed, setScheduledCollapsed] = useState(false);
-    const [datelessCollapsed, setDatelessCollapsed] = useState(false);
-    const [completedDatelessCollapsed, setCompletedDatelessCollapsed] = useState(false);
-    const [droppedDatelessCollapsed, setDroppedDatelessCollapsed] = useState(false);
+  // Schedule calendar modal
+  const [scheduleModalTask, setScheduleModalTask] = useState<Task | null>(null);
 
-    // Pagination per section
-    const [scheduledPage, setScheduledPage] = useState(0);
-    const [datelessPageMap, setDatelessPageMap] = useState<Record<string, number>>({});
+  // ─── DnD sensors ──────────────────────────────────────────────────────────
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
-    const datelessPage = datelessPageMap[selectedListId] ?? 0;
-    const setDatelessPage: React.Dispatch<React.SetStateAction<number>> = (value) => {
-      setDatelessPageMap((prev) => {
-        const current = prev[selectedListId] ?? 0;
-        const next = typeof value === 'function' ? value(current) : value;
-        return { ...prev, [selectedListId]: next };
+  // ─── Extract tasks ────────────────────────────────────────────────────────
+  const allTasks = useMemo(() => entries.filter((e): e is Task => e.type === 'task'), [entries]);
+
+  // All dateless tasks for the Paper List (ignores status filter and list filter)
+  const paperListTasks = useMemo(() => {
+    return allTasks
+      .filter((t) => !t.scheduled_at)
+      .sort((a, b) => {
+        const aSort = a.sort_order ?? Infinity;
+        const bSort = b.sort_order ?? Infinity;
+        if (aSort !== bSort) return aSort - bSort;
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
       });
-    };
-    const [completedDatelessPage, setCompletedDatelessPage] = useState(0);
-    const [droppedDatelessPage, setDroppedDatelessPage] = useState(0);
-    const [completedScheduledPage, setCompletedScheduledPage] = useState(0);
+  }, [allTasks]);
 
-    // Optimistic state per section
-    const [optimisticScheduled, setOptimisticScheduled] = useState<Task[] | null>(null);
-    const [optimisticDateless, setOptimisticDateless] = useState<Task[] | null>(null);
-    const [optimisticCompletedDateless, setOptimisticCompletedDateless] = useState<Task[] | null>(
-      null,
-    );
-    const [optimisticDroppedDateless, setOptimisticDroppedDateless] = useState<Task[] | null>(null);
-    const [optimisticCompletedScheduled, setOptimisticCompletedScheduled] = useState<Task[] | null>(
-      null,
-    );
+  // ─── Filter ──────────────────────────────────────────────────────────────
+  const filteredTasks = useMemo(() => {
+    let tasks = allTasks;
 
-    // Move to page modal
-    const [moveToPageModalTask, setMoveToPageModalTask] = useState<Task | null>(null);
+    if (statusFilter === 'todo') {
+      // "Scheduled" view - keep scheduled tasks only (both active and completed)
+      tasks = tasks.filter((t) => t.scheduled_at);
+    } else if (statusFilter === 'done') {
+      tasks = tasks.filter((t) => t.status === 'done');
+    }
 
-    // Status picker modal
-    const [statusPickerTask, setStatusPickerTask] = useState<Task | null>(null);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      tasks = tasks.filter((t) => {
+        const title = (t.title || '').toLowerCase();
+        const content = (t.content || '').toLowerCase();
+        return title.includes(q) || content.includes(q);
+      });
+    }
 
-    // Paper list modal
-    const [isPaperListOpen, setIsPaperListOpen] = useState(false);
+    return tasks;
+  }, [allTasks, statusFilter, searchQuery]);
 
-    // Schedule calendar modal
-    const [scheduleModalTask, setScheduleModalTask] = useState<Task | null>(null);
+  // ─── Split into scheduled, active dateless, completed dateless, dropped dateless, and completed scheduled ──────
+  const {
+    scheduledTasks,
+    datelessTasks,
+    completedDatelessTasks,
+    droppedDatelessTasks,
+    completedScheduledTasks,
+  } = useMemo(() => {
+    const scheduled: Task[] = [];
+    const dateless: Task[] = [];
+    const completedDateless: Task[] = [];
+    const droppedDateless: Task[] = [];
+    const completedScheduled: Task[] = [];
 
-    // ─── DnD sensors ──────────────────────────────────────────────────────────
-    const sensors = useSensors(
-      useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
-      useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-    );
-
-    // ─── Extract tasks ────────────────────────────────────────────────────────
-    const allTasks = useMemo(() => entries.filter((e): e is Task => e.type === 'task'), [entries]);
-
-    // All dateless tasks for the Paper List (ignores status filter and list filter)
-    const paperListTasks = useMemo(() => {
-      return allTasks
-        .filter((t) => !t.scheduled_at)
-        .sort((a, b) => {
-          const aSort = a.sort_order ?? Infinity;
-          const bSort = b.sort_order ?? Infinity;
-          if (aSort !== bSort) return aSort - bSort;
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        });
-    }, [allTasks]);
-
-    // ─── Filter ──────────────────────────────────────────────────────────────
-    const filteredTasks = useMemo(() => {
-      let tasks = allTasks;
-
-      if (statusFilter === 'todo') {
-        // "Scheduled" view - keep scheduled tasks only (both active and completed)
-        tasks = tasks.filter((t) => t.scheduled_at);
-      } else if (statusFilter === 'done') {
-        tasks = tasks.filter((t) => t.status === 'done');
-      }
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        tasks = tasks.filter((t) => {
-          const title = (t.title || '').toLowerCase();
-          const content = (t.content || '').toLowerCase();
-          return title.includes(q) || content.includes(q);
-        });
-      }
-
-      return tasks;
-    }, [allTasks, statusFilter, searchQuery]);
-
-    // ─── Split into scheduled, active dateless, completed dateless, dropped dateless, and completed scheduled ──────
-    const {
-      scheduledTasks,
-      datelessTasks,
-      completedDatelessTasks,
-      droppedDatelessTasks,
-      completedScheduledTasks,
-    } = useMemo(() => {
-      const scheduled: Task[] = [];
-      const dateless: Task[] = [];
-      const completedDateless: Task[] = [];
-      const droppedDateless: Task[] = [];
-      const completedScheduled: Task[] = [];
-
-      filteredTasks.forEach((t) => {
-        if (t.scheduled_at) {
-          if (statusFilter === 'todo') {
-            if (t.status === 'done') {
-              completedScheduled.push(t);
-            } else {
-              scheduled.push(t);
-            }
-          } else if (statusFilter === 'done') {
+    filteredTasks.forEach((t) => {
+      if (t.scheduled_at) {
+        if (statusFilter === 'todo') {
+          if (t.status === 'done') {
             completedScheduled.push(t);
+          } else {
+            scheduled.push(t);
           }
-        } else {
-          // Dateless tasks logic
-          if (statusFilter === 'inbox') {
-            if (t.status === 'done') {
-              completedDateless.push(t);
-            } else if (t.status === 'dropped') {
-              droppedDateless.push(t);
-            } else {
-              dateless.push(t);
-            }
-          } else if (statusFilter === 'done') {
+        } else if (statusFilter === 'done') {
+          completedScheduled.push(t);
+        }
+      } else {
+        // Dateless tasks logic
+        if (statusFilter === 'inbox') {
+          if (t.status === 'done') {
             completedDateless.push(t);
+          } else if (t.status === 'dropped') {
+            droppedDateless.push(t);
+          } else {
+            dateless.push(t);
           }
+        } else if (statusFilter === 'done') {
+          completedDateless.push(t);
         }
-      });
-
-      // Sort scheduled: sort_order, then scheduled_at, then created_at
-      scheduled.sort((a, b) => {
-        const aSort = a.sort_order ?? Infinity;
-        const bSort = b.sort_order ?? Infinity;
-        if (aSort !== bSort) return aSort - bSort;
-        const aSched = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
-        const bSched = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
-        if (aSched !== bSched) return aSched - bSched;
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      });
-
-      // Sort dateless: sort_order, then created_at
-      dateless.sort((a, b) => {
-        const aSort = a.sort_order ?? Infinity;
-        const bSort = b.sort_order ?? Infinity;
-        if (aSort !== bSort) return aSort - bSort;
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      });
-
-      // Sort completed dateless: sort_order, then created_at
-      completedDateless.sort((a, b) => {
-        const aSort = a.sort_order ?? Infinity;
-        const bSort = b.sort_order ?? Infinity;
-        if (aSort !== bSort) return aSort - bSort;
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      });
-
-      // Sort dropped dateless: sort_order, then created_at
-      droppedDateless.sort((a, b) => {
-        const aSort = a.sort_order ?? Infinity;
-        const bSort = b.sort_order ?? Infinity;
-        if (aSort !== bSort) return aSort - bSort;
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      });
-
-      // Sort completed scheduled: sort_order, then scheduled_at, then created_at
-      completedScheduled.sort((a, b) => {
-        const aSort = a.sort_order ?? Infinity;
-        const bSort = b.sort_order ?? Infinity;
-        if (aSort !== bSort) return aSort - bSort;
-        const aSched = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
-        const bSched = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
-        if (aSched !== bSched) return aSched - bSched;
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      });
-
-      return {
-        scheduledTasks: scheduled,
-        datelessTasks: dateless,
-        completedDatelessTasks: completedDateless,
-        droppedDatelessTasks: droppedDateless,
-        completedScheduledTasks: completedScheduled,
-      };
-    }, [filteredTasks, statusFilter]);
-
-    // ─── Display lists (optimistic override) ──────────────────────────────────
-    const displayScheduled = optimisticScheduled ?? scheduledTasks;
-    const displayCompletedScheduled = optimisticCompletedScheduled ?? completedScheduledTasks;
-
-    // Apply list filter to dateless tasks
-    const baseDisplayDateless = optimisticDateless ?? datelessTasks;
-    const listFilteredDateless = useMemo(() => {
-      if (selectedListId === 'all') return baseDisplayDateless;
-      if (selectedListId === 'none')
-        return baseDisplayDateless.filter((t) => {
-          const ids = t.category_ids ?? [];
-          return ids.length === 0 || !taskLists.some((l) => ids.includes(l.id));
-        });
-      return baseDisplayDateless.filter((t) => (t.category_ids ?? []).includes(selectedListId));
-    }, [baseDisplayDateless, selectedListId, taskLists]);
-
-    const baseDisplayCompletedDateless = optimisticCompletedDateless ?? completedDatelessTasks;
-    const listFilteredCompletedDateless = useMemo(() => {
-      if (selectedListId === 'all' || selectedListId === 'none') {
-        return baseDisplayCompletedDateless;
       }
-      return baseDisplayCompletedDateless.filter((t) =>
-        (t.category_ids ?? []).includes(selectedListId),
-      );
-    }, [baseDisplayCompletedDateless, selectedListId]);
+    });
 
-    const baseDisplayDroppedDateless = optimisticDroppedDateless ?? droppedDatelessTasks;
-    const listFilteredDroppedDateless = useMemo(() => {
-      if (selectedListId === 'all' || selectedListId === 'none') {
-        return baseDisplayDroppedDateless;
-      }
-      return baseDisplayDroppedDateless.filter((t) =>
-        (t.category_ids ?? []).includes(selectedListId),
-      );
-    }, [baseDisplayDroppedDateless, selectedListId]);
+    // Sort scheduled: sort_order, then scheduled_at, then created_at
+    scheduled.sort((a, b) => {
+      const aSort = a.sort_order ?? Infinity;
+      const bSort = b.sort_order ?? Infinity;
+      if (aSort !== bSort) return aSort - bSort;
+      const aSched = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
+      const bSched = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
+      if (aSched !== bSched) return aSched - bSched;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
 
-    // Apply dateless status filter ('all' | 'todo' | 'in_progress' | 'done' | 'dropped')
-    const displayDateless = useMemo(() => {
-      if (datelessStateFilter === 'all') return listFilteredDateless;
-      if (datelessStateFilter === 'todo')
-        return listFilteredDateless.filter((t) => t.status === 'todo' || !t.status);
-      if (datelessStateFilter === 'in_progress')
-        return listFilteredDateless.filter((t) => t.status === 'in_progress');
-      return [];
-    }, [listFilteredDateless, datelessStateFilter]);
+    // Sort dateless: sort_order, then created_at
+    dateless.sort((a, b) => {
+      const aSort = a.sort_order ?? Infinity;
+      const bSort = b.sort_order ?? Infinity;
+      if (aSort !== bSort) return aSort - bSort;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
 
-    const displayCompletedDateless = useMemo(() => {
-      if (datelessStateFilter === 'all' || datelessStateFilter === 'done') {
-        return listFilteredCompletedDateless;
-      }
-      return [];
-    }, [listFilteredCompletedDateless, datelessStateFilter]);
+    // Sort completed dateless: sort_order, then created_at
+    completedDateless.sort((a, b) => {
+      const aSort = a.sort_order ?? Infinity;
+      const bSort = b.sort_order ?? Infinity;
+      if (aSort !== bSort) return aSort - bSort;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
 
-    const displayDroppedDateless = useMemo(() => {
-      if (datelessStateFilter === 'all' || datelessStateFilter === 'dropped') {
-        return listFilteredDroppedDateless;
-      }
-      return [];
-    }, [listFilteredDroppedDateless, datelessStateFilter]);
+    // Sort dropped dateless: sort_order, then created_at
+    droppedDateless.sort((a, b) => {
+      const aSort = a.sort_order ?? Infinity;
+      const bSort = b.sort_order ?? Infinity;
+      if (aSort !== bSort) return aSort - bSort;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
 
-    // ─── Pagination ────────────────────────────────────────────────────────────
-    const scheduledTotalPages = Math.max(1, Math.ceil(displayScheduled.length / PAGE_SIZE));
-    const datelessTotalPages = Math.max(1, Math.ceil(displayDateless.length / PAGE_SIZE));
-    const completedDatelessTotalPages = Math.max(
-      1,
-      Math.ceil(displayCompletedDateless.length / PAGE_SIZE),
-    );
-    const droppedDatelessTotalPages = Math.max(
-      1,
-      Math.ceil(displayDroppedDateless.length / PAGE_SIZE),
-    );
-    const completedScheduledTotalPages = Math.max(
-      1,
-      Math.ceil(displayCompletedScheduled.length / PAGE_SIZE),
-    );
+    // Sort completed scheduled: sort_order, then scheduled_at, then created_at
+    completedScheduled.sort((a, b) => {
+      const aSort = a.sort_order ?? Infinity;
+      const bSort = b.sort_order ?? Infinity;
+      if (aSort !== bSort) return aSort - bSort;
+      const aSched = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
+      const bSched = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
+      if (aSched !== bSched) return aSched - bSched;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
 
-    // Reset pages when filters change
-    React.useEffect(() => {
-      setScheduledPage(0);
-      setDatelessPageMap({});
-      setCompletedDatelessPage(0);
-      setDroppedDatelessPage(0);
-      setCompletedScheduledPage(0);
-    }, [statusFilter, searchQuery]);
-
-    // Starred selection modal state
-    const [isStarModalOpen, setIsStarModalOpen] = useState(false);
-
-    // ─── DragEnd Handlers ─────────────────────────────────────────────────────
-    const createDragEndHandler = useCallback(
-      (
-        displayList: Task[],
-        safePage: number,
-        setOptimistic: React.Dispatch<React.SetStateAction<Task[] | null>>,
-        filteredList: Task[],
-      ) =>
-        async (event: DragEndEvent) => {
-          const { active, over } = event;
-          if (!over || active.id === over.id) return;
-
-          const pageTasks = displayList.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
-          const pageIds = pageTasks.map((t) => t.id);
-          const oldIndex = pageIds.indexOf(active.id as string);
-          const newIndex = pageIds.indexOf(over.id as string);
-          if (oldIndex === -1 || newIndex === -1) return;
-
-          const reorderedIds = arrayMove(pageIds, oldIndex, newIndex);
-
-          setOptimistic((prev) => {
-            const base = prev ?? filteredList;
-            const idSet = new Set(reorderedIds);
-            const rest = base.filter((t) => !idSet.has(t.id));
-            const reorderedPage = reorderedIds
-              .map((id) => base.find((t) => t.id === id)!)
-              .filter(Boolean);
-            const pageStart = safePage * PAGE_SIZE;
-            const before = rest.slice(0, pageStart);
-            const after = rest.slice(pageStart);
-            return [...before, ...reorderedPage, ...after];
-          });
-
-          for (let i = 0; i < reorderedIds.length; i++) {
-            await db.entries.update(reorderedIds[i], {
-              sort_order: safePage * PAGE_SIZE + i,
-            } as any);
-          }
-
-          setTimeout(() => setOptimistic(null), 2000);
-        },
-      [],
-    );
-
-    const scheduledSafePage = Math.min(scheduledPage, scheduledTotalPages - 1);
-    const datelessSafePage = Math.min(datelessPage, datelessTotalPages - 1);
-    const completedDatelessSafePage = Math.min(
-      completedDatelessPage,
-      completedDatelessTotalPages - 1,
-    );
-    const droppedDatelessSafePage = Math.min(
-      droppedDatelessPage,
-      droppedDatelessTotalPages - 1,
-    );
-    const completedScheduledSafePage = Math.min(
-      completedScheduledPage,
-      completedScheduledTotalPages - 1,
-    );
-
-    const handleScheduledDragEnd = useMemo(
-      () =>
-        createDragEndHandler(
-          displayScheduled,
-          scheduledSafePage,
-          setOptimisticScheduled,
-          scheduledTasks,
-        ),
-      [createDragEndHandler, displayScheduled, scheduledSafePage, scheduledTasks],
-    );
-
-    const handleDatelessDragEnd = useMemo(
-      () =>
-        createDragEndHandler(displayDateless, datelessSafePage, setOptimisticDateless, datelessTasks),
-      [createDragEndHandler, displayDateless, datelessSafePage, datelessTasks],
-    );
-
-    const handleCompletedDatelessDragEnd = useMemo(
-      () =>
-        createDragEndHandler(
-          displayCompletedDateless,
-          completedDatelessSafePage,
-          setOptimisticCompletedDateless,
-          completedDatelessTasks,
-        ),
-      [
-        createDragEndHandler,
-        displayCompletedDateless,
-        completedDatelessSafePage,
-        completedDatelessTasks,
-      ],
-    );
-
-    const handleDroppedDatelessDragEnd = useMemo(
-      () =>
-        createDragEndHandler(
-          displayDroppedDateless,
-          droppedDatelessSafePage,
-          setOptimisticDroppedDateless,
-          droppedDatelessTasks,
-        ),
-      [
-        createDragEndHandler,
-        displayDroppedDateless,
-        droppedDatelessSafePage,
-        droppedDatelessTasks,
-      ],
-    );
-
-    const handleCompletedScheduledDragEnd = useMemo(
-      () =>
-        createDragEndHandler(
-          displayCompletedScheduled,
-          completedScheduledSafePage,
-          setOptimisticCompletedScheduled,
-          completedScheduledTasks,
-        ),
-      [
-        createDragEndHandler,
-        displayCompletedScheduled,
-        completedScheduledSafePage,
-        completedScheduledTasks,
-      ],
-    );
-
-    // ─── MoveToPage Handlers ──────────────────────────────────────────────────
-    const createMoveToPageHandler = useCallback(
-      (
-        displayList: Task[],
-        safePage: number,
-        setOptimistic: React.Dispatch<React.SetStateAction<Task[] | null>>,
-        setPageFn: React.Dispatch<React.SetStateAction<number>>,
-      ) =>
-        async (taskId: string, targetPage: number) => {
-          if (targetPage === safePage) {
-            setMoveToPageModalTask(null);
-            return;
-          }
-
-          const fullList = [...displayList];
-          const movedIdx = fullList.findIndex((t) => t.id === taskId);
-          if (movedIdx === -1) {
-            setMoveToPageModalTask(null);
-            return;
-          }
-
-          const [movedTask] = fullList.splice(movedIdx, 1);
-          const insertAt = targetPage * PAGE_SIZE;
-          fullList.splice(insertAt, 0, movedTask);
-
-          setOptimistic(fullList);
-
-          await db.transaction('rw', db.entries, async () => {
-            for (let i = 0; i < fullList.length; i++) {
-              await db.entries.update(fullList[i].id, { sort_order: i } as any);
-            }
-          });
-
-          setPageFn(targetPage);
-          setMoveToPageModalTask(null);
-          setTimeout(() => setOptimistic(null), 2000);
-        },
-      [setMoveToPageModalTask],
-    );
-
-    const handleScheduledMoveToPage = useMemo(
-      () =>
-        createMoveToPageHandler(
-          displayScheduled,
-          scheduledSafePage,
-          setOptimisticScheduled,
-          setScheduledPage,
-        ),
-      [createMoveToPageHandler, displayScheduled, scheduledSafePage],
-    );
-
-    const handleDatelessMoveToPage = useMemo(
-      () =>
-        createMoveToPageHandler(
-          displayDateless,
-          datelessSafePage,
-          setOptimisticDateless,
-          setDatelessPage,
-        ),
-      [createMoveToPageHandler, displayDateless, datelessSafePage],
-    );
-
-    const handleCompletedDatelessMoveToPage = useMemo(
-      () =>
-        createMoveToPageHandler(
-          displayCompletedDateless,
-          completedDatelessSafePage,
-          setOptimisticCompletedDateless,
-          setCompletedDatelessPage,
-        ),
-      [createMoveToPageHandler, displayCompletedDateless, completedDatelessSafePage],
-    );
-
-    const handleDroppedDatelessMoveToPage = useMemo(
-      () =>
-        createMoveToPageHandler(
-          displayDroppedDateless,
-          droppedDatelessSafePage,
-          setOptimisticDroppedDateless,
-          setDroppedDatelessPage,
-        ),
-      [createMoveToPageHandler, displayDroppedDateless, droppedDatelessSafePage],
-    );
-
-    const handleCompletedScheduledMoveToPage = useMemo(
-      () =>
-        createMoveToPageHandler(
-          displayCompletedScheduled,
-          completedScheduledSafePage,
-          setOptimisticCompletedScheduled,
-          setCompletedScheduledPage,
-        ),
-      [createMoveToPageHandler, displayCompletedScheduled, completedScheduledSafePage],
-    );
-
-    // ─── Close list picker on outside click ───────────────────────────────────
-    const [listPickerTaskId, setListPickerTaskId] = useState<string | null>(null);
-
-    useEffect(() => {
-      if (!listPickerTaskId) return;
-      const handler = (e: MouseEvent) => {
-        const target = e.target as HTMLElement;
-        if (!target.closest('[data-list-picker]')) {
-          setListPickerTaskId(null);
-        }
-      };
-      document.addEventListener('mousedown', handler);
-      return () => document.removeEventListener('mousedown', handler);
-    }, [listPickerTaskId]);
-
-    // ─── Schedule handlers ───────────────────────────────────────────────────
-    const handleSelectDate = async (taskId: string, date: Date) => {
-      await db.entries.update(taskId, { scheduled_at: date } as any);
+    return {
+      scheduledTasks: scheduled,
+      datelessTasks: dateless,
+      completedDatelessTasks: completedDateless,
+      droppedDatelessTasks: droppedDateless,
+      completedScheduledTasks: completedScheduled,
     };
+  }, [filteredTasks, statusFilter]);
 
-    const handleUnschedule = async (taskId: string) => {
-      await db.entries.update(taskId, { scheduled_at: undefined } as any);
-    };
+  // ─── Display lists (optimistic override) ──────────────────────────────────
+  const displayScheduled = optimisticScheduled ?? scheduledTasks;
+  const displayCompletedScheduled = optimisticCompletedScheduled ?? completedScheduledTasks;
 
-    const formatScheduledBadge = (
-      task: Task,
-    ): { label: string; isOverdue: boolean } | null => {
-      if (!task.scheduled_at) return null;
-      const d = new Date(task.scheduled_at);
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const targetDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-      const diffDays = Math.round((targetDay.getTime() - today.getTime()) / 86400000);
-
-      if (diffDays === 0) return { label: 'Today', isOverdue: false };
-      if (diffDays === 1) return { label: 'Tomorrow', isOverdue: false };
-      if (diffDays === -1) return { label: 'Yesterday', isOverdue: true };
-      if (diffDays < -1) return { label: `${Math.abs(diffDays)}d ago`, isOverdue: true };
-      if (diffDays <= 7) return { label: `${diffDays}d left`, isOverdue: false };
-      return {
-        label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        isOverdue: false,
-      };
-    };
-
-    // ─── Per-list task counts for sidebar ────────────────────────────────────
-    const listTaskCounts = useMemo(() => {
-      const counts: Record<string, { active: number; done: number }> = {};
-      const datelessAll = allTasks.filter((t) => !t.scheduled_at);
-
-      // 'all'
-      counts['all'] = {
-        active: datelessAll.filter((t) => t.status !== 'done' && t.status !== 'dropped').length,
-        done: datelessAll.filter((t) => t.status === 'done').length,
-      };
-
-      // 'none' — tasks that belong to no known list
-      const noneTasks = datelessAll.filter((t) => {
+  // Apply list filter to dateless tasks
+  const baseDisplayDateless = optimisticDateless ?? datelessTasks;
+  const listFilteredDateless = useMemo(() => {
+    if (selectedListId === 'all') return baseDisplayDateless;
+    if (selectedListId === 'none')
+      return baseDisplayDateless.filter((t) => {
         const ids = t.category_ids ?? [];
         return ids.length === 0 || !taskLists.some((l) => ids.includes(l.id));
       });
-      counts['none'] = {
-        active: noneTasks.filter((t) => t.status !== 'done' && t.status !== 'dropped').length,
-        done: noneTasks.filter((t) => t.status === 'done').length,
-      };
+    return baseDisplayDateless.filter((t) => (t.category_ids ?? []).includes(selectedListId));
+  }, [baseDisplayDateless, selectedListId, taskLists]);
 
-      // per-list
-      taskLists.forEach((list) => {
-        const listTasks = datelessAll.filter((t) => (t.category_ids ?? []).includes(list.id));
-        counts[list.id] = {
-          active: listTasks.filter((t) => t.status !== 'done' && t.status !== 'dropped').length,
-          done: listTasks.filter((t) => t.status === 'done').length,
-        };
-      });
+  const baseDisplayCompletedDateless = optimisticCompletedDateless ?? completedDatelessTasks;
+  const listFilteredCompletedDateless = useMemo(() => {
+    if (selectedListId === 'all' || selectedListId === 'none') {
+      return baseDisplayCompletedDateless;
+    }
+    return baseDisplayCompletedDateless.filter((t) =>
+      (t.category_ids ?? []).includes(selectedListId),
+    );
+  }, [baseDisplayCompletedDateless, selectedListId]);
 
-      return counts;
-    }, [allTasks, taskLists]);
+  const baseDisplayDroppedDateless = optimisticDroppedDateless ?? droppedDatelessTasks;
+  const listFilteredDroppedDateless = useMemo(() => {
+    if (selectedListId === 'all' || selectedListId === 'none') {
+      return baseDisplayDroppedDateless;
+    }
+    return baseDisplayDroppedDateless.filter((t) =>
+      (t.category_ids ?? []).includes(selectedListId),
+    );
+  }, [baseDisplayDroppedDateless, selectedListId]);
 
-    const LIST_COLORS: Record<string, { active: string; dot: string; glow: string }> = {
-      violet: {
-        active: 'bg-violet-500/10 border-violet-500/30 text-violet-300',
-        dot: 'bg-violet-500',
-        glow: 'text-violet-400',
+  // Apply dateless status filter ('all' | 'todo' | 'in_progress' | 'done' | 'dropped')
+  const displayDateless = useMemo(() => {
+    if (datelessStateFilter === 'all') return listFilteredDateless;
+    if (datelessStateFilter === 'todo')
+      return listFilteredDateless.filter((t) => t.status === 'todo' || !t.status);
+    if (datelessStateFilter === 'in_progress')
+      return listFilteredDateless.filter((t) => t.status === 'in_progress');
+    return [];
+  }, [listFilteredDateless, datelessStateFilter]);
+
+  const displayCompletedDateless = useMemo(() => {
+    if (datelessStateFilter === 'all' || datelessStateFilter === 'done') {
+      return listFilteredCompletedDateless;
+    }
+    return [];
+  }, [listFilteredCompletedDateless, datelessStateFilter]);
+
+  const displayDroppedDateless = useMemo(() => {
+    if (datelessStateFilter === 'all' || datelessStateFilter === 'dropped') {
+      return listFilteredDroppedDateless;
+    }
+    return [];
+  }, [listFilteredDroppedDateless, datelessStateFilter]);
+
+  // ─── Pagination ────────────────────────────────────────────────────────────
+  const scheduledTotalPages = Math.max(1, Math.ceil(displayScheduled.length / PAGE_SIZE));
+  const datelessTotalPages = Math.max(1, Math.ceil(displayDateless.length / PAGE_SIZE));
+  const completedDatelessTotalPages = Math.max(
+    1,
+    Math.ceil(displayCompletedDateless.length / PAGE_SIZE),
+  );
+  const droppedDatelessTotalPages = Math.max(
+    1,
+    Math.ceil(displayDroppedDateless.length / PAGE_SIZE),
+  );
+  const completedScheduledTotalPages = Math.max(
+    1,
+    Math.ceil(displayCompletedScheduled.length / PAGE_SIZE),
+  );
+
+  // Reset pages when filters change
+  React.useEffect(() => {
+    setScheduledPage(0);
+    setDatelessPageMap({});
+    setCompletedDatelessPage(0);
+    setDroppedDatelessPage(0);
+    setCompletedScheduledPage(0);
+  }, [statusFilter, searchQuery]);
+
+  // Starred selection modal state
+  const [isStarModalOpen, setIsStarModalOpen] = useState(false);
+
+  // ─── DragEnd Handlers ─────────────────────────────────────────────────────
+  const createDragEndHandler = useCallback(
+    (
+      displayList: Task[],
+      safePage: number,
+      setOptimistic: React.Dispatch<React.SetStateAction<Task[] | null>>,
+      filteredList: Task[],
+    ) =>
+      async (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        const pageTasks = displayList.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+        const pageIds = pageTasks.map((t) => t.id);
+        const oldIndex = pageIds.indexOf(active.id as string);
+        const newIndex = pageIds.indexOf(over.id as string);
+        if (oldIndex === -1 || newIndex === -1) return;
+
+        const reorderedIds = arrayMove(pageIds, oldIndex, newIndex);
+
+        setOptimistic((prev) => {
+          const base = prev ?? filteredList;
+          const idSet = new Set(reorderedIds);
+          const rest = base.filter((t) => !idSet.has(t.id));
+          const reorderedPage = reorderedIds
+            .map((id) => base.find((t) => t.id === id)!)
+            .filter(Boolean);
+          const pageStart = safePage * PAGE_SIZE;
+          const before = rest.slice(0, pageStart);
+          const after = rest.slice(pageStart);
+          return [...before, ...reorderedPage, ...after];
+        });
+
+        for (let i = 0; i < reorderedIds.length; i++) {
+          await db.entries.update(reorderedIds[i], {
+            sort_order: safePage * PAGE_SIZE + i,
+          } as any);
+        }
+
+        setTimeout(() => setOptimistic(null), 2000);
       },
-      sky: {
-        active: 'bg-sky-500/10 border-sky-500/30 text-sky-300',
-        dot: 'bg-sky-500',
-        glow: 'text-sky-400',
+    [],
+  );
+
+  const scheduledSafePage = Math.min(scheduledPage, scheduledTotalPages - 1);
+  const datelessSafePage = Math.min(datelessPage, datelessTotalPages - 1);
+  const completedDatelessSafePage = Math.min(
+    completedDatelessPage,
+    completedDatelessTotalPages - 1,
+  );
+  const droppedDatelessSafePage = Math.min(droppedDatelessPage, droppedDatelessTotalPages - 1);
+  const completedScheduledSafePage = Math.min(
+    completedScheduledPage,
+    completedScheduledTotalPages - 1,
+  );
+
+  const handleScheduledDragEnd = useMemo(
+    () =>
+      createDragEndHandler(
+        displayScheduled,
+        scheduledSafePage,
+        setOptimisticScheduled,
+        scheduledTasks,
+      ),
+    [createDragEndHandler, displayScheduled, scheduledSafePage, scheduledTasks],
+  );
+
+  const handleDatelessDragEnd = useMemo(
+    () =>
+      createDragEndHandler(displayDateless, datelessSafePage, setOptimisticDateless, datelessTasks),
+    [createDragEndHandler, displayDateless, datelessSafePage, datelessTasks],
+  );
+
+  const handleCompletedDatelessDragEnd = useMemo(
+    () =>
+      createDragEndHandler(
+        displayCompletedDateless,
+        completedDatelessSafePage,
+        setOptimisticCompletedDateless,
+        completedDatelessTasks,
+      ),
+    [
+      createDragEndHandler,
+      displayCompletedDateless,
+      completedDatelessSafePage,
+      completedDatelessTasks,
+    ],
+  );
+
+  const handleDroppedDatelessDragEnd = useMemo(
+    () =>
+      createDragEndHandler(
+        displayDroppedDateless,
+        droppedDatelessSafePage,
+        setOptimisticDroppedDateless,
+        droppedDatelessTasks,
+      ),
+    [createDragEndHandler, displayDroppedDateless, droppedDatelessSafePage, droppedDatelessTasks],
+  );
+
+  const handleCompletedScheduledDragEnd = useMemo(
+    () =>
+      createDragEndHandler(
+        displayCompletedScheduled,
+        completedScheduledSafePage,
+        setOptimisticCompletedScheduled,
+        completedScheduledTasks,
+      ),
+    [
+      createDragEndHandler,
+      displayCompletedScheduled,
+      completedScheduledSafePage,
+      completedScheduledTasks,
+    ],
+  );
+
+  // ─── MoveToPage Handlers ──────────────────────────────────────────────────
+  const createMoveToPageHandler = useCallback(
+    (
+      displayList: Task[],
+      safePage: number,
+      setOptimistic: React.Dispatch<React.SetStateAction<Task[] | null>>,
+      setPageFn: React.Dispatch<React.SetStateAction<number>>,
+    ) =>
+      async (taskId: string, targetPage: number) => {
+        if (targetPage === safePage) {
+          setMoveToPageModalTask(null);
+          return;
+        }
+
+        const fullList = [...displayList];
+        const movedIdx = fullList.findIndex((t) => t.id === taskId);
+        if (movedIdx === -1) {
+          setMoveToPageModalTask(null);
+          return;
+        }
+
+        const [movedTask] = fullList.splice(movedIdx, 1);
+        const insertAt = targetPage * PAGE_SIZE;
+        fullList.splice(insertAt, 0, movedTask);
+
+        setOptimistic(fullList);
+
+        await db.transaction('rw', db.entries, async () => {
+          for (let i = 0; i < fullList.length; i++) {
+            await db.entries.update(fullList[i].id, { sort_order: i } as any);
+          }
+        });
+
+        setPageFn(targetPage);
+        setMoveToPageModalTask(null);
+        setTimeout(() => setOptimistic(null), 2000);
       },
-      emerald: {
-        active: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300',
-        dot: 'bg-emerald-500',
-        glow: 'text-emerald-400',
-      },
-      amber: {
-        active: 'bg-amber-500/10 border-amber-500/30 text-amber-300',
-        dot: 'bg-amber-500',
-        glow: 'text-amber-400',
-      },
-      rose: {
-        active: 'bg-rose-500/10 border-rose-500/30 text-rose-300',
-        dot: 'bg-rose-500',
-        glow: 'text-rose-400',
-      },
-      indigo: {
-        active: 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300',
-        dot: 'bg-indigo-500',
-        glow: 'text-indigo-400',
-      },
-      teal: {
-        active: 'bg-teal-500/10 border-teal-500/30 text-teal-300',
-        dot: 'bg-teal-500',
-        glow: 'text-teal-400',
-      },
-      orange: {
-        active: 'bg-orange-500/10 border-orange-500/30 text-orange-300',
-        dot: 'bg-orange-500',
-        glow: 'text-orange-400',
-      },
+    [setMoveToPageModalTask],
+  );
+
+  const handleScheduledMoveToPage = useMemo(
+    () =>
+      createMoveToPageHandler(
+        displayScheduled,
+        scheduledSafePage,
+        setOptimisticScheduled,
+        setScheduledPage,
+      ),
+    [createMoveToPageHandler, displayScheduled, scheduledSafePage],
+  );
+
+  const handleDatelessMoveToPage = useMemo(
+    () =>
+      createMoveToPageHandler(
+        displayDateless,
+        datelessSafePage,
+        setOptimisticDateless,
+        setDatelessPage,
+      ),
+    [createMoveToPageHandler, displayDateless, datelessSafePage],
+  );
+
+  const handleCompletedDatelessMoveToPage = useMemo(
+    () =>
+      createMoveToPageHandler(
+        displayCompletedDateless,
+        completedDatelessSafePage,
+        setOptimisticCompletedDateless,
+        setCompletedDatelessPage,
+      ),
+    [createMoveToPageHandler, displayCompletedDateless, completedDatelessSafePage],
+  );
+
+  const handleDroppedDatelessMoveToPage = useMemo(
+    () =>
+      createMoveToPageHandler(
+        displayDroppedDateless,
+        droppedDatelessSafePage,
+        setOptimisticDroppedDateless,
+        setDroppedDatelessPage,
+      ),
+    [createMoveToPageHandler, displayDroppedDateless, droppedDatelessSafePage],
+  );
+
+  const handleCompletedScheduledMoveToPage = useMemo(
+    () =>
+      createMoveToPageHandler(
+        displayCompletedScheduled,
+        completedScheduledSafePage,
+        setOptimisticCompletedScheduled,
+        setCompletedScheduledPage,
+      ),
+    [createMoveToPageHandler, displayCompletedScheduled, completedScheduledSafePage],
+  );
+
+  // ─── Close list picker on outside click ───────────────────────────────────
+  const [listPickerTaskId, setListPickerTaskId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!listPickerTaskId) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-list-picker]')) {
+        setListPickerTaskId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [listPickerTaskId]);
+
+  // ─── Schedule handlers ───────────────────────────────────────────────────
+  const handleSelectDate = async (taskId: string, date: Date) => {
+    await db.entries.update(taskId, { scheduled_at: date } as any);
+  };
+
+  const handleUnschedule = async (taskId: string) => {
+    await db.entries.update(taskId, { scheduled_at: undefined } as any);
+  };
+
+  const formatScheduledBadge = (task: Task): { label: string; isOverdue: boolean } | null => {
+    if (!task.scheduled_at) return null;
+    const d = new Date(task.scheduled_at);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const targetDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diffDays = Math.round((targetDay.getTime() - today.getTime()) / 86400000);
+
+    if (diffDays === 0) return { label: 'Today', isOverdue: false };
+    if (diffDays === 1) return { label: 'Tomorrow', isOverdue: false };
+    if (diffDays === -1) return { label: 'Yesterday', isOverdue: true };
+    if (diffDays < -1) return { label: `${Math.abs(diffDays)}d ago`, isOverdue: true };
+    if (diffDays <= 7) return { label: `${diffDays}d left`, isOverdue: false };
+    return {
+      label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      isOverdue: false,
+    };
+  };
+
+  // ─── Per-list task counts for sidebar ────────────────────────────────────
+  const listTaskCounts = useMemo(() => {
+    const counts: Record<string, { active: number; done: number }> = {};
+    const datelessAll = allTasks.filter((t) => !t.scheduled_at);
+
+    // 'all'
+    counts['all'] = {
+      active: datelessAll.filter((t) => t.status !== 'done' && t.status !== 'dropped').length,
+      done: datelessAll.filter((t) => t.status === 'done').length,
     };
 
-    // State filter buttons for Lists view
-    const stateFilterButtons = (
-      <div className="flex items-center gap-1 bg-[#0d0d0d] border border-stone-800/80 rounded-lg p-0.5 shrink-0">
-        {(['all', 'todo', 'in_progress', 'done', 'dropped'] as const).map((st) => (
-          <button
-            key={st}
-            onClick={() => {
-              setDatelessStateFilter(st);
-              localStorage.setItem('flowday-tasks-dateless-state-filter', st);
-            }}
-            className={`px-2 py-1 text-[9px] font-mono font-bold uppercase tracking-wider rounded-md transition-all cursor-pointer ${
-              datelessStateFilter === st
-                ? st === 'in_progress'
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
-                  : st === 'done'
+    // 'none' — tasks that belong to no known list
+    const noneTasks = datelessAll.filter((t) => {
+      const ids = t.category_ids ?? [];
+      return ids.length === 0 || !taskLists.some((l) => ids.includes(l.id));
+    });
+    counts['none'] = {
+      active: noneTasks.filter((t) => t.status !== 'done' && t.status !== 'dropped').length,
+      done: noneTasks.filter((t) => t.status === 'done').length,
+    };
+
+    // per-list
+    taskLists.forEach((list) => {
+      const listTasks = datelessAll.filter((t) => (t.category_ids ?? []).includes(list.id));
+      counts[list.id] = {
+        active: listTasks.filter((t) => t.status !== 'done' && t.status !== 'dropped').length,
+        done: listTasks.filter((t) => t.status === 'done').length,
+      };
+    });
+
+    return counts;
+  }, [allTasks, taskLists]);
+
+  const LIST_COLORS: Record<string, { active: string; dot: string; glow: string }> = {
+    violet: {
+      active: 'bg-violet-500/10 border-violet-500/30 text-violet-300',
+      dot: 'bg-violet-500',
+      glow: 'text-violet-400',
+    },
+    sky: {
+      active: 'bg-sky-500/10 border-sky-500/30 text-sky-300',
+      dot: 'bg-sky-500',
+      glow: 'text-sky-400',
+    },
+    emerald: {
+      active: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300',
+      dot: 'bg-emerald-500',
+      glow: 'text-emerald-400',
+    },
+    amber: {
+      active: 'bg-amber-500/10 border-amber-500/30 text-amber-300',
+      dot: 'bg-amber-500',
+      glow: 'text-amber-400',
+    },
+    rose: {
+      active: 'bg-rose-500/10 border-rose-500/30 text-rose-300',
+      dot: 'bg-rose-500',
+      glow: 'text-rose-400',
+    },
+    indigo: {
+      active: 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300',
+      dot: 'bg-indigo-500',
+      glow: 'text-indigo-400',
+    },
+    teal: {
+      active: 'bg-teal-500/10 border-teal-500/30 text-teal-300',
+      dot: 'bg-teal-500',
+      glow: 'text-teal-400',
+    },
+    orange: {
+      active: 'bg-orange-500/10 border-orange-500/30 text-orange-300',
+      dot: 'bg-orange-500',
+      glow: 'text-orange-400',
+    },
+  };
+
+  // State filter buttons for Lists view
+  const stateFilterButtons = (
+    <div className="flex items-center gap-1 bg-[#0d0d0d] border border-stone-800/80 rounded-lg p-0.5 shrink-0">
+      {(['all', 'todo', 'in_progress', 'done', 'dropped'] as const).map((st) => (
+        <button
+          key={st}
+          onClick={() => {
+            setDatelessStateFilter(st);
+            localStorage.setItem('flowday-tasks-dateless-state-filter', st);
+          }}
+          className={`px-2 py-1 text-[9px] font-mono font-bold uppercase tracking-wider rounded-md transition-all cursor-pointer ${
+            datelessStateFilter === st
+              ? st === 'in_progress'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                : st === 'done'
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
                   : st === 'dropped'
-                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm'
-                  : 'bg-stone-800 text-stone-200 shadow-sm border border-stone-700'
-                : 'text-stone-500 hover:text-stone-300 border border-transparent'
-            }`}
-          >
-            {st === 'all'
-              ? 'All'
-              : st === 'todo'
+                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm'
+                    : 'bg-stone-800 text-stone-200 shadow-sm border border-stone-700'
+              : 'text-stone-500 hover:text-stone-300 border border-transparent'
+          }`}
+        >
+          {st === 'all'
+            ? 'All'
+            : st === 'todo'
               ? 'To Do'
               : st === 'in_progress'
-              ? 'In Progress'
-              : st === 'done'
-              ? 'Completed'
-              : 'Dropped'}
-          </button>
-        ))}
-      </div>
-    );
+                ? 'In Progress'
+                : st === 'done'
+                  ? 'Completed'
+                  : 'Dropped'}
+        </button>
+      ))}
+    </div>
+  );
 
-    // ─── Task section content (shared between mobile & desktop right column) ──
-    const taskSectionsContent = (
-      <>
-        {/* Dateless Tasks Section (renders in 'inbox' (Lists) mode) */}
-        {statusFilter === 'inbox' &&
-          (displayDateless.length > 0 ||
-            (datelessStateFilter !== 'all' &&
-              displayCompletedDateless.length === 0 &&
-              displayDroppedDateless.length === 0) ||
-            (displayCompletedDateless.length === 0 && displayDroppedDateless.length === 0)) && (
-            <TaskSection
-              label={
-                datelessStateFilter === 'in_progress'
-                  ? 'In Progress'
-                  : datelessStateFilter === 'todo'
-                  ? 'To Do'
-                  : 'Dateless'
-              }
-              icon={
-                datelessStateFilter === 'in_progress' ? (
-                  <CircleDashed className="w-3.5 h-3.5 text-amber-400" />
-                ) : (
-                  <Inbox className="w-3.5 h-3.5 text-violet-400" />
-                )
-              }
-              accentColor={datelessStateFilter === 'in_progress' ? 'amber' : 'violet'}
-              tasks={displayDateless}
-              isCollapsed={datelessCollapsed}
-              onToggleCollapse={() => setDatelessCollapsed((p) => !p)}
-              deletingId={deletingId}
-              activeTaskId={activeTaskId}
-              totalPages={datelessTotalPages}
-              page={datelessPage}
-              setPage={setDatelessPage}
-              onDeleteEntry={onDeleteEntry}
-              onOpenDetail={onOpenDetail}
-              onToggleTaskStatus={onToggleTaskStatus}
-              onOpenStatusModal={setStatusPickerTask}
-              onActivateTask={onActivateTask}
-              onOpenScheduleModal={setScheduleModalTask}
-              formatTime={formatTime}
-              sensors={sensors}
-              onDragEnd={handleDatelessDragEnd}
-              handleMoveToPage={handleDatelessMoveToPage}
-              formatScheduledBadge={formatScheduledBadge}
-              setActiveDate={setActiveDate}
-              taskLists={taskLists}
-              listPickerTaskId={listPickerTaskId}
-              setListPickerTaskId={setListPickerTaskId}
-              moveToPageModalTask={moveToPageModalTask}
-              setMoveToPageModalTask={setMoveToPageModalTask}
-              showContent={showContent}
-              selectedListId={selectedListId}
-            />
-          )}
-
-        {/* Completed Dateless Tasks Section (Renders in 'inbox' (Lists) or 'done' mode) */}
-        {(statusFilter === 'inbox' || statusFilter === 'done') &&
-          displayCompletedDateless.length > 0 && (
-            <TaskSection
-              label={statusFilter === 'done' ? 'Completed Dateless' : 'Dateless Completed'}
-              icon={<Check className="w-3.5 h-3.5 text-emerald-400" />}
-              accentColor="emerald"
-              tasks={displayCompletedDateless}
-              isCollapsed={completedDatelessCollapsed}
-              onToggleCollapse={() => setCompletedDatelessCollapsed((p) => !p)}
-              deletingId={deletingId}
-              activeTaskId={activeTaskId}
-              totalPages={completedDatelessTotalPages}
-              page={completedDatelessPage}
-              setPage={setCompletedDatelessPage}
-              onDeleteEntry={onDeleteEntry}
-              onOpenDetail={onOpenDetail}
-              onToggleTaskStatus={onToggleTaskStatus}
-              onOpenStatusModal={setStatusPickerTask}
-              onActivateTask={onActivateTask}
-              onOpenScheduleModal={setScheduleModalTask}
-              formatTime={formatTime}
-              sensors={sensors}
-              onDragEnd={handleCompletedDatelessDragEnd}
-              handleMoveToPage={handleCompletedDatelessMoveToPage}
-              formatScheduledBadge={formatScheduledBadge}
-              setActiveDate={setActiveDate}
-              taskLists={taskLists}
-              listPickerTaskId={listPickerTaskId}
-              setListPickerTaskId={setListPickerTaskId}
-              moveToPageModalTask={moveToPageModalTask}
-              setMoveToPageModalTask={setMoveToPageModalTask}
-              showContent={showContent}
-              selectedListId={selectedListId}
-            />
-          )}
-
-        {/* Dropped Dateless Tasks Section (Renders in 'inbox' (Lists) mode) */}
-        {statusFilter === 'inbox' && displayDroppedDateless.length > 0 && (
+  // ─── Task section content (shared between mobile & desktop right column) ──
+  const taskSectionsContent = (
+    <>
+      {/* Dateless Tasks Section (renders in 'inbox' (Lists) mode) */}
+      {statusFilter === 'inbox' &&
+        (displayDateless.length > 0 ||
+          (datelessStateFilter !== 'all' &&
+            displayCompletedDateless.length === 0 &&
+            displayDroppedDateless.length === 0) ||
+          (displayCompletedDateless.length === 0 && displayDroppedDateless.length === 0)) && (
           <TaskSection
-            label="Dateless Dropped"
-            icon={<X className="w-3.5 h-3.5 text-rose-400 stroke-[2.5]" />}
-            accentColor="rose"
-            tasks={displayDroppedDateless}
-            isCollapsed={droppedDatelessCollapsed}
-            onToggleCollapse={() => setDroppedDatelessCollapsed((p) => !p)}
+            label={
+              datelessStateFilter === 'in_progress'
+                ? 'In Progress'
+                : datelessStateFilter === 'todo'
+                  ? 'To Do'
+                  : 'Dateless To Do'
+            }
+            icon={
+              datelessStateFilter === 'in_progress' ? (
+                <CircleDashed className="w-3.5 h-3.5 text-amber-400" />
+              ) : (
+                <Inbox className="w-3.5 h-3.5 text-violet-400" />
+              )
+            }
+            accentColor={datelessStateFilter === 'in_progress' ? 'amber' : 'violet'}
+            tasks={displayDateless}
+            isCollapsed={datelessCollapsed}
+            onToggleCollapse={() => setDatelessCollapsed((p) => !p)}
             deletingId={deletingId}
             activeTaskId={activeTaskId}
-            totalPages={droppedDatelessTotalPages}
-            page={droppedDatelessPage}
-            setPage={setDroppedDatelessPage}
+            totalPages={datelessTotalPages}
+            page={datelessPage}
+            setPage={setDatelessPage}
             onDeleteEntry={onDeleteEntry}
             onOpenDetail={onOpenDetail}
             onToggleTaskStatus={onToggleTaskStatus}
@@ -2223,8 +2146,8 @@ function ListStrip({ lists, selectedId, onSelect, onManage }: ListStripProps) {
             onOpenScheduleModal={setScheduleModalTask}
             formatTime={formatTime}
             sensors={sensors}
-            onDragEnd={handleDroppedDatelessDragEnd}
-            handleMoveToPage={handleDroppedDatelessMoveToPage}
+            onDragEnd={handleDatelessDragEnd}
+            handleMoveToPage={handleDatelessMoveToPage}
             formatScheduledBadge={formatScheduledBadge}
             setActiveDate={setActiveDate}
             taskLists={taskLists}
@@ -2237,20 +2160,129 @@ function ListStrip({ lists, selectedId, onSelect, onManage }: ListStripProps) {
           />
         )}
 
-        {/* Scheduled Tasks Section (Renders only when statusFilter is 'todo' (Scheduled)) */}
-        {statusFilter === 'todo' && (
+      {/* Completed Dateless Tasks Section (Renders in 'inbox' (Lists) or 'done' mode) */}
+      {(statusFilter === 'inbox' || statusFilter === 'done') &&
+        displayCompletedDateless.length > 0 && (
           <TaskSection
-            label="Scheduled Tasks"
-            icon={<CalendarClock className="w-3.5 h-3.5 text-amber-400" />}
-            accentColor="amber"
-            tasks={displayScheduled}
-            isCollapsed={scheduledCollapsed}
-            onToggleCollapse={() => setScheduledCollapsed((p) => !p)}
+            label={statusFilter === 'done' ? 'Completed Dateless' : 'Dateless Completed'}
+            icon={<Check className="w-3.5 h-3.5 text-emerald-400" />}
+            accentColor="emerald"
+            tasks={displayCompletedDateless}
+            isCollapsed={completedDatelessCollapsed}
+            onToggleCollapse={() => setCompletedDatelessCollapsed((p) => !p)}
             deletingId={deletingId}
             activeTaskId={activeTaskId}
-            totalPages={scheduledTotalPages}
-            page={scheduledPage}
-            setPage={setScheduledPage}
+            totalPages={completedDatelessTotalPages}
+            page={completedDatelessPage}
+            setPage={setCompletedDatelessPage}
+            onDeleteEntry={onDeleteEntry}
+            onOpenDetail={onOpenDetail}
+            onToggleTaskStatus={onToggleTaskStatus}
+            onOpenStatusModal={setStatusPickerTask}
+            onActivateTask={onActivateTask}
+            onOpenScheduleModal={setScheduleModalTask}
+            formatTime={formatTime}
+            sensors={sensors}
+            onDragEnd={handleCompletedDatelessDragEnd}
+            handleMoveToPage={handleCompletedDatelessMoveToPage}
+            formatScheduledBadge={formatScheduledBadge}
+            setActiveDate={setActiveDate}
+            taskLists={taskLists}
+            listPickerTaskId={listPickerTaskId}
+            setListPickerTaskId={setListPickerTaskId}
+            moveToPageModalTask={moveToPageModalTask}
+            setMoveToPageModalTask={setMoveToPageModalTask}
+            showContent={showContent}
+            selectedListId={selectedListId}
+          />
+        )}
+
+      {/* Dropped Dateless Tasks Section (Renders in 'inbox' (Lists) mode) */}
+      {statusFilter === 'inbox' && displayDroppedDateless.length > 0 && (
+        <TaskSection
+          label="Dateless Dropped"
+          icon={<X className="w-3.5 h-3.5 text-rose-400 stroke-[2.5]" />}
+          accentColor="rose"
+          tasks={displayDroppedDateless}
+          isCollapsed={droppedDatelessCollapsed}
+          onToggleCollapse={() => setDroppedDatelessCollapsed((p) => !p)}
+          deletingId={deletingId}
+          activeTaskId={activeTaskId}
+          totalPages={droppedDatelessTotalPages}
+          page={droppedDatelessPage}
+          setPage={setDroppedDatelessPage}
+          onDeleteEntry={onDeleteEntry}
+          onOpenDetail={onOpenDetail}
+          onToggleTaskStatus={onToggleTaskStatus}
+          onOpenStatusModal={setStatusPickerTask}
+          onActivateTask={onActivateTask}
+          onOpenScheduleModal={setScheduleModalTask}
+          formatTime={formatTime}
+          sensors={sensors}
+          onDragEnd={handleDroppedDatelessDragEnd}
+          handleMoveToPage={handleDroppedDatelessMoveToPage}
+          formatScheduledBadge={formatScheduledBadge}
+          setActiveDate={setActiveDate}
+          taskLists={taskLists}
+          listPickerTaskId={listPickerTaskId}
+          setListPickerTaskId={setListPickerTaskId}
+          moveToPageModalTask={moveToPageModalTask}
+          setMoveToPageModalTask={setMoveToPageModalTask}
+          showContent={showContent}
+          selectedListId={selectedListId}
+        />
+      )}
+
+      {/* Scheduled Tasks Section (Renders only when statusFilter is 'todo' (Scheduled)) */}
+      {statusFilter === 'todo' && (
+        <TaskSection
+          label="Scheduled Tasks"
+          icon={<CalendarClock className="w-3.5 h-3.5 text-amber-400" />}
+          accentColor="amber"
+          tasks={displayScheduled}
+          isCollapsed={scheduledCollapsed}
+          onToggleCollapse={() => setScheduledCollapsed((p) => !p)}
+          deletingId={deletingId}
+          activeTaskId={activeTaskId}
+          totalPages={scheduledTotalPages}
+          page={scheduledPage}
+          setPage={setScheduledPage}
+          onDeleteEntry={onDeleteEntry}
+          onOpenDetail={onOpenDetail}
+          onToggleTaskStatus={onToggleTaskStatus}
+          onActivateTask={onActivateTask}
+          onOpenScheduleModal={setScheduleModalTask}
+          formatTime={formatTime}
+          sensors={sensors}
+          onDragEnd={handleScheduledDragEnd}
+          handleMoveToPage={handleScheduledMoveToPage}
+          formatScheduledBadge={formatScheduledBadge}
+          setActiveDate={setActiveDate}
+          taskLists={[]}
+          listPickerTaskId={null}
+          setListPickerTaskId={() => {}}
+          moveToPageModalTask={moveToPageModalTask}
+          setMoveToPageModalTask={setMoveToPageModalTask}
+          showContent={showContent}
+          selectedListId={selectedListId}
+        />
+      )}
+
+      {/* Completed Scheduled Tasks Section (Renders when statusFilter is 'todo' (Scheduled) or 'done') */}
+      {(statusFilter === 'todo' || statusFilter === 'done') &&
+        displayCompletedScheduled.length > 0 && (
+          <TaskSection
+            label={statusFilter === 'done' ? 'Completed Scheduled' : 'Scheduled Completed'}
+            icon={<Check className="w-3.5 h-3.5 text-emerald-400" />}
+            accentColor="emerald"
+            tasks={displayCompletedScheduled}
+            isCollapsed={completedDatelessCollapsed}
+            onToggleCollapse={() => setCompletedDatelessCollapsed((p) => !p)}
+            deletingId={deletingId}
+            activeTaskId={activeTaskId}
+            totalPages={completedScheduledTotalPages}
+            page={completedScheduledPage}
+            setPage={setCompletedScheduledPage}
             onDeleteEntry={onDeleteEntry}
             onOpenDetail={onOpenDetail}
             onToggleTaskStatus={onToggleTaskStatus}
@@ -2258,8 +2290,8 @@ function ListStrip({ lists, selectedId, onSelect, onManage }: ListStripProps) {
             onOpenScheduleModal={setScheduleModalTask}
             formatTime={formatTime}
             sensors={sensors}
-            onDragEnd={handleScheduledDragEnd}
-            handleMoveToPage={handleScheduledMoveToPage}
+            onDragEnd={handleCompletedScheduledDragEnd}
+            handleMoveToPage={handleCompletedScheduledMoveToPage}
             formatScheduledBadge={formatScheduledBadge}
             setActiveDate={setActiveDate}
             taskLists={[]}
@@ -2272,393 +2304,378 @@ function ListStrip({ lists, selectedId, onSelect, onManage }: ListStripProps) {
           />
         )}
 
-        {/* Completed Scheduled Tasks Section (Renders when statusFilter is 'todo' (Scheduled) or 'done') */}
-        {(statusFilter === 'todo' || statusFilter === 'done') &&
-          displayCompletedScheduled.length > 0 && (
-            <TaskSection
-              label={statusFilter === 'done' ? 'Completed Scheduled' : 'Scheduled Completed'}
-              icon={<Check className="w-3.5 h-3.5 text-emerald-400" />}
-              accentColor="emerald"
-              tasks={displayCompletedScheduled}
-              isCollapsed={completedDatelessCollapsed}
-              onToggleCollapse={() => setCompletedDatelessCollapsed((p) => !p)}
-              deletingId={deletingId}
-              activeTaskId={activeTaskId}
-              totalPages={completedScheduledTotalPages}
-              page={completedScheduledPage}
-              setPage={setCompletedScheduledPage}
-              onDeleteEntry={onDeleteEntry}
-              onOpenDetail={onOpenDetail}
-              onToggleTaskStatus={onToggleTaskStatus}
-              onActivateTask={onActivateTask}
-              onOpenScheduleModal={setScheduleModalTask}
-              formatTime={formatTime}
-              sensors={sensors}
-              onDragEnd={handleCompletedScheduledDragEnd}
-              handleMoveToPage={handleCompletedScheduledMoveToPage}
-              formatScheduledBadge={formatScheduledBadge}
-              setActiveDate={setActiveDate}
-              taskLists={[]}
-              listPickerTaskId={null}
-              setListPickerTaskId={() => {}}
-              moveToPageModalTask={moveToPageModalTask}
-              setMoveToPageModalTask={setMoveToPageModalTask}
-              showContent={showContent}
-              selectedListId={selectedListId}
+      {/* Empty state */}
+      {displayScheduled.length === 0 &&
+        displayDateless.length === 0 &&
+        displayCompletedDateless.length === 0 &&
+        displayDroppedDateless.length === 0 &&
+        displayCompletedScheduled.length === 0 && (
+          <div className="py-24 px-6 text-center text-stone-500 select-none">
+            <ListTodo className="w-12 h-12 text-stone-800 mx-auto mb-4" />
+            <h4 className="font-sans font-medium text-sm text-stone-400 mb-1">
+              {searchQuery.trim()
+                ? 'No matching tasks'
+                : statusFilter === 'todo'
+                  ? 'No scheduled tasks'
+                  : statusFilter === 'done'
+                    ? 'No completed tasks'
+                    : 'List is empty'}
+            </h4>
+            <p className="text-xs font-sans max-w-md mx-auto leading-relaxed text-stone-500">
+              {searchQuery.trim()
+                ? 'Try a different search term.'
+                : statusFilter === 'todo'
+                  ? 'You have no scheduled tasks. Schedule tasks using the input engine below.'
+                  : statusFilter === 'done'
+                    ? 'Complete some tasks and they will show up here.'
+                    : 'Start creating dateless tasks using the input engine below to populate your Lists.'}
+            </p>
+          </div>
+        )}
+    </>
+  );
+
+  return (
+    <div className="space-y-0" id="tasks-view-dashboard">
+      {/* Sticky search and filter control header */}
+      <div className="z-20 bg-[#0a0a0a] py-0 flex items-center justify-between gap-3">
+        <div className="flex gap-1.5">
+          <div className="relative flex items-center flex-1 max-w-[200px] sm:max-w-xs">
+            <Search className="absolute left-2.5 w-3.5 h-3.5 text-stone-500 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search tasks..."
+              className="w-full sm:w-64 pl-7 pr-2.5 py-1.5 text-[11px] font-mono bg-[#0a0a0a] border border-stone-800 rounded-lg text-stone-300 placeholder-stone-600 focus:outline-none focus:border-stone-600 transition-colors"
             />
-          )}
-
-        {/* Empty state */}
-        {displayScheduled.length === 0 &&
-          displayDateless.length === 0 &&
-          displayCompletedDateless.length === 0 &&
-          displayDroppedDateless.length === 0 &&
-          displayCompletedScheduled.length === 0 && (
-            <div className="py-24 px-6 text-center text-stone-500 select-none">
-              <ListTodo className="w-12 h-12 text-stone-800 mx-auto mb-4" />
-              <h4 className="font-sans font-medium text-sm text-stone-400 mb-1">
-                {searchQuery.trim()
-                  ? 'No matching tasks'
-                  : statusFilter === 'todo'
-                    ? 'No scheduled tasks'
-                    : statusFilter === 'done'
-                      ? 'No completed tasks'
-                      : 'List is empty'}
-              </h4>
-              <p className="text-xs font-sans max-w-md mx-auto leading-relaxed text-stone-500">
-                {searchQuery.trim()
-                  ? 'Try a different search term.'
-                  : statusFilter === 'todo'
-                    ? 'You have no scheduled tasks. Schedule tasks using the input engine below.'
-                    : statusFilter === 'done'
-                      ? 'Complete some tasks and they will show up here.'
-                      : 'Start creating dateless tasks using the input engine below to populate your Lists.'}
-              </p>
-            </div>
-          )}
-      </>
-    );
-
-    return (
-      <div className="space-y-0" id="tasks-view-dashboard">
-        {/* Sticky search and filter control header */}
-        <div className="z-20 bg-[#0a0a0a] py-0 flex items-center justify-between gap-3">
-          <div className="flex gap-1.5">
-            <div className="relative flex items-center flex-1 max-w-[200px] sm:max-w-xs">
-              <Search className="absolute left-2.5 w-3.5 h-3.5 text-stone-500 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search tasks..."
-                className="w-full sm:w-64 pl-7 pr-2.5 py-1.5 text-[11px] font-mono bg-[#0a0a0a] border border-stone-800 rounded-lg text-stone-300 placeholder-stone-600 focus:outline-none focus:border-stone-600 transition-colors"
-              />
-            </div>
-            {/* Paper List trigger */}
-            <button
-              onClick={() => setIsPaperListOpen(true)}
-              className="px-1.75 py-1.5 rounded-lg border border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer"
-              title="Paper List"
-            >
-              <ClipboardList className="w-3.5 h-3.5" />
-            </button>
           </div>
-
-          {/* Actions */}
-          <div className="flex gap-2">
-            {/* Status filter */}
-            <div className="flex items-center gap-1 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 w-fit">
-              <button
-                onClick={() => handleStatusFilterChange('inbox')}
-                className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-                  statusFilter === 'inbox'
-                    ? 'bg-stone-800 text-stone-200 shadow-sm'
-                    : 'text-stone-500 hover:text-stone-300'
-                }`}
-              >
-                Lists
-              </button>
-
-              <button
-                onClick={() => handleStatusFilterChange('todo')}
-                className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-                  statusFilter === 'todo'
-                    ? 'bg-stone-800 text-stone-200 shadow-sm'
-                    : 'text-stone-500 hover:text-stone-300'
-                }`}
-              >
-                Scheduled
-              </button>
-              <button
-                onClick={() => handleStatusFilterChange('done')}
-                className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-                  statusFilter === 'done'
-                    ? 'bg-emerald-900/60 text-emerald-300 shadow-sm'
-                    : 'text-stone-500 hover:text-stone-300'
-                }`}
-              >
-                Done
-              </button>
-            </div>
-          </div>
+          {/* Paper List trigger */}
+          <button
+            onClick={() => setIsPaperListOpen(true)}
+            className="px-1.75 py-1.5 rounded-lg border border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer"
+            title="Paper List"
+          >
+            <ClipboardList className="w-3.5 h-3.5" />
+          </button>
         </div>
 
-        {/* ── LISTS (INBOX) VIEW ──────────────────────────────────────────────── */}
-        {statusFilter === 'inbox' ? (
-          <>
-            {/* ── MOBILE: original strip layout ── */}
-            <div className="md:hidden">
-              <ListStrip
-                lists={taskLists}
-                selectedId={selectedListId}
-                onSelect={(id) => {
-                  setSelectedListId(id);
-                  localStorage.setItem('flowday-tasks-selected-list', id);
-                  setDatelessPageMap((prev) => ({ ...prev, [id]: 0 }));
-                }}
-                onManage={() => setIsListManagerOpen(true)}
-              />
-              <div className="flex items-center justify-end my-2">
-                {stateFilterButtons}
-              </div>
-              {taskSectionsContent}
-            </div>
+        {/* Actions */}
+        <div className="flex gap-2">
+          {/* Status filter */}
+          <div className="flex items-center gap-1 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 w-fit">
+            <button
+              onClick={() => handleStatusFilterChange('inbox')}
+              className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
+                statusFilter === 'inbox'
+                  ? 'bg-stone-800 text-stone-200 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-300'
+              }`}
+            >
+              Lists
+            </button>
 
-            {/* ── DESKTOP: two-column sidebar layout ── */}
-            <div className="hidden md:flex gap-0 mt-3 h-[500px] overflow-hidden">
-              {/* LEFT COLUMN — List sidebar */}
-              <div className="w-[200px] lg:w-[220px] h-[500px] shrink-0 flex flex-col min-h-0 border-r border-stone-800/60 pr-3 mr-3 items-between">
-                {/* Sidebar header: All · None · ··· — pinned, never scrolls */}
-                <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-stone-800/60 shrink-0">
-                  <button
-                    onClick={() => {
-                      setSelectedListId('all');
-                      localStorage.setItem('flowday-tasks-selected-list', 'all');
-                      setDatelessPageMap((prev) => ({ ...prev, all: 0 }));
-                    }}
-                    className={`flex-1 px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer border ${
-                      selectedListId === 'all'
-                        ? 'bg-stone-800 border-stone-700 text-stone-100'
-                        : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-900'
-                    }`}
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedListId('none');
-                      localStorage.setItem('flowday-tasks-selected-list', 'none');
-                      setDatelessPageMap((prev) => ({ ...prev, none: 0 }));
-                    }}
-                    className={`flex-1 px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer border ${
-                      selectedListId === 'none'
-                        ? 'bg-stone-800 border-stone-700 text-stone-100'
-                        : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-900'
-                    }`}
-                  >
-                    None
-                  </button>
-                  <button
-                    onClick={() => setIsListManagerOpen(true)}
-                    className="p-1.5 rounded-lg border border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer shrink-0"
-                    title="Manage lists"
-                  >
-                    <MoreHorizontal className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+            <button
+              onClick={() => handleStatusFilterChange('todo')}
+              className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
+                statusFilter === 'todo'
+                  ? 'bg-stone-800 text-stone-200 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-300'
+              }`}
+            >
+              Scheduled
+            </button>
+            <button
+              onClick={() => handleStatusFilterChange('done')}
+              className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
+                statusFilter === 'done'
+                  ? 'bg-emerald-900/60 text-emerald-300 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-300'
+              }`}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
 
-                {/* List rows — scrollable independently */}
-                <div
-                  className="flex flex-col gap-0.5 overflow-y-auto flex-1 min-h-0"
-                  style={{ scrollbarWidth: 'none' }}
-                >
-                  {taskLists.length === 0 && (
-                    <p className="text-[10px] font-mono text-stone-600 text-center py-6 px-2 leading-relaxed">
-                      No lists yet.
-                      <br />
-                      Click ··· to create one.
-                    </p>
-                  )}
-                  {taskLists.map((list) => {
-                    const cs = LIST_COLORS[list.color] ?? LIST_COLORS['violet'];
-                    const isActive = selectedListId === list.id;
-                    const counts = listTaskCounts[list.id] ?? { active: 0, done: 0 };
-                    return (
-                      <button
-                        key={list.id}
-                        onClick={() => {
-                          setSelectedListId(list.id);
-                          localStorage.setItem('flowday-tasks-selected-list', list.id);
-                          setDatelessPageMap((prev) => ({ ...prev, [list.id]: 0 }));
-                        }}
-                        className={`group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg border text-left transition-all duration-150 cursor-pointer ${
-                          isActive
-                            ? cs.active
-                            : 'bg-transparent border-transparent text-stone-400 hover:bg-stone-900 hover:border-stone-800 hover:text-stone-200'
-                        }`}
-                      >
-                        {/* Color dot */}
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${cs.dot}`} />
-
-                        {/* List name */}
-                        <span className="flex-1 min-w-0 text-[11px] font-mono font-semibold truncate">
-                          {list.name}
-                        </span>
-
-                        {/* Counts */}
-                        <span className="flex items-center gap-1.5 shrink-0">
-                          {/* Active count */}
-                          {counts.active > 0 && (
-                            <span
-                              className={`text-[9px] font-mono font-bold tabular-nums min-w-[14px] text-center ${
-                                isActive
-                                  ? 'text-current opacity-80'
-                                  : 'text-stone-500 group-hover:text-stone-400'
-                              }`}
-                              title={`${counts.active} active`}
-                            >
-                              {counts.active}
-                            </span>
-                          )}
-                          {/* Done count */}
-                          {counts.done > 0 && (
-                            <span
-                              className={`text-[9px] font-mono font-bold tabular-nums min-w-[14px] text-center opacity-50 ${
-                                isActive
-                                  ? 'text-current'
-                                  : 'text-stone-600 group-hover:text-stone-500'
-                              }`}
-                              title={`${counts.done} completed`}
-                            >
-                              ✓{counts.done}
-                            </span>
-                          )}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Sidebar footer — pinned at bottom, never scrolls */}
-                {taskLists.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-stone-800/60 shrink-0">
-                    <p className="text-[9px] font-mono text-stone-600 tabular-nums">
-                      {listTaskCounts['all']?.active ?? 0} active · {listTaskCounts['all']?.done ?? 0}{' '}
-                      done
-                    </p>
+      {/* ── LISTS (INBOX) VIEW ──────────────────────────────────────────────── */}
+      {statusFilter === 'inbox' ? (
+        <>
+          {/* ── MOBILE: original strip layout ── */}
+          <div className="md:hidden">
+            <ListStrip
+              lists={taskLists}
+              selectedId={selectedListId}
+              onSelect={(id) => {
+                setSelectedListId(id);
+                localStorage.setItem('flowday-tasks-selected-list', id);
+                setDatelessPageMap((prev) => ({ ...prev, [id]: 0 }));
+              }}
+              onManage={() => setIsListManagerOpen(true)}
+            />
+            <div className="flex items-center justify-between gap-2 my-2">
+              {/* Active list name label */}
+              {(() => {
+                const activeList = taskLists.find((l) => l.id === selectedListId);
+                const cs = activeList
+                  ? (LIST_COLORS[activeList.color] ?? LIST_COLORS['violet'])
+                  : null;
+                return (
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {cs && activeList && (
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${cs.dot}`} />
+                    )}
+                    <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-stone-400 truncate">
+                      {selectedListId === 'all'
+                        ? 'All Tasks'
+                        : selectedListId === 'none'
+                          ? 'Uncategorized'
+                          : (activeList?.name ?? 'Tasks')}
+                    </span>
                   </div>
-                )}
+                );
+              })()}
+              {stateFilterButtons}
+            </div>
+            {taskSectionsContent}
+          </div>
+
+          {/* ── DESKTOP: two-column sidebar layout ── */}
+          <div className="hidden md:flex gap-0 mt-3 h-[500px] overflow-hidden">
+            {/* LEFT COLUMN — List sidebar */}
+            <div className="w-[200px] lg:w-[220px] h-[500px] shrink-0 flex flex-col min-h-0 border-r border-stone-800/60 pr-3 mr-3 items-between">
+              {/* Sidebar header: All · None · ··· — pinned, never scrolls */}
+              <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-stone-800/60 shrink-0">
+                <button
+                  onClick={() => {
+                    setSelectedListId('all');
+                    localStorage.setItem('flowday-tasks-selected-list', 'all');
+                    setDatelessPageMap((prev) => ({ ...prev, all: 0 }));
+                  }}
+                  className={`flex-1 px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer border ${
+                    selectedListId === 'all'
+                      ? 'bg-stone-800 border-stone-700 text-stone-100'
+                      : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-900'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedListId('none');
+                    localStorage.setItem('flowday-tasks-selected-list', 'none');
+                    setDatelessPageMap((prev) => ({ ...prev, none: 0 }));
+                  }}
+                  className={`flex-1 px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer border ${
+                    selectedListId === 'none'
+                      ? 'bg-stone-800 border-stone-700 text-stone-100'
+                      : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-900'
+                  }`}
+                >
+                  None
+                </button>
+                <button
+                  onClick={() => setIsListManagerOpen(true)}
+                  className="p-1.5 rounded-lg border border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer shrink-0"
+                  title="Manage lists"
+                >
+                  <MoreHorizontal className="w-3.5 h-3.5" />
+                </button>
               </div>
 
-              {/* RIGHT COLUMN — Task sections */}
-              <div className="flex-1 min-w-0 min-h-0 flex flex-col">
-                {/* Active list header & state filter */}
-                {(() => {
-                  const activeList = taskLists.find((l) => l.id === selectedListId);
-                  const cs = activeList
-                    ? (LIST_COLORS[activeList.color] ?? LIST_COLORS['violet'])
-                    : null;
-                  const counts = listTaskCounts[selectedListId] ?? { active: 0, done: 0 };
+              {/* List rows — scrollable independently */}
+              <div
+                className="flex flex-col gap-0.5 overflow-y-auto flex-1 min-h-0"
+                style={{ scrollbarWidth: 'none' }}
+              >
+                {taskLists.length === 0 && (
+                  <p className="text-[10px] font-mono text-stone-600 text-center py-6 px-2 leading-relaxed">
+                    No lists yet.
+                    <br />
+                    Click ··· to create one.
+                  </p>
+                )}
+                {taskLists.map((list) => {
+                  const cs = LIST_COLORS[list.color] ?? LIST_COLORS['violet'];
+                  const isActive = selectedListId === list.id;
+                  const counts = listTaskCounts[list.id] ?? { active: 0, done: 0 };
                   return (
-                    <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
-                      <div className="flex items-center gap-2">
-                        {cs && activeList && (
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${cs.dot}`} />
+                    <button
+                      key={list.id}
+                      onClick={() => {
+                        setSelectedListId(list.id);
+                        localStorage.setItem('flowday-tasks-selected-list', list.id);
+                        setDatelessPageMap((prev) => ({ ...prev, [list.id]: 0 }));
+                      }}
+                      className={`group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg border text-left transition-all duration-150 cursor-pointer ${
+                        isActive
+                          ? cs.active
+                          : 'bg-transparent border-transparent text-stone-400 hover:bg-stone-900 hover:border-stone-800 hover:text-stone-200'
+                      }`}
+                    >
+                      {/* Color dot */}
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${cs.dot}`} />
+
+                      {/* List name */}
+                      <span className="flex-1 min-w-0 text-[11px] font-mono font-semibold truncate">
+                        {list.name}
+                      </span>
+
+                      {/* Counts */}
+                      <span className="flex items-center gap-1.5 shrink-0">
+                        {/* Active count */}
+                        {counts.active > 0 && (
+                          <span
+                            className={`text-[9px] font-mono font-bold tabular-nums min-w-[14px] text-center ${
+                              isActive
+                                ? 'text-current opacity-80'
+                                : 'text-stone-500 group-hover:text-stone-400'
+                            }`}
+                            title={`${counts.active} active`}
+                          >
+                            {counts.active}
+                          </span>
                         )}
-                        <h3 className="text-[11px] font-mono font-bold uppercase tracking-widest text-stone-400">
-                          {selectedListId === 'all'
-                            ? 'All Tasks'
-                            : selectedListId === 'none'
-                              ? 'Uncategorized'
-                              : (activeList?.name ?? 'Tasks')}
-                        </h3>
-                        <span className="text-[9px] font-mono text-stone-600 tabular-nums ml-1">
-                          {counts.active > 0 && `${counts.active} active`}
-                          {counts.active > 0 && counts.done > 0 && ' · '}
-                          {counts.done > 0 && `${counts.done} done`}
-                        </span>
-                      </div>
-                      {stateFilterButtons}
-                    </div>
+                        {/* Done count */}
+                        {counts.done > 0 && (
+                          <span
+                            className={`text-[9px] font-mono font-bold tabular-nums min-w-[14px] text-center opacity-50 ${
+                              isActive
+                                ? 'text-current'
+                                : 'text-stone-600 group-hover:text-stone-500'
+                            }`}
+                            title={`${counts.done} completed`}
+                          >
+                            ✓{counts.done}
+                          </span>
+                        )}
+                      </span>
+                    </button>
                   );
-                })()}
-                {/* Scrollable task content — independent from left sidebar */}
-                <div
-                  className="flex-1 min-h-0 overflow-y-auto pr-1"
-                  style={{ scrollbarWidth: 'thin', scrollbarColor: '#3d3d3d transparent' }}
-                >
-                  {taskSectionsContent}
+                })}
+              </div>
+
+              {/* Sidebar footer — pinned at bottom, never scrolls */}
+              {taskLists.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-stone-800/60 shrink-0">
+                  <p className="text-[9px] font-mono text-stone-600 tabular-nums">
+                    {listTaskCounts['all']?.active ?? 0} active · {listTaskCounts['all']?.done ?? 0}{' '}
+                    done
+                  </p>
                 </div>
+              )}
+            </div>
+
+            {/* RIGHT COLUMN — Task sections */}
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+              {/* Active list header & state filter */}
+              {(() => {
+                const activeList = taskLists.find((l) => l.id === selectedListId);
+                const cs = activeList
+                  ? (LIST_COLORS[activeList.color] ?? LIST_COLORS['violet'])
+                  : null;
+                const counts = listTaskCounts[selectedListId] ?? { active: 0, done: 0 };
+                return (
+                  <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
+                    <div className="flex items-center gap-2">
+                      {cs && activeList && (
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${cs.dot}`} />
+                      )}
+                      <h3 className="text-[11px] font-mono font-bold uppercase tracking-widest text-stone-400">
+                        {selectedListId === 'all'
+                          ? 'All Tasks'
+                          : selectedListId === 'none'
+                            ? 'Uncategorized'
+                            : (activeList?.name ?? 'Tasks')}
+                      </h3>
+                      <span className="text-[9px] font-mono text-stone-600 tabular-nums ml-1">
+                        {counts.active > 0 && `${counts.active} active`}
+                        {counts.active > 0 && counts.done > 0 && ' · '}
+                        {counts.done > 0 && `${counts.done} done`}
+                      </span>
+                    </div>
+                    {stateFilterButtons}
+                  </div>
+                );
+              })()}
+              {/* Scrollable task content — independent from left sidebar */}
+              <div
+                className="flex-1 min-h-0 overflow-y-auto pr-1"
+                style={{ scrollbarWidth: 'thin', scrollbarColor: '#3d3d3d transparent' }}
+              >
+                {taskSectionsContent}
               </div>
             </div>
-          </>
-        ) : (
-          /* ── SCHEDULED / DONE VIEWS (unchanged layout) ── */
-          <div>{taskSectionsContent}</div>
-        )}
+          </div>
+        </>
+      ) : (
+        /* ── SCHEDULED / DONE VIEWS (unchanged layout) ── */
+        <div>{taskSectionsContent}</div>
+      )}
 
-        {/* Schedule Calendar Modal */}
-        {scheduleModalTask && (
-          <ScheduleCalendarModal
-            task={scheduleModalTask}
-            onClose={() => setScheduleModalTask(null)}
-            onSelectDate={handleSelectDate}
-            onUnschedule={handleUnschedule}
-          />
-        )}
+      {/* Schedule Calendar Modal */}
+      {scheduleModalTask && (
+        <ScheduleCalendarModal
+          task={scheduleModalTask}
+          onClose={() => setScheduleModalTask(null)}
+          onSelectDate={handleSelectDate}
+          onUnschedule={handleUnschedule}
+        />
+      )}
 
-        {/* Task Status Picker Modal */}
-        {statusPickerTask && (
-          <TaskStatusPickerPopover
-            task={statusPickerTask}
-            onClose={() => setStatusPickerTask(null)}
-          />
-        )}
+      {/* Task Status Picker Modal */}
+      {statusPickerTask && (
+        <TaskStatusPickerPopover
+          task={statusPickerTask}
+          onClose={() => setStatusPickerTask(null)}
+        />
+      )}
 
-        {/* Move to Page Modal */}
-        {moveToPageModalTask && (
-          <MoveToPageModal
-            task={moveToPageModalTask}
-            currentPage={
-              moveToPageModalTask.scheduled_at
-                ? moveToPageModalTask.status === 'done'
-                  ? Math.min(completedScheduledPage, completedScheduledTotalPages - 1)
-                  : Math.min(scheduledPage, scheduledTotalPages - 1)
-                : moveToPageModalTask.status === 'done'
-                  ? Math.min(completedDatelessPage, completedDatelessTotalPages - 1)
-                  : moveToPageModalTask.status === 'dropped'
-                    ? Math.min(droppedDatelessPage, droppedDatelessTotalPages - 1)
-                    : Math.min(datelessPage, datelessTotalPages - 1)
-            }
-            totalPages={
-              moveToPageModalTask.scheduled_at
-                ? moveToPageModalTask.status === 'done'
-                  ? completedScheduledTotalPages
-                  : scheduledTotalPages
-                : moveToPageModalTask.status === 'done'
-                  ? completedDatelessTotalPages
-                  : moveToPageModalTask.status === 'dropped'
-                    ? droppedDatelessTotalPages
-                    : datelessTotalPages
-            }
-            onClose={() => setMoveToPageModalTask(null)}
-            onSelectPage={(taskId, page) => {
-              if (moveToPageModalTask.scheduled_at) {
-                if (moveToPageModalTask.status === 'done') {
-                  handleCompletedScheduledMoveToPage(taskId, page);
-                } else {
-                  handleScheduledMoveToPage(taskId, page);
-                }
-              } else if (moveToPageModalTask.status === 'done') {
-                handleCompletedDatelessMoveToPage(taskId, page);
-              } else if (moveToPageModalTask.status === 'dropped') {
-                handleDroppedDatelessMoveToPage(taskId, page);
+      {/* Move to Page Modal */}
+      {moveToPageModalTask && (
+        <MoveToPageModal
+          task={moveToPageModalTask}
+          currentPage={
+            moveToPageModalTask.scheduled_at
+              ? moveToPageModalTask.status === 'done'
+                ? Math.min(completedScheduledPage, completedScheduledTotalPages - 1)
+                : Math.min(scheduledPage, scheduledTotalPages - 1)
+              : moveToPageModalTask.status === 'done'
+                ? Math.min(completedDatelessPage, completedDatelessTotalPages - 1)
+                : moveToPageModalTask.status === 'dropped'
+                  ? Math.min(droppedDatelessPage, droppedDatelessTotalPages - 1)
+                  : Math.min(datelessPage, datelessTotalPages - 1)
+          }
+          totalPages={
+            moveToPageModalTask.scheduled_at
+              ? moveToPageModalTask.status === 'done'
+                ? completedScheduledTotalPages
+                : scheduledTotalPages
+              : moveToPageModalTask.status === 'done'
+                ? completedDatelessTotalPages
+                : moveToPageModalTask.status === 'dropped'
+                  ? droppedDatelessTotalPages
+                  : datelessTotalPages
+          }
+          onClose={() => setMoveToPageModalTask(null)}
+          onSelectPage={(taskId, page) => {
+            if (moveToPageModalTask.scheduled_at) {
+              if (moveToPageModalTask.status === 'done') {
+                handleCompletedScheduledMoveToPage(taskId, page);
               } else {
-                handleDatelessMoveToPage(taskId, page);
+                handleScheduledMoveToPage(taskId, page);
               }
-            }}
-          />
-        )}
+            } else if (moveToPageModalTask.status === 'done') {
+              handleCompletedDatelessMoveToPage(taskId, page);
+            } else if (moveToPageModalTask.status === 'dropped') {
+              handleDroppedDatelessMoveToPage(taskId, page);
+            } else {
+              handleDatelessMoveToPage(taskId, page);
+            }
+          }}
+        />
+      )}
 
       {isListManagerOpen && <TaskListManagerModal onClose={() => setIsListManagerOpen(false)} />}
 
