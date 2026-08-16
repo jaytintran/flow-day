@@ -437,9 +437,10 @@ export default function Journal({
   // Sync edit state when selectedEntry changes
   useEffect(() => {
     if (!selectedEntry) return;
-    const titleVal = selectedEntry.type === 'note'
-      ? (selectedEntry as Note).title || ''
-      : selectedEntry.title || '';
+    const titleVal =
+      selectedEntry.type === 'note'
+        ? (selectedEntry as Note).title || ''
+        : selectedEntry.title || '';
     setEditTitle(titleVal);
     setIsEditingTitle(titleVal.trim() === '');
 
@@ -926,7 +927,7 @@ export default function Journal({
       ref={containerRef}
     >
       <div
-        className={`w-full md:mx-auto ${viewMode === 'hub' ? 'h-full md:max-w-9xl flex flex-col' : 'md:max-w-4xl space-y-8'}`}
+        className={`w-full md:mx-auto ${viewMode === 'hub' ? 'h-full md:max-w-9xl flex flex-col' : viewMode === 'tasks' ? 'md:max-w-9xl ' : 'md:max-w-4xl space-y-8'}`}
       >
         {viewMode === 'records' ? (
           <RecordsView
@@ -1058,7 +1059,7 @@ export default function Journal({
         )}
       </div>
 
-       {/* GENERALIZED DETAIL SHEET — EDIT ANY ENTRY TYPE */}
+      {/* GENERALIZED DETAIL SHEET — EDIT ANY ENTRY TYPE */}
       <DetailSheet
         open={isDetailOpen && selectedEntry !== null}
         onClose={handleCloseDetail}
@@ -1209,24 +1210,31 @@ export default function Journal({
                         setSelectedEntry({ ...task, starred: nextStarred });
                       }}
                       className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-mono font-bold uppercase tracking-widest cursor-pointer transition-all active:scale-95 ${
-                        (selectedEntry as Task).starred || ((selectedEntry as Task).achievements && (selectedEntry as Task).achievements!.length > 0)
+                        (selectedEntry as Task).starred ||
+                        ((selectedEntry as Task).achievements &&
+                          (selectedEntry as Task).achievements!.length > 0)
                           ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
                           : 'bg-[#121212] border-stone-800 text-stone-500 hover:text-stone-300 hover:border-stone-750'
                       }`}
                       title={
-                        (selectedEntry as Task).achievements && (selectedEntry as Task).achievements!.length > 0
+                        (selectedEntry as Task).achievements &&
+                        (selectedEntry as Task).achievements!.length > 0
                           ? 'Auto-starred because it has achievements'
                           : 'Toggle star achievement status'
                       }
                     >
                       <Star
                         className={`w-3 h-3 ${
-                          (selectedEntry as Task).starred || ((selectedEntry as Task).achievements && (selectedEntry as Task).achievements!.length > 0)
+                          (selectedEntry as Task).starred ||
+                          ((selectedEntry as Task).achievements &&
+                            (selectedEntry as Task).achievements!.length > 0)
                             ? 'fill-current'
                             : ''
                         }`}
                       />
-                      {(selectedEntry as Task).starred || ((selectedEntry as Task).achievements && (selectedEntry as Task).achievements!.length > 0)
+                      {(selectedEntry as Task).starred ||
+                      ((selectedEntry as Task).achievements &&
+                        (selectedEntry as Task).achievements!.length > 0)
                         ? 'Starred Win'
                         : 'Star Win'}
                     </button>
@@ -1299,7 +1307,9 @@ export default function Journal({
                       placeholder="Add context, links, notes about this task..."
                       onClick={() => setIsEditingContent(true)}
                     />
-                    <span className="text-[10px] text-stone-600 font-mono mt-1 select-none">Click content to edit</span>
+                    <span className="text-[10px] text-stone-600 font-mono mt-1 select-none">
+                      Click content to edit
+                    </span>
                   </div>
                 )}
               </div>
@@ -1340,7 +1350,9 @@ export default function Journal({
                       placeholder="Tap to start typing your thoughts..."
                       onClick={() => setIsEditingContent(true)}
                     />
-                    <span className="text-[10px] text-stone-600 font-mono mt-1 select-none">Click content to edit</span>
+                    <span className="text-[10px] text-stone-600 font-mono mt-1 select-none">
+                      Click content to edit
+                    </span>
                   </div>
                 )}
               </div>
@@ -1381,7 +1393,9 @@ export default function Journal({
                       placeholder="Event description, notes, or details..."
                       onClick={() => setIsEditingContent(true)}
                     />
-                    <span className="text-[10px] text-stone-600 font-mono mt-1 select-none">Click content to edit</span>
+                    <span className="text-[10px] text-stone-600 font-mono mt-1 select-none">
+                      Click content to edit
+                    </span>
                   </div>
                 )}
               </div>

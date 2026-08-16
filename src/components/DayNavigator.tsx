@@ -77,9 +77,8 @@ export default function DayNavigator({
   const entries = useLiveQuery(() => db.entries.toArray()) || [];
 
   // Load achievements / starred tasks reactively
-  const starredTasks = (useLiveQuery(() => 
-    db.entries.where('type').equals('task').toArray()
-  ) || []) as Task[];
+  const starredTasks = (useLiveQuery(() => db.entries.where('type').equals('task').toArray()) ||
+    []) as Task[];
 
   const availableYears = React.useMemo(() => {
     const yearsSet = new Set<string>();
@@ -107,10 +106,10 @@ export default function DayNavigator({
 
   const totalStats = React.useMemo(() => {
     const completedStarred = starredTasks.filter(
-      (t) => t.status === 'done' && (t.starred || (t.achievements && t.achievements.length > 0))
+      (t) => t.status === 'done' && (t.starred || (t.achievements && t.achievements.length > 0)),
     );
     const totalWins = completedStarred.length;
-    
+
     const now = new Date();
     const currentMonthWins = completedStarred.filter((t) => {
       const d = t.completed_at ? new Date(t.completed_at) : new Date(t.created_at);
@@ -119,7 +118,7 @@ export default function DayNavigator({
 
     const totalSubAchievements = completedStarred.reduce(
       (sum, t) => sum + (t.achievements?.length ?? 0),
-      0
+      0,
     );
 
     let badge = 'Novice';
@@ -140,14 +139,15 @@ export default function DayNavigator({
 
   const groupedAchievementsList = React.useMemo(() => {
     const completedStarred = starredTasks
-      .filter((t) => t.status === 'done' && (t.starred || (t.achievements && t.achievements.length > 0)))
+      .filter(
+        (t) => t.status === 'done' && (t.starred || (t.achievements && t.achievements.length > 0)),
+      )
       .filter((t) => {
         if (!searchQuery.trim()) return true;
         const query = searchQuery.toLowerCase();
         const matchesTitle = t.title.toLowerCase().includes(query);
-        const matchesAchievements = t.achievements?.some((a) =>
-          a.text.toLowerCase().includes(query)
-        ) ?? false;
+        const matchesAchievements =
+          t.achievements?.some((a) => a.text.toLowerCase().includes(query)) ?? false;
         return matchesTitle || matchesAchievements;
       })
       .filter((t) => {
@@ -161,12 +161,18 @@ export default function DayNavigator({
         return d.getMonth().toString() === filterMonth;
       })
       .sort((a, b) => {
-        const dateA = a.completed_at ? new Date(a.completed_at).getTime() : new Date(a.created_at).getTime();
-        const dateB = b.completed_at ? new Date(b.completed_at).getTime() : new Date(b.created_at).getTime();
+        const dateA = a.completed_at
+          ? new Date(a.completed_at).getTime()
+          : new Date(a.created_at).getTime();
+        const dateB = b.completed_at
+          ? new Date(b.completed_at).getTime()
+          : new Date(b.created_at).getTime();
         return dateB - dateA;
       });
 
-    const groupsMap: { [key: string]: { label: string; year: number; month: number; tasks: Task[] } } = {};
+    const groupsMap: {
+      [key: string]: { label: string; year: number; month: number; tasks: Task[] };
+    } = {};
     completedStarred.forEach((task) => {
       const date = task.completed_at ? new Date(task.completed_at) : new Date(task.created_at);
       const year = date.getFullYear();
@@ -428,7 +434,7 @@ export default function DayNavigator({
   return (
     <div className="w-full border-t border-stone-800 bg-[#121212] text-sm" ref={containerRef}>
       <div
-        className={`${viewMode === 'hub' ? 'md:max-w-9xl' : 'max-w-4xl'} mx-auto px-5 md:px-6 py-3 flex flex-col gap-3 w-full"
+        className={`${viewMode === 'hub' || viewMode === 'tasks' ? 'md:max-w-9xl' : 'max-w-4xl'} mx-auto px-5 md:px-6 py-3 flex flex-col gap-3 w-full"
         id="day-navigator-container`}
       >
         <div className="flex md:flex-row flex-col items-center justify-between gap-4 w-full">
@@ -565,114 +571,118 @@ export default function DayNavigator({
         </div>
 
         {/* Quick-tick Habit strip — only when active habits exist */}
-        {sortedActiveHabits.length > 0 && (() => {
-          const totalHabits = sortedActiveHabits.length;
-          const tickedCount = sortedActiveHabits.filter((h) =>
-            habitLogs.some(
-              (l) =>
-                l.habit_id === h.id &&
-                toLocalDateString(new Date(l.timestamp)) === activeDateStr,
-            ),
-          ).length;
-          const allDone = tickedCount === totalHabits;
+        {sortedActiveHabits.length > 0 &&
+          (() => {
+            const totalHabits = sortedActiveHabits.length;
+            const tickedCount = sortedActiveHabits.filter((h) =>
+              habitLogs.some(
+                (l) =>
+                  l.habit_id === h.id && toLocalDateString(new Date(l.timestamp)) === activeDateStr,
+              ),
+            ).length;
+            const allDone = tickedCount === totalHabits;
 
-          return (
-            <div className="flex items-center gap-2 w-full min-w-0">
-              {/* Scroll-faded strip wrapper */}
-              <div className="relative flex-1 min-w-0">
-                {/* Left fade */}
-                {stripCanScrollLeft && (
-                  <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 z-10 bg-gradient-to-r from-[#0a0a0a] to-transparent" />
-                )}
-                {/* Right fade */}
-                {stripCanScrollRight && (
-                  <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 z-10 bg-gradient-to-l from-[#0a0a0a] to-transparent" />
-                )}
+            return (
+              <div className="flex items-center gap-2 w-full min-w-0">
+                {/* Scroll-faded strip wrapper */}
+                <div className="relative flex-1 min-w-0">
+                  {/* Left fade */}
+                  {stripCanScrollLeft && (
+                    <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 z-10 bg-gradient-to-r from-[#0a0a0a] to-transparent" />
+                  )}
+                  {/* Right fade */}
+                  {stripCanScrollRight && (
+                    <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 z-10 bg-gradient-to-l from-[#0a0a0a] to-transparent" />
+                  )}
 
-                <div
-                  ref={stripRef}
-                  className="flex items-center gap-2 overflow-x-auto pb-0.5 md:flex-wrap md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-                >
-                  {sortedActiveHabits.map((habit) => {
-                    const logsToday = habitLogs.filter(
-                      (l) =>
-                        l.habit_id === habit.id &&
-                        toLocalDateString(new Date(l.timestamp)) === activeDateStr,
-                    );
-                    const count = logsToday.length;
-                    const isTicked = count > 0;
-                    const colorMap: Record<string, string> = {
-                      emerald: isTicked
-                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                        : 'border-stone-700/60 text-stone-500 hover:border-emerald-500/30 hover:text-emerald-400',
-                      sky: isTicked
-                        ? 'bg-sky-500/15 border-sky-500/40 text-sky-300'
-                        : 'border-stone-700/60 text-stone-500 hover:border-sky-500/30 hover:text-sky-400',
-                      violet: isTicked
-                        ? 'bg-violet-500/15 border-violet-500/40 text-violet-300'
-                        : 'border-stone-700/60 text-stone-500 hover:border-violet-500/30 hover:text-violet-400',
-                      rose: isTicked
-                        ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
-                        : 'border-stone-700/60 text-stone-500 hover:border-rose-500/30 hover:text-rose-400',
-                      amber: isTicked
-                        ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-                        : 'border-stone-700/60 text-stone-500 hover:border-amber-500/30 hover:text-amber-400',
-                    };
-                    const cls = colorMap[habit.color ?? 'emerald'] ?? colorMap.emerald;
-                    return (
-                      <button
-                        key={habit.id}
-                        onClick={() => handleQuickTick(habit)}
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          openContextMenu(habit, e.clientX, e.clientY);
-                        }}
-                        onPointerDown={(e) => {
-                          if (e.pointerType === 'touch') {
-                            longPressTimerRef.current = setTimeout(() => {
-                              openContextMenu(habit, e.clientX, e.clientY);
-                            }, 500);
+                  <div
+                    ref={stripRef}
+                    className="flex items-center gap-2 overflow-x-auto pb-0.5 md:flex-wrap md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                  >
+                    {sortedActiveHabits.map((habit) => {
+                      const logsToday = habitLogs.filter(
+                        (l) =>
+                          l.habit_id === habit.id &&
+                          toLocalDateString(new Date(l.timestamp)) === activeDateStr,
+                      );
+                      const count = logsToday.length;
+                      const isTicked = count > 0;
+                      const colorMap: Record<string, string> = {
+                        emerald: isTicked
+                          ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                          : 'border-stone-700/60 text-stone-500 hover:border-emerald-500/30 hover:text-emerald-400',
+                        sky: isTicked
+                          ? 'bg-sky-500/15 border-sky-500/40 text-sky-300'
+                          : 'border-stone-700/60 text-stone-500 hover:border-sky-500/30 hover:text-sky-400',
+                        violet: isTicked
+                          ? 'bg-violet-500/15 border-violet-500/40 text-violet-300'
+                          : 'border-stone-700/60 text-stone-500 hover:border-violet-500/30 hover:text-violet-400',
+                        rose: isTicked
+                          ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
+                          : 'border-stone-700/60 text-stone-500 hover:border-rose-500/30 hover:text-rose-400',
+                        amber: isTicked
+                          ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                          : 'border-stone-700/60 text-stone-500 hover:border-amber-500/30 hover:text-amber-400',
+                      };
+                      const cls = colorMap[habit.color ?? 'emerald'] ?? colorMap.emerald;
+                      return (
+                        <button
+                          key={habit.id}
+                          onClick={() => handleQuickTick(habit)}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            openContextMenu(habit, e.clientX, e.clientY);
+                          }}
+                          onPointerDown={(e) => {
+                            if (e.pointerType === 'touch') {
+                              longPressTimerRef.current = setTimeout(() => {
+                                openContextMenu(habit, e.clientX, e.clientY);
+                              }, 500);
+                            }
+                          }}
+                          onPointerUp={() => {
+                            if (longPressTimerRef.current) {
+                              clearTimeout(longPressTimerRef.current);
+                              longPressTimerRef.current = null;
+                            }
+                          }}
+                          onPointerCancel={() => {
+                            if (longPressTimerRef.current) {
+                              clearTimeout(longPressTimerRef.current);
+                              longPressTimerRef.current = null;
+                            }
+                          }}
+                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-mono font-semibold uppercase tracking-wide transition-all active:scale-95 cursor-pointer shrink-0 select-none ${cls}`}
+                          title={
+                            isTicked
+                              ? `Uncheck "${habit.title}" — right-click for insights`
+                              : `Check "${habit.title}" — right-click for insights`
                           }
-                        }}
-                        onPointerUp={() => {
-                          if (longPressTimerRef.current) {
-                            clearTimeout(longPressTimerRef.current);
-                            longPressTimerRef.current = null;
-                          }
-                        }}
-                        onPointerCancel={() => {
-                          if (longPressTimerRef.current) {
-                            clearTimeout(longPressTimerRef.current);
-                            longPressTimerRef.current = null;
-                          }
-                        }}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-mono font-semibold uppercase tracking-wide transition-all active:scale-95 cursor-pointer shrink-0 select-none ${cls}`}
-                        title={isTicked ? `Uncheck "${habit.title}" — right-click for insights` : `Check "${habit.title}" — right-click for insights`}
-                      >
-                        {isTicked && <Check className="w-3 h-3 stroke-[3]" />}
-                        {habit.title}
-                        {count > 1 && <span className="ml-0.5 opacity-70">×{count}</span>}
-                      </button>
-                    );
-                  })}
+                        >
+                          {isTicked && <Check className="w-3 h-3 stroke-[3]" />}
+                          {habit.title}
+                          {count > 1 && <span className="ml-0.5 opacity-70">×{count}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
 
-              {/* Completion ratio badge */}
-              <span
-                className={`shrink-0 flex items-center gap-1 font-mono text-[9px] px-1.5 py-0.5 rounded border transition-colors select-none ${
-                  allDone
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                    : 'bg-stone-900 border-stone-800 text-stone-500'
-                }`}
-                title={`${tickedCount} of ${totalHabits} habits done today`}
-              >
-                {allDone ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : null}
-                {tickedCount}/{totalHabits}
-              </span>
-            </div>
-          );
-        })()}
+                {/* Completion ratio badge */}
+                <span
+                  className={`shrink-0 flex items-center gap-1 font-mono text-[9px] px-1.5 py-0.5 rounded border transition-colors select-none ${
+                    allDone
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                      : 'bg-stone-900 border-stone-800 text-stone-500'
+                  }`}
+                  title={`${tickedCount} of ${totalHabits} habits done today`}
+                >
+                  {allDone ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : null}
+                  {tickedCount}/{totalHabits}
+                </span>
+              </div>
+            );
+          })()}
 
         {/* Habit context menu */}
         {contextMenuPos && contextHabit && (
@@ -945,7 +955,7 @@ export default function DayNavigator({
                     </p>
                   </div>
                 </div>
-                
+
                 <button
                   onClick={() => setIsTrophyOpen(false)}
                   className="p-1.5 rounded-lg border border-stone-800 bg-stone-900/50 text-stone-500 hover:text-stone-300 hover:bg-stone-850 transition-colors cursor-pointer"
@@ -958,20 +968,38 @@ export default function DayNavigator({
               {/* Stats Bar */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-stone-950/60 border-b border-stone-850/80">
                 <div className="flex flex-col p-3 rounded-xl border border-stone-850 bg-[#0e0e0e]/50">
-                  <span className="text-[10px] uppercase tracking-wider text-stone-500 font-mono font-bold">Total Wins</span>
-                  <span className="text-xl font-extrabold text-amber-500 font-mono mt-0.5">{totalStats.totalWins}</span>
+                  <span className="text-[10px] uppercase tracking-wider text-stone-500 font-mono font-bold">
+                    Total Wins
+                  </span>
+                  <span className="text-xl font-extrabold text-amber-500 font-mono mt-0.5">
+                    {totalStats.totalWins}
+                  </span>
                 </div>
                 <div className="flex flex-col p-3 rounded-xl border border-stone-850 bg-[#0e0e0e]/50">
-                  <span className="text-[10px] uppercase tracking-wider text-stone-500 font-mono font-bold">This Month</span>
-                  <span className="text-xl font-extrabold text-stone-100 font-mono mt-0.5">{totalStats.currentMonthWins}</span>
+                  <span className="text-[10px] uppercase tracking-wider text-stone-500 font-mono font-bold">
+                    This Month
+                  </span>
+                  <span className="text-xl font-extrabold text-stone-100 font-mono mt-0.5">
+                    {totalStats.currentMonthWins}
+                  </span>
                 </div>
                 <div className="flex flex-col p-3 rounded-xl border border-stone-850 bg-[#0e0e0e]/50">
-                  <span className="text-[10px] uppercase tracking-wider text-stone-500 font-mono font-bold">Sub-Wins</span>
-                  <span className="text-xl font-extrabold text-stone-300 font-mono mt-0.5">{totalStats.totalSubAchievements}</span>
+                  <span className="text-[10px] uppercase tracking-wider text-stone-500 font-mono font-bold">
+                    Sub-Wins
+                  </span>
+                  <span className="text-xl font-extrabold text-stone-300 font-mono mt-0.5">
+                    {totalStats.totalSubAchievements}
+                  </span>
                 </div>
-                <div className={`flex flex-col p-3 rounded-xl border ${totalStats.badgeColor} justify-center`}>
-                  <span className="text-[9px] uppercase tracking-widest text-amber-500/80 font-mono font-extrabold">Trophy Rank</span>
-                  <span className="text-xs font-bold font-mono mt-0.5 uppercase tracking-wide truncate">{totalStats.badge}</span>
+                <div
+                  className={`flex flex-col p-3 rounded-xl border ${totalStats.badgeColor} justify-center`}
+                >
+                  <span className="text-[9px] uppercase tracking-widest text-amber-500/80 font-mono font-extrabold">
+                    Trophy Rank
+                  </span>
+                  <span className="text-xs font-bold font-mono mt-0.5 uppercase tracking-wide truncate">
+                    {totalStats.badge}
+                  </span>
                 </div>
               </div>
 
@@ -1056,7 +1084,9 @@ export default function DayNavigator({
               <div className="flex items-center gap-3 px-6 py-2.5 bg-stone-950 border-b border-stone-850/80">
                 {/* Year Dropdown Selector */}
                 <div className="flex items-center gap-1.5 shrink-0 border-r border-stone-850 pr-3">
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-stone-500 font-bold">Year:</span>
+                  <span className="text-[10px] uppercase font-mono tracking-wider text-stone-500 font-bold">
+                    Year:
+                  </span>
                   <select
                     value={filterYear}
                     onChange={(e) => {
@@ -1067,7 +1097,9 @@ export default function DayNavigator({
                   >
                     <option value="All">All Years</option>
                     {availableYears.map((y) => (
-                      <option key={y} value={y}>{y}</option>
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -1085,7 +1117,9 @@ export default function DayNavigator({
                     All Months
                   </button>
                   {availableMonths.map((mIndex) => {
-                    const label = new Date(2000, mIndex, 1).toLocaleString('en-US', { month: 'short' });
+                    const label = new Date(2000, mIndex, 1).toLocaleString('en-US', {
+                      month: 'short',
+                    });
                     const isSelected = filterMonth === mIndex.toString();
                     return (
                       <button
@@ -1108,11 +1142,15 @@ export default function DayNavigator({
               <div className="flex-1 overflow-y-auto p-6 min-h-[30vh]">
                 {groupedAchievementsList.length === 0 ? (
                   <div className="text-center py-16 text-stone-500 font-mono text-xs border border-dashed border-stone-800/80 rounded-2xl bg-stone-900/10">
-                    <p className="mb-2 text-stone-300 font-bold text-sm">No accomplishments found</p>
+                    <p className="mb-2 text-stone-300 font-bold text-sm">
+                      No accomplishments found
+                    </p>
                     {searchQuery ? (
                       <p className="text-stone-600">Try adjusting your search criteria.</p>
                     ) : (
-                      <p className="text-[10px] text-stone-600">Complete tasks and mark them with a ⭐ to build momentum!</p>
+                      <p className="text-[10px] text-stone-600">
+                        Complete tasks and mark them with a ⭐ to build momentum!
+                      </p>
                     )}
                   </div>
                 ) : (
@@ -1121,12 +1159,26 @@ export default function DayNavigator({
                       <div key={group.label} className="flex flex-col gap-3">
                         <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-500 border-b border-stone-850/60 pb-2 flex items-center justify-between">
                           <span>{group.label}</span>
-                          <span className="text-[9px] text-stone-600 font-semibold">{group.tasks.length} {group.tasks.length === 1 ? 'win' : 'wins'}</span>
+                          <span className="text-[9px] text-stone-600 font-semibold">
+                            {group.tasks.length} {group.tasks.length === 1 ? 'win' : 'wins'}
+                          </span>
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                           {group.tasks.map((task) => {
-                            const dateObj = task.completed_at ? new Date(task.completed_at) : new Date(task.created_at);
-                            const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+                            const dateObj = task.completed_at
+                              ? new Date(task.completed_at)
+                              : new Date(task.created_at);
+                            const dateStr =
+                              dateObj.toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                              }) +
+                              ', ' +
+                              dateObj.toLocaleTimeString('en-US', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: false,
+                              });
                             const isEditingDate = editingDateTaskId === task.id;
                             // Format for datetime-local input value: YYYY-MM-DDTHH:MM
                             const toDatetimeLocal = (d: Date) => {
@@ -1169,7 +1221,10 @@ export default function DayNavigator({
                                 key={task.id}
                                 onClick={() => {
                                   if (!isEditingTask) {
-                                    setExpandedCards((prev) => ({ ...prev, [task.id]: !prev[task.id] }));
+                                    setExpandedCards((prev) => ({
+                                      ...prev,
+                                      [task.id]: !prev[task.id],
+                                    }));
                                   }
                                 }}
                                 className={`group/item flex flex-col p-4 rounded-xl border transition-all cursor-pointer shadow-md relative overflow-hidden ${
@@ -1191,9 +1246,12 @@ export default function DayNavigator({
                                         </span>
                                       )}
                                     </div>
-                                    
+
                                     {isEditingTask ? (
-                                      <div className="flex items-center gap-1 flex-1" onClick={(e) => e.stopPropagation()}>
+                                      <div
+                                        className="flex items-center gap-1 flex-1"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
                                         <input
                                           type="text"
                                           value={editingTaskTitle}
@@ -1219,13 +1277,18 @@ export default function DayNavigator({
                                         </button>
                                       </div>
                                     ) : (
-                                      <span className={`text-xs font-semibold transition-colors break-all ${isExpanded ? 'text-amber-300' : 'text-stone-200 group-hover/item:text-amber-300'} ${isExpanded ? '' : 'line-clamp-1'}`}>
+                                      <span
+                                        className={`text-xs font-semibold transition-colors break-all ${isExpanded ? 'text-amber-300' : 'text-stone-200 group-hover/item:text-amber-300'} ${isExpanded ? '' : 'line-clamp-1'}`}
+                                      >
                                         {task.title}
                                       </span>
                                     )}
                                   </div>
-                                  
-                                  <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+
+                                  <div
+                                    className="flex items-center gap-1.5 shrink-0"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
                                     {!isEditingTask && (
                                       <div className="flex items-center opacity-0 group-hover/item:opacity-100 transition-opacity gap-0.5">
                                         <button
@@ -1248,41 +1311,48 @@ export default function DayNavigator({
                                       </div>
                                     )}
                                     {isEditingDate ? (
-                                       <input
-                                         type="datetime-local"
-                                         defaultValue={toDatetimeLocal(dateObj)}
-                                         autoFocus
-                                         onClick={(e) => e.stopPropagation()}
-                                         onBlur={async (e) => {
-                                           const val = e.target.value;
-                                           if (val) {
-                                             await db.entries.update(task.id, { completed_at: new Date(val) } as any);
-                                           }
-                                           setEditingDateTaskId(null);
-                                         }}
-                                         onKeyDown={async (e) => {
-                                           if (e.key === 'Escape') setEditingDateTaskId(null);
-                                           if (e.key === 'Enter') {
-                                             const val = (e.target as HTMLInputElement).value;
-                                             if (val) await db.entries.update(task.id, { completed_at: new Date(val) } as any);
-                                             setEditingDateTaskId(null);
-                                           }
-                                         }}
-                                         className="bg-[#0c0c0c] border border-amber-500/30 rounded px-1.5 py-0.5 text-[9px] font-mono text-amber-300 focus:outline-none w-[145px]"
-                                       />
-                                     ) : (
-                                       <button
-                                         onClick={(e) => {
-                                           e.stopPropagation();
-                                           setEditingDateTaskId(task.id);
-                                         }}
-                                         className="group/date text-[9px] font-mono text-stone-500 bg-stone-950 hover:bg-stone-900 px-2 py-0.5 rounded border border-stone-850 hover:text-amber-400 hover:border-amber-500/20 transition-colors cursor-pointer flex items-center gap-1"
-                                         title="Edit date & time"
-                                       >
-                                         {dateStr}
-                                       </button>
-                                     )}
-                                    <ChevronDown className={`w-3.5 h-3.5 text-stone-500 transition-transform duration-200 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                                      <input
+                                        type="datetime-local"
+                                        defaultValue={toDatetimeLocal(dateObj)}
+                                        autoFocus
+                                        onClick={(e) => e.stopPropagation()}
+                                        onBlur={async (e) => {
+                                          const val = e.target.value;
+                                          if (val) {
+                                            await db.entries.update(task.id, {
+                                              completed_at: new Date(val),
+                                            } as any);
+                                          }
+                                          setEditingDateTaskId(null);
+                                        }}
+                                        onKeyDown={async (e) => {
+                                          if (e.key === 'Escape') setEditingDateTaskId(null);
+                                          if (e.key === 'Enter') {
+                                            const val = (e.target as HTMLInputElement).value;
+                                            if (val)
+                                              await db.entries.update(task.id, {
+                                                completed_at: new Date(val),
+                                              } as any);
+                                            setEditingDateTaskId(null);
+                                          }
+                                        }}
+                                        className="bg-[#0c0c0c] border border-amber-500/30 rounded px-1.5 py-0.5 text-[9px] font-mono text-amber-300 focus:outline-none w-[145px]"
+                                      />
+                                    ) : (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditingDateTaskId(task.id);
+                                        }}
+                                        className="group/date text-[9px] font-mono text-stone-500 bg-stone-950 hover:bg-stone-900 px-2 py-0.5 rounded border border-stone-850 hover:text-amber-400 hover:border-amber-500/20 transition-colors cursor-pointer flex items-center gap-1"
+                                        title="Edit date & time"
+                                      >
+                                        {dateStr}
+                                      </button>
+                                    )}
+                                    <ChevronDown
+                                      className={`w-3.5 h-3.5 text-stone-500 transition-transform duration-200 ${isExpanded ? 'rotate-0' : '-rotate-90'}`}
+                                    />
                                   </div>
                                 </div>
 
@@ -1302,24 +1372,32 @@ export default function DayNavigator({
                                         <div className="flex flex-col gap-1.5 pl-6 pb-2.5">
                                           {task.achievements.map((ach) => {
                                             const isEditingThis = editingAchievementId === ach.id;
-                                            
+
                                             const commitEdit = async () => {
                                               const val = editingAchievementText.trim();
                                               let updated: TaskAchievement[];
                                               if (!val) {
-                                                updated = (task.achievements ?? []).filter((x) => x.id !== ach.id);
+                                                updated = (task.achievements ?? []).filter(
+                                                  (x) => x.id !== ach.id,
+                                                );
                                               } else {
                                                 updated = (task.achievements ?? []).map((x) =>
-                                                  x.id === ach.id ? { ...x, text: val } : x
+                                                  x.id === ach.id ? { ...x, text: val } : x,
                                                 );
                                               }
-                                              await db.entries.update(task.id, { achievements: updated } as any);
+                                              await db.entries.update(task.id, {
+                                                achievements: updated,
+                                              } as any);
                                               setEditingAchievementId(null);
                                             };
 
                                             const deleteAch = async () => {
-                                              const updated = (task.achievements ?? []).filter((x) => x.id !== ach.id);
-                                              await db.entries.update(task.id, { achievements: updated } as any);
+                                              const updated = (task.achievements ?? []).filter(
+                                                (x) => x.id !== ach.id,
+                                              );
+                                              await db.entries.update(task.id, {
+                                                achievements: updated,
+                                              } as any);
                                             };
 
                                             return (
@@ -1335,15 +1413,20 @@ export default function DayNavigator({
                                                 className="group/ach flex items-center justify-between gap-2 p-2 rounded-lg border border-stone-850/80 bg-stone-950/40 hover:bg-stone-950 hover:border-amber-500/10 transition-all text-[11px] text-stone-300 font-mono"
                                               >
                                                 <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                                  <span className="text-amber-500/70 select-none shrink-0">🏆</span>
+                                                  <span className="text-amber-500/70 select-none shrink-0">
+                                                    🏆
+                                                  </span>
                                                   {isEditingThis ? (
                                                     <input
                                                       type="text"
                                                       value={editingAchievementText}
-                                                      onChange={(e) => setEditingAchievementText(e.target.value)}
+                                                      onChange={(e) =>
+                                                        setEditingAchievementText(e.target.value)
+                                                      }
                                                       onKeyDown={(e) => {
                                                         if (e.key === 'Enter') commitEdit();
-                                                        if (e.key === 'Escape') setEditingAchievementId(null);
+                                                        if (e.key === 'Escape')
+                                                          setEditingAchievementId(null);
                                                       }}
                                                       onBlur={commitEdit}
                                                       autoFocus
@@ -1351,7 +1434,9 @@ export default function DayNavigator({
                                                       onClick={(e) => e.stopPropagation()}
                                                     />
                                                   ) : (
-                                                    <span className="break-all flex-1">{ach.text}</span>
+                                                    <span className="break-all flex-1">
+                                                      {ach.text}
+                                                    </span>
                                                   )}
                                                 </div>
                                                 {!isEditingThis && (
@@ -1381,7 +1466,10 @@ export default function DayNavigator({
                                           type="text"
                                           value={inputText}
                                           onChange={(e) =>
-                                            setNewAchievementText((prev) => ({ ...prev, [task.id]: e.target.value }))
+                                            setNewAchievementText((prev) => ({
+                                              ...prev,
+                                              [task.id]: e.target.value,
+                                            }))
                                           }
                                           onKeyDown={(e) => {
                                             if (e.key === 'Enter') handleAddAchievement();

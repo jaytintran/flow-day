@@ -16,6 +16,7 @@ import {
   ClipboardList,
   WalletCards,
   CircleDashed,
+  FileText,
 } from 'lucide-react';
 import {
   DndContext,
@@ -30,6 +31,7 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
+  rectSortingStrategy,
   arrayMove,
 } from '@dnd-kit/sortable';
 import { AnimatePresence, motion } from 'motion/react';
@@ -56,7 +58,7 @@ interface TasksViewProps {
   formatDateStringLabel: (dayStr: string) => string;
 }
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 21;
 
 // ─── Move to Page Modal ──────────────────────────────────────────────────────
 
@@ -877,6 +879,222 @@ const CATEGORY_COLORS: Record<string, string> = {
   orange: 'bg-orange-500/10 border-orange-500/20 text-orange-400',
 };
 
+const LIST_BORDER_COLORS: Record<string, string> = {
+  violet: 'border-violet-500/40 hover:border-violet-500/70',
+  sky: 'border-sky-500/40 hover:border-sky-500/70',
+  emerald: 'border-emerald-500/40 hover:border-emerald-500/70',
+  amber: 'border-amber-500/40 hover:border-amber-500/70',
+  rose: 'border-rose-500/40 hover:border-rose-500/70',
+  indigo: 'border-indigo-500/40 hover:border-indigo-500/70',
+  teal: 'border-teal-500/40 hover:border-teal-500/70',
+  orange: 'border-orange-500/40 hover:border-orange-500/70',
+};
+
+// ─── Task Action Context Menu ───────────────────────────────────────────────
+
+interface TaskActionContextMenuProps {
+  task: Task;
+  position: { x: number; y: number };
+  onClose: () => void;
+  onOpenDetail: (task: Task) => void;
+  onActivateTask: (taskId: string) => void;
+  onOpenScheduleModal: (task: Task) => void;
+  onOpenListPicker: (task: Task) => void;
+  onOpenMoveToPage: (task: Task) => void;
+  onDeleteEntry: (taskId: string) => void;
+  onOpenStatusModal?: (task: Task) => void;
+  onToggleTaskStatus: (task: Task) => void;
+  totalPages: number;
+  taskLists: Category[];
+  activeTaskId?: string | null;
+}
+
+function TaskActionContextMenu({
+  task,
+  position,
+  onClose,
+  onOpenDetail,
+  onActivateTask,
+  onOpenScheduleModal,
+  onOpenListPicker,
+  onOpenMoveToPage,
+  onDeleteEntry,
+  onOpenStatusModal,
+  onToggleTaskStatus,
+  totalPages,
+  taskLists,
+  activeTaskId,
+}: TaskActionContextMenuProps) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: position.y, left: position.x });
+
+  const isActive = activeTaskId === task.id;
+  const isDone = task.status === 'done';
+  const isDropped = task.status === 'dropped';
+  const isDateless = !task.scheduled_at;
+
+  useEffect(() => {
+    if (!menuRef.current) return;
+    const rect = menuRef.current.getBoundingClientRect();
+    const menuWidth = rect.width || 230;
+    const menuHeight = rect.height || 280;
+    const padding = 12;
+
+    let left = position.x;
+    let top = position.y;
+
+    if (left + menuWidth > window.innerWidth - padding) {
+      left = Math.max(padding, window.innerWidth - menuWidth - padding);
+    }
+    if (top + menuHeight > window.innerHeight - padding) {
+      top = Math.max(padding, window.innerHeight - menuHeight - padding);
+    }
+
+    setPos({ top, left });
+  }, [position]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[1000] select-none"
+      onClick={onClose}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+    >
+      <div
+        ref={menuRef}
+        style={{ top: `${pos.top}px`, left: `${pos.left}px` }}
+        onClick={(e) => e.stopPropagation()}
+        className="fixed w-56 bg-[#141414] border border-stone-800 rounded-xl shadow-2xl overflow-hidden py-1.5 z-[1001] animate-in fade-in zoom-in-95 duration-100 font-sans"
+      >
+        {/* Header with Title Preview */}
+        <div className="px-3 py-1.5 border-b border-stone-800/80 mb-1">
+          <p className="text-[11px] font-mono font-semibold text-stone-300 truncate">
+            {task.title}
+          </p>
+          <span className="text-[9px] font-mono text-stone-500 uppercase tracking-wider">
+            {task.status === 'in_progress'
+              ? 'In Progress'
+              : task.status === 'done'
+                ? 'Completed'
+                : task.status === 'dropped'
+                  ? 'Dropped'
+                  : 'To Do'}
+          </span>
+        </div>
+
+        {/* 1. Open Details */}
+        <button
+          onClick={() => {
+            onClose();
+            onOpenDetail(task);
+          }}
+          className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-xs font-mono text-stone-300 hover:text-white hover:bg-stone-800/80 transition-colors cursor-pointer"
+        >
+          <FileText className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+          <span>Open Details</span>
+        </button>
+
+        {/* 2. Activate as Working Task */}
+        {!isDone && !isDropped && !isActive && (
+          <button
+            onClick={() => {
+              onClose();
+              onActivateTask(task.id);
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-xs font-mono text-amber-300 hover:text-amber-200 hover:bg-amber-500/10 transition-colors cursor-pointer"
+          >
+            <Play className="w-3.5 h-3.5 text-amber-400 fill-current shrink-0" />
+            <span>Activate Focus</span>
+          </button>
+        )}
+
+        {/* 3. Change Status */}
+        <button
+          onClick={() => {
+            onClose();
+            if (isDateless && onOpenStatusModal) {
+              onOpenStatusModal(task);
+            } else {
+              onToggleTaskStatus(task);
+            }
+          }}
+          className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-xs font-mono text-stone-300 hover:text-white hover:bg-stone-800/80 transition-colors cursor-pointer"
+        >
+          <CircleDashed className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          <span>Change Status</span>
+        </button>
+
+        {/* 4. Schedule Date */}
+        <button
+          onClick={() => {
+            onClose();
+            onOpenScheduleModal(task);
+          }}
+          className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-xs font-mono text-stone-300 hover:text-amber-300 hover:bg-stone-800/80 transition-colors cursor-pointer"
+        >
+          <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+          <span>{task.scheduled_at ? 'Reschedule / Date' : 'Schedule Date'}</span>
+        </button>
+
+        {/* 5. Assign to List */}
+        {isDateless && taskLists.length > 0 && (
+          <button
+            onClick={() => {
+              onClose();
+              onOpenListPicker(task);
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-xs font-mono text-stone-300 hover:text-violet-300 hover:bg-stone-800/80 transition-colors cursor-pointer"
+          >
+            <ListTodo className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+            <span>Assign to List</span>
+          </button>
+        )}
+
+        {/* 6. Move to Page */}
+        {totalPages > 1 && (
+          <button
+            onClick={() => {
+              onClose();
+              onOpenMoveToPage(task);
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-xs font-mono text-stone-300 hover:text-white hover:bg-stone-800/80 transition-colors cursor-pointer"
+          >
+            <ArrowRightLeft className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+            <span>Move to Page</span>
+          </button>
+        )}
+
+        <div className="h-px bg-stone-800 my-1" />
+
+        {/* 7. Delete Task */}
+        {confirmDelete ? (
+          <button
+            onClick={() => {
+              onClose();
+              onDeleteEntry(task.id);
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-xs font-mono text-red-400 bg-red-950/40 hover:bg-red-900/60 transition-colors cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-red-400 shrink-0" />
+            <span>Confirm Delete?</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-xs font-mono text-stone-400 hover:text-red-400 hover:bg-red-950/20 transition-colors cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-stone-500 hover:text-red-400 shrink-0" />
+            <span>Delete Task</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TaskSection({
   label,
   icon,
@@ -913,8 +1131,12 @@ function TaskSection({
   const pageTasks = tasks.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
   const [openRowId, setOpenRowId] = useState<string | null>(null);
+  const [contextMenuTask, setContextMenuTask] = useState<{
+    task: Task;
+    position: { x: number; y: number };
+  } | null>(null);
 
-  const renderTaskRow = (
+  const renderMobileTaskRow = (
     task: Task,
     rowOpenId: string | null,
     setRowOpenId: (id: string | null) => void,
@@ -1038,7 +1260,7 @@ function TaskSection({
           actions={actionButtons}
         >
           <div
-            id={`tasks-view-row-${task.id}`}
+            id={`tasks-view-mobile-row-${task.id}`}
             onClick={() => {
               if (isOpen) {
                 setRowOpenId(null);
@@ -1046,7 +1268,7 @@ function TaskSection({
               }
               onOpenDetail(task);
             }}
-            className={`group/row relative flex items-center gap-3 px-3 py-2.5 last:border-b-0 hover:bg-stone-900/40 transition-colors cursor-pointer ${
+            className={`group/row relative flex items-center gap-3 px-3 py-2.5 border-b border-stone-900/60 last:border-b-0 hover:bg-stone-900/40 transition-colors cursor-pointer ${
               isActive ? 'border-l-2 border-l-amber-500 bg-amber-500/5' : ''
             }`}
           >
@@ -1171,7 +1393,7 @@ function TaskSection({
                   onOpenScheduleModal(task);
                 }}
                 title="Change scheduled date"
-                className={`shrink-0 px-2 py-0.5 rounded-full border text-[10px] font-mono font-semibold uppercase tracking-wider transition-colors cursor-pointer hidden sm:inline-block ${
+                className={`shrink-0 px-2 py-0.5 rounded-full border text-[10px] font-mono font-semibold uppercase tracking-wider transition-colors cursor-pointer ${
                   badge.isOverdue
                     ? 'bg-red-950/20 border-red-800/30 text-red-400 hover:text-red-300 hover:border-red-700/50'
                     : 'bg-stone-900 border-stone-800 text-stone-400 hover:text-emerald-400 hover:border-emerald-500/30'
@@ -1180,13 +1402,194 @@ function TaskSection({
                 {badge.label}
               </button>
             )}
-
-            {/* Desktop Action Buttons */}
-            <div className="hidden sm:flex items-center gap-1.5 shrink-0 opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity ml-2">
-              {actionButtons}
-            </div>
           </div>
         </SwipeableRow>
+      </SortableRow>
+    );
+  };
+
+  const renderDesktopTaskCard = (task: Task) => {
+    const isActive = activeTaskId === task.id;
+    const isDone = task.status === 'done';
+    const isDropped = task.status === 'dropped';
+    const isInProgress = task.status === 'in_progress';
+    const hasAchievements = task.achievements && task.achievements.length > 0;
+    const badge = formatScheduledBadge(task);
+    const isDateless = !task.scheduled_at;
+    const taskCategories = (task.category_ids ?? [])
+      .map((id) => taskLists.find((list) => list.id === id))
+      .filter((list): list is Category => !!list && list.id !== selectedListId);
+
+    // Border color based on task status or assigned list color
+    const primaryList = (task.category_ids ?? [])
+      .map((id) => taskLists.find((list) => list.id === id))
+      .find(Boolean);
+    const listBorder =
+      primaryList && LIST_BORDER_COLORS[primaryList.color]
+        ? LIST_BORDER_COLORS[primaryList.color]
+        : 'border-stone-800 hover:border-stone-700';
+
+    const borderClass = isDone
+      ? hasAchievements
+        ? 'border-amber-400/80 hover:border-amber-400'
+        : 'border-emerald-600 hover:border-emerald-500'
+      : isDropped
+        ? 'border-stone-600/60 opacity-60 hover:opacity-100'
+        : isInProgress
+          ? 'border-amber-200/95 hover:border-amber-200'
+          : listBorder;
+
+    return (
+      <SortableRow key={task.id} id={task.id}>
+        <div
+          id={`tasks-view-desktop-card-${task.id}`}
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest('[data-no-menu]')) {
+              return;
+            }
+            e.preventDefault();
+            setContextMenuTask({
+              task,
+              position: { x: e.clientX, y: e.clientY },
+            });
+          }}
+          className={`group/row relative flex flex-col justify-between p-3 rounded-xl border bg-[#0d0d0d] hover:bg-[#121212] transition-all duration-150 cursor-pointer select-none min-h-[92px] ${borderClass} ${
+            isActive ? 'ring-1 ring-amber-500/50 bg-amber-500/[0.04]' : ''
+          }`}
+        >
+          {/* Top Row: Status button + Title */}
+          <div className="flex items-start gap-2.5 min-w-0 mb-1.5">
+            {/* Status Button */}
+            <div data-no-menu className="shrink-0 mt-0.5">
+              {isDateless && onOpenStatusModal ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenStatusModal(task);
+                  }}
+                  className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
+                    isDone
+                      ? 'bg-emerald-600 border-emerald-500 text-stone-950 shadow-[0_0_8px_rgba(16,185,129,0.3)]'
+                      : isInProgress
+                        ? 'bg-amber-500/20 border-amber-500/60 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
+                        : isDropped
+                          ? 'bg-rose-950/60 border-rose-800 text-rose-400'
+                          : 'border-stone-700 bg-[#0a0a0a] text-transparent hover:border-stone-500 hover:text-stone-500'
+                  }`}
+                  title="Change status"
+                >
+                  {isDone && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                  {isInProgress && (
+                    <CircleDashed
+                      className="w-3.5 h-3.5 animate-spin"
+                      style={{ animationDuration: '4s' }}
+                    />
+                  )}
+                  {isDropped && <X className="w-3 h-3 stroke-[2.5]" />}
+                </button>
+              ) : (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleTaskStatus(task);
+                  }}
+                  className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors cursor-pointer ${
+                    isDone
+                      ? 'bg-stone-800 border-stone-700 text-stone-400'
+                      : 'border-stone-700 bg-[#0a0a0a] text-transparent hover:text-stone-400 hover:bg-stone-900/60'
+                  }`}
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                </button>
+              )}
+            </div>
+
+            {/* Title */}
+            <div className="flex-1 min-w-0">
+              <p
+                className={`font-serif text-sm font-semibold line-clamp-2 leading-snug ${
+                  isDone
+                    ? hasAchievements
+                      ? 'text-amber-400/80'
+                      : 'text-emerald-600'
+                    : isDropped
+                      ? 'text-stone-600 opacity-60'
+                      : isInProgress
+                        ? 'text-amber-200/95 font-bold'
+                        : 'text-stone-200'
+                }`}
+              >
+                {isDone && hasAchievements && <span className="mr-1.5 not-italic">🏆</span>}
+                {task.title}
+              </p>
+            </div>
+          </div>
+
+          {/* Middle: Content snippet */}
+          {showContent && task.content && task.content.trim() && (
+            <p className="text-[10px] font-mono text-stone-500 line-clamp-2 leading-relaxed mb-2">
+              {task.content}
+            </p>
+          )}
+
+          {/* Bottom row: badges and timestamps */}
+          <div className="flex items-center justify-between flex-wrap gap-x-1.5 gap-y-1 mt-auto pt-1.5 border-t border-stone-800/40">
+            <div className="flex items-center flex-wrap gap-1">
+              {isDateless && isInProgress && (
+                <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider border border-amber-500/30 bg-amber-500/10 text-amber-400 shrink-0">
+                  In Progress
+                </span>
+              )}
+              {isDateless && isDropped && (
+                <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider border border-rose-500/30 bg-rose-500/10 text-rose-400 shrink-0">
+                  Dropped
+                </span>
+              )}
+              {isDateless &&
+                !isDone &&
+                !isDropped &&
+                taskCategories.map((cat) => {
+                  const colorClass = CATEGORY_COLORS[cat.color] ?? CATEGORY_COLORS.violet;
+                  return (
+                    <span
+                      key={cat.id}
+                      className={`px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider border shrink-0 ${colorClass}`}
+                    >
+                      {cat.name}
+                    </span>
+                  );
+                })}
+              {badge && (
+                <span
+                  data-no-menu
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenScheduleModal(task);
+                  }}
+                  className={`shrink-0 px-2 py-0.5 rounded-full border text-[9px] font-mono font-semibold uppercase tracking-wider cursor-pointer ${
+                    badge.isOverdue
+                      ? 'bg-red-950/20 border-red-800/30 text-red-400 hover:text-red-300 hover:border-red-700/50'
+                      : 'bg-stone-900 border-stone-800 text-stone-400 hover:text-emerald-400 hover:border-emerald-500/30'
+                  }`}
+                >
+                  {badge.label}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1 text-[9px] font-mono text-stone-500 shrink-0">
+              <span>{formatTime(task.created_at)}</span>
+              {task.time_spent > 0 && (
+                <span className="text-stone-600">· {Math.floor(task.time_spent / 60000)}m</span>
+              )}
+              {isDone && task.completed_at && (
+                <span className="text-emerald-500 font-semibold">
+                  · ✓ {formatTime(task.completed_at)}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
       </SortableRow>
     );
   };
@@ -1255,12 +1658,15 @@ function TaskSection({
                 collisionDetection={closestCenter}
                 onDragEnd={onDragEnd}
               >
-                <SortableContext
-                  items={pageTasks.map((t) => t.id)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <div className="border border-stone-900/60 rounded-xl overflow-hidden">
-                    {pageTasks.map((task) => renderTaskRow(task, openRowId, setOpenRowId))}
+                <SortableContext items={pageTasks.map((t) => t.id)} strategy={rectSortingStrategy}>
+                  {/* Mobile view: classic list with swipeable rows */}
+                  <div className="md:hidden border border-stone-900/60 rounded-xl overflow-hidden">
+                    {pageTasks.map((task) => renderMobileTaskRow(task, openRowId, setOpenRowId))}
+                  </div>
+
+                  {/* Desktop view: 3-column cards with status/list borders & context menu */}
+                  <div className="hidden md:grid grid-cols-3 gap-2 space-y-5">
+                    {pageTasks.map((task) => renderDesktopTaskCard(task))}
                   </div>
                 </SortableContext>
               </DndContext>
@@ -1272,6 +1678,40 @@ function TaskSection({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Action Context Menu Modal */}
+      {contextMenuTask && (
+        <TaskActionContextMenu
+          task={contextMenuTask.task}
+          position={contextMenuTask.position}
+          onClose={() => setContextMenuTask(null)}
+          onOpenDetail={onOpenDetail}
+          onActivateTask={onActivateTask}
+          onOpenScheduleModal={onOpenScheduleModal}
+          onOpenListPicker={(t) => setListPickerTaskId(t.id)}
+          onOpenMoveToPage={setMoveToPageModalTask}
+          onDeleteEntry={onDeleteEntry}
+          onOpenStatusModal={onOpenStatusModal}
+          onToggleTaskStatus={onToggleTaskStatus}
+          totalPages={totalPages}
+          taskLists={taskLists}
+          activeTaskId={activeTaskId}
+        />
+      )}
+
+      {/* List Picker Popover modal when opened */}
+      {listPickerTaskId &&
+        (() => {
+          const task = tasks.find((t) => t.id === listPickerTaskId);
+          if (!task) return null;
+          return (
+            <ListPickerPopover
+              task={task}
+              lists={taskLists}
+              onClose={() => setListPickerTaskId(null)}
+            />
+          );
+        })()}
     </div>
   );
 }
@@ -2444,7 +2884,7 @@ export default function TasksView({
           {/* ── DESKTOP: two-column sidebar layout ── */}
           <div className="hidden md:flex gap-0 mt-3 h-[500px] overflow-hidden">
             {/* LEFT COLUMN — List sidebar */}
-            <div className="w-[200px] lg:w-[220px] h-[500px] shrink-0 flex flex-col min-h-0 border-r border-stone-800/60 pr-3 mr-3 items-between">
+            <div className="w-[200px] lg:w-[300px] h-[500px] shrink-0 flex flex-col min-h-0 border-r border-stone-800/60 pr-3 mr-3 items-between">
               {/* Sidebar header: All · None · ··· — pinned, never scrolls */}
               <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-stone-800/60 shrink-0">
                 <button
