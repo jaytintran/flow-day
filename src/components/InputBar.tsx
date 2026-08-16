@@ -85,36 +85,192 @@ function parseSmartDate(
   return { parsedDate: targetDate, textAfterDateRemoval: cleanText };
 }
 
-// Helper to parse time keyword from text
+// Helper regex tokens for time parsing
+const TIME_TOKEN_PATTERN =
+  '(?:\\d{1,2}:\\d{2}\\s*(?:am|pm)?|\\d{1,2}\\s*(?:am|pm)\\s*\\d{1,2}|\\d{1,2}\\s*(?:am|pm)|\\d{1,2}\\s*h\\s*\\d{1,2}|\\d{1,2})';
+const fromToRegex = new RegExp(
+  '(?:\\s+|^)from\\s*(' + TIME_TOKEN_PATTERN + ')\\s*to\\s*(' + TIME_TOKEN_PATTERN + ')(?=\\s|$)',
+  'i',
+);
+const atRegex = new RegExp('(?:\\s+|^)at\\s*(' + TIME_TOKEN_PATTERN + ')(?=\\s|$)', 'i');
+const durationRegex = /(?:\s+|^)(\d+)\s*h\s*(\d+)?\s*(?:m|min)?(?=\s|$)/i;
+const durationOnlyMinutesRegex = /(?:\s+|^)(\d+)\s*(?:m|min)(?=\s|$)/i;
+
+// Parse a single time token like "3pm40", "3:45pm", "3pm", "15:30", "3h20", "3"
+function parseSingleTimeToken(
+  tokenStr: string,
+): { hour: number; minute: number; ampm: string | null } | null {
+  if (!tokenStr) return null;
+  const s = tokenStr.trim().toLowerCase();
+
+  // Format: 3:45pm, 3:45 am, 3:45, 15:45
+  const colonMatch = s.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/);
+  if (colonMatch) {
+    const h = parseInt(colonMatch[1], 10);
+    const m = parseInt(colonMatch[2], 10);
+    if (h >= 0 && h <= 24 && m >= 0 && m < 60) {
+      return { hour: h, minute: m, ampm: colonMatch[3] || null };
+    }
+  }
+
+  // Format: 3pm40, 3pm 40, 3am20, 5pm50, 3pm30
+  const ampmMinMatch = s.match(/^(\d{1,2})\s*(am|pm)\s*(\d{1,2})$/);
+  if (ampmMinMatch) {
+    const h = parseInt(ampmMinMatch[1], 10);
+    const m = parseInt(ampmMinMatch[3], 10);
+    if (h >= 0 && h <= 12 && m >= 0 && m < 60) {
+      return { hour: h, minute: m, ampm: ampmMinMatch[2] };
+    }
+  }
+
+  // Format: 3h40, 15h30
+  const hMatch = s.match(/^(\d{1,2})\s*h\s*(\d{1,2})$/);
+  if (hMatch) {
+    const h = parseInt(hMatch[1], 10);
+    const m = parseInt(hMatch[2], 10);
+    if (h >= 0 && h <= 24 && m >= 0 && m < 60) {
+      return { hour: h, minute: m, ampm: null };
+    }
+  }
+
+  // Format: 3pm, 3 am
+  const ampmOnlyMatch = s.match(/^(\d{1,2})\s*(am|pm)$/);
+  if (ampmOnlyMatch) {
+    const h = parseInt(ampmOnlyMatch[1], 10);
+    if (h >= 0 && h <= 12) {
+      return { hour: h, minute: 0, ampm: ampmOnlyMatch[2] };
+    }
+  }
+
+  // Format: 3, 15 (standalone number)
+  const numMatch = s.match(/^(\d{1,2})$/);
+  if (numMatch) {
+    const h = parseInt(numMatch[1], 10);
+    if (h >= 0 && h <= 24) {
+      return { hour: h, minute: 0, ampm: null };
+    }
+  }
+
+  return null;
+}
+
+function resolveHour(hour: number, ampm: string | null): number {
+  let h = hour;
+  if (ampm === 'pm' && h < 12) {
+    h += 12;
+  } else if (ampm === 'am' && h === 12) {
+    h = 0;
+  }
+  return h;
+}
+
+// Helper to parse time keyword or time span from text
+function parseSmartTimeSpan(
+  inputText: string,
+  baseDate: Date,
+): {
+  parsedStart: Date;
+  parsedEnd: Date | null;
+  hasSpan: boolean;
+  hasTime: boolean;
+  textAfterTimeRemoval: string;
+} {
+  let cleanText = inputText;
+  let startAt = new Date(baseDate);
+  let endAt: Date | null = null;
+  let hasSpan = false;
+  let hasTime = false;
+
+  // 1. Try to match "from <time> to <time>" (e.g. from 3pm to 4pm, from3pmto4pm, from 3pm40 to 5pm50, from3pm30to5pm30)
+  const fromToMatch = cleanText.match(fromToRegex);
+  if (fromToMatch) {
+    const t1 = parseSingleTimeToken(fromToMatch[1]);
+    const t2 = parseSingleTimeToken(fromToMatch[2]);
+
+    if (t1 && t2) {
+      // Inherit am/pm if one is missing but the other exists
+      if (!t1.ampm && t2.ampm && t1.hour < 12) {
+        t1.ampm = t2.ampm;
+      }
+      if (!t2.ampm && t1.ampm && t2.hour < 12) {
+        t2.ampm = t1.ampm;
+      }
+
+      const startH = resolveHour(t1.hour, t1.ampm);
+      const endH = resolveHour(t2.hour, t2.ampm);
+
+      if (startH >= 0 && startH < 24 && t1.minute >= 0 && t1.minute < 60) {
+        startAt.setHours(startH, t1.minute, 0, 0);
+        hasTime = true;
+      }
+      if (endH >= 0 && endH < 24 && t2.minute >= 0 && t2.minute < 60) {
+        const calculatedEnd = new Date(startAt);
+        calculatedEnd.setHours(endH, t2.minute, 0, 0);
+        if (calculatedEnd.getTime() <= startAt.getTime()) {
+          calculatedEnd.setDate(calculatedEnd.getDate() + 1);
+        }
+        endAt = calculatedEnd;
+        hasSpan = true;
+      }
+
+      cleanText = cleanText.replace(fromToRegex, ' ').trim().replace(/\s+/g, ' ');
+    }
+  }
+
+  // 2. If no from...to span, try "at <time>" (e.g. at 3:45pm, at3pm20, at 3pm20, at 20:15)
+  if (!hasTime) {
+    const atMatch = cleanText.match(atRegex);
+    if (atMatch) {
+      const t = parseSingleTimeToken(atMatch[1]);
+      if (t) {
+        const targetHour = resolveHour(t.hour, t.ampm);
+        if (targetHour >= 0 && targetHour < 24 && t.minute >= 0 && t.minute < 60) {
+          startAt.setHours(targetHour, t.minute, 0, 0);
+          hasTime = true;
+        }
+        cleanText = cleanText.replace(atRegex, ' ').trim().replace(/\s+/g, ' ');
+      }
+    }
+  }
+
+  // 3. Check for trailing duration (e.g. 1h30, 45m)
+  const durMatch = cleanText.match(durationRegex);
+  if (durMatch) {
+    const h = parseInt(durMatch[1], 10);
+    const m = durMatch[2] ? parseInt(durMatch[2], 10) : 0;
+    const durationMinutes = h * 60 + m;
+    endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
+    hasSpan = true;
+    cleanText = cleanText.replace(durationRegex, ' ').trim().replace(/\s+/g, ' ');
+  } else {
+    const minMatch = cleanText.match(durationOnlyMinutesRegex);
+    if (minMatch) {
+      const durationMinutes = parseInt(minMatch[1], 10);
+      endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
+      hasSpan = true;
+      cleanText = cleanText.replace(durationOnlyMinutesRegex, ' ').trim().replace(/\s+/g, ' ');
+    }
+  }
+
+  return {
+    parsedStart: startAt,
+    parsedEnd: endAt,
+    hasSpan,
+    hasTime,
+    textAfterTimeRemoval: cleanText.trim().replace(/\s+/g, ' '),
+  };
+}
+
+// Backward-compatible helper to parse time keyword from text
 function parseSmartTime(
   inputText: string,
   baseDate: Date,
 ): { parsedDate: Date; textAfterTimeRemoval: string } {
-  let cleanText = inputText;
-  let targetDate = new Date(baseDate);
-
-  const timeRegex = /(?:\s+|^)at\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i;
-  const match = cleanText.match(timeRegex);
-  if (match) {
-    const h = parseInt(match[1], 10);
-    const m = match[2] ? parseInt(match[2], 10) : 0;
-    const ampm = match[3] ? match[3].toLowerCase() : null;
-
-    let targetHour = h;
-    if (ampm === 'pm' && h < 12) {
-      targetHour += 12;
-    } else if (ampm === 'am' && h === 12) {
-      targetHour = 0;
-    }
-
-    if (targetHour >= 0 && targetHour < 24 && m >= 0 && m < 60) {
-      targetDate.setHours(targetHour, m, 0, 0);
-      cleanText = cleanText.replace(timeRegex, ' ');
-    }
-  }
-
-  cleanText = cleanText.trim().replace(/\s+/g, ' ');
-  return { parsedDate: targetDate, textAfterTimeRemoval: cleanText };
+  const result = parseSmartTimeSpan(inputText, baseDate);
+  return {
+    parsedDate: result.parsedStart,
+    textAfterTimeRemoval: result.textAfterTimeRemoval,
+  };
 }
 
 // Helper to parse complex timeblock options
@@ -131,106 +287,19 @@ function parseTimeBlock(
   );
   cleanText = textAfterDateRemoval;
 
-  let startAt = new Date(dateBaseline);
-  let endAt = new Date(dateBaseline);
+  // 2. Parse time span or at time + duration
+  const spanResult = parseSmartTimeSpan(cleanText, dateBaseline);
+  const startAt = spanResult.parsedStart;
+  let endAt = spanResult.parsedEnd;
+
   // Default end is 1 hour after start if not overridden
-  endAt.setHours(startAt.getHours() + 1);
-
-  // 2. Try to parse "from X to Y" (e.g. "from 6pm to 7pm" or "from 6:30pm to 7:20pm")
-  const fromToRegex =
-    /(?:\s+|^)from\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*to\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i;
-  const fromToMatch = cleanText.match(fromToRegex);
-
-  let hasFromTo = false;
-  if (fromToMatch) {
-    let startH = parseInt(fromToMatch[1], 10);
-    let startM = fromToMatch[2] ? parseInt(fromToMatch[2], 10) : 0;
-    let startAmpm = fromToMatch[3] ? fromToMatch[3].toLowerCase() : null;
-
-    let endH = parseInt(fromToMatch[4], 10);
-    let endM = fromToMatch[5] ? parseInt(fromToMatch[5], 10) : 0;
-    let endAmpm = fromToMatch[6] ? fromToMatch[6].toLowerCase() : null;
-
-    // Inherit am/pm if one is missing but the other exists
-    if (!startAmpm && endAmpm && startH < 12) {
-      startAmpm = endAmpm;
-    }
-    if (!endAmpm && startAmpm && endH < 12) {
-      endAmpm = startAmpm;
-    }
-
-    if (startAmpm === 'pm' && startH < 12) startH += 12;
-    if (startAmpm === 'am' && startH === 12) startH = 0;
-    if (endAmpm === 'pm' && endH < 12) endH += 12;
-    if (endAmpm === 'am' && endH === 12) endH = 0;
-
-    if (startH >= 0 && startH < 24 && startM >= 0 && startM < 60) {
-      startAt.setHours(startH, startM, 0, 0);
-    }
-    if (endH >= 0 && endH < 24 && endM >= 0 && endM < 60) {
-      endAt.setHours(endH, endM, 0, 0);
-      if (endAt.getTime() < startAt.getTime()) {
-        endAt.setDate(endAt.getDate() + 1);
-      }
-    }
-    hasFromTo = true;
-    cleanText = cleanText.replace(fromToRegex, ' ').trim().replace(/\s+/g, ' ');
-  }
-
-  // 3. Otherwise try discrete "at X" (e.g. "at 6pm") as startAt
-  if (!hasFromTo) {
-    const timeRegex = /(?:\s+|^)at\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i;
-    const timeMatch = cleanText.match(timeRegex);
-    if (timeMatch) {
-      let h = parseInt(timeMatch[1], 10);
-      let m = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-      let ampm = timeMatch[3] ? timeMatch[3].toLowerCase() : null;
-
-      let targetHour = h;
-      if (ampm === 'pm' && h < 12) {
-        targetHour += 12;
-      } else if (ampm === 'am' && h === 12) {
-        targetHour = 0;
-      }
-
-      if (targetHour >= 0 && targetHour < 24 && m >= 0 && m < 60) {
-        startAt.setHours(targetHour, m, 0, 0);
-        endAt = new Date(startAt);
-        endAt.setHours(startAt.getHours() + 1);
-      }
-      cleanText = cleanText.replace(timeRegex, ' ').trim().replace(/\s+/g, ' ');
-    }
-  }
-
-  // 4. Parse duration keywords: e.g. "1h30", "45m"
-  const durationRegex = /(?:\s+|^)(\d+)\s*h\s*(\d+)?\s*(?:m|min)?\b/i;
-  const durationOnlyMinutesRegex = /(?:\s+|^)(\d+)\s*(?:m|min)\b/i;
-
-  let durationMinutes = 0;
-  let matchedDuration = false;
-
-  const durMatch = cleanText.match(durationRegex);
-  if (durMatch) {
-    const h = parseInt(durMatch[1], 10);
-    const m = durMatch[2] ? parseInt(durMatch[2], 10) : 0;
-    durationMinutes = h * 60 + m;
-    matchedDuration = true;
-    cleanText = cleanText.replace(durationRegex, ' ').trim().replace(/\s+/g, ' ');
-  } else {
-    const minMatch = cleanText.match(durationOnlyMinutesRegex);
-    if (minMatch) {
-      durationMinutes = parseInt(minMatch[1], 10);
-      matchedDuration = true;
-      cleanText = cleanText.replace(durationOnlyMinutesRegex, ' ').trim().replace(/\s+/g, ' ');
-    }
-  }
-
-  if (matchedDuration) {
-    endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
+  if (!endAt) {
+    endAt = new Date(startAt);
+    endAt.setHours(startAt.getHours() + 1);
   }
 
   return {
-    title: cleanText.trim(),
+    title: spanResult.textAfterTimeRemoval.trim(),
     startAt,
     endAt,
   };
@@ -347,7 +416,13 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
       );
       cleanTitle = textAfterDateRemoval;
 
-      const { parsedDate: finalDate, textAfterTimeRemoval } = parseSmartTime(cleanTitle, dateBase);
+      const {
+        parsedStart,
+        parsedEnd,
+        hasSpan,
+        hasTime,
+        textAfterTimeRemoval,
+      } = parseSmartTimeSpan(cleanTitle, dateBase);
       cleanTitle = textAfterTimeRemoval;
 
       const finalTitle = cleanTitle || title.trim();
@@ -366,9 +441,10 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
         status: 'todo',
         time_spent: 0,
         created_at: getBaseCompletedDate(),
-        // In 'tasks' mode, tasks are dateless (no scheduled_at) unless the user explicitly typed a date keyword
+        // In 'tasks' mode, tasks are dateless (no scheduled_at) unless the user explicitly typed a date/time keyword
         ...(autoListIds.length > 0 ? { category_ids: autoListIds } : {}),
-        ...(viewMode === 'tasks' ? {} : { scheduled_at: finalDate }),
+        ...(viewMode === 'tasks' && !hasTime ? {} : { scheduled_at: parsedStart }),
+        ...(hasSpan && parsedEnd ? { scheduled_end_at: parsedEnd } : {}),
       };
     } else if (activeType === 'log') {
       let cleanTitle = title.trim();
@@ -381,7 +457,12 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
       );
       cleanTitle = textAfterDateRemoval;
 
-      const { parsedDate: finalDate, textAfterTimeRemoval } = parseSmartTime(cleanTitle, dateBase);
+      const {
+        parsedStart,
+        parsedEnd,
+        hasSpan,
+        textAfterTimeRemoval,
+      } = parseSmartTimeSpan(cleanTitle, dateBase);
       cleanTitle = textAfterTimeRemoval;
 
       const finalTitle = cleanTitle || title.trim();
@@ -391,7 +472,8 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
         id: entryId,
         type: 'log',
         title: finalTitle,
-        timestamp: finalDate,
+        timestamp: parsedStart,
+        ...(hasSpan && parsedEnd ? { end_timestamp: parsedEnd } : {}),
         created_at: getBaseCompletedDate(),
       };
     } else if (activeType === 'event') {
@@ -405,7 +487,12 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
       );
       cleanTitle = textAfterDateRemoval;
 
-      const { parsedDate: finalDate, textAfterTimeRemoval } = parseSmartTime(cleanTitle, dateBase);
+      const {
+        parsedStart,
+        parsedEnd,
+        hasSpan,
+        textAfterTimeRemoval,
+      } = parseSmartTimeSpan(cleanTitle, dateBase);
       cleanTitle = textAfterTimeRemoval;
 
       const finalTitle = cleanTitle || title.trim();
@@ -416,9 +503,10 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
         type: 'event',
         title: finalTitle,
         content: content.trim(),
-        timestamp: finalDate,
+        timestamp: parsedStart,
         created_at: getBaseCompletedDate(),
-        scheduled_at: finalDate,
+        scheduled_at: parsedStart,
+        ...(hasSpan && parsedEnd ? { end_timestamp: parsedEnd } : {}),
       };
     } else if (activeType === 'note') {
       let cleanTitle = title.trim();
@@ -530,22 +618,30 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                 {activeType === 'task' && (
                   <>
                     <p className="text-stone-400 leading-relaxed">
-                      Our task input scans your words dynamically for dates and times, creates the
-                      timeline entry correctly, and formats the clean residual title.
+                      Our task input scans your words dynamically for dates, exact times, or time spans,
+                      schedules the timeline entry correctly, and cleans the residual title.
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                       <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
                         <div className="font-mono text-[9px] text-stone-500 uppercase tracking-widest mb-1.5 font-bold">
-                          Time Recognition
+                          Time & Span Recognition
                         </div>
                         <p className="text-stone-300 leading-relaxed">
                           Type{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
                             at 3:45pm
-                          </code>{' '}
-                          or{' '}
+                          </code>
+                          ,{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
-                            at 20:15
+                            at3pm20
+                          </code>
+                          ,{' '}
+                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
+                            from 3pm to 4pm
+                          </code>
+                          , or{' '}
+                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
+                            from3pm30to5pm30
                           </code>
                           .
                         </p>
@@ -580,7 +676,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                         Interactive Example:
                       </span>
                       <span className="font-sans text-stone-200 text-sm leading-relaxed block font-medium">
-                        "Review engineering specs tomorrow at 11am"
+                        "Review engineering specs tomorrow from 3pm40 to 5pm50"
                       </span>
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-mono text-stone-400 border-t border-emerald-900/20 pt-1.5">
                         <span>
@@ -588,8 +684,8 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                           <strong className="text-emerald-400">"Review engineering specs"</strong>
                         </span>
                         <span>
-                          ✓ Calculated Date:{' '}
-                          <strong className="text-emerald-400">Tomorrow @ 11:00 AM</strong>
+                          ✓ Scheduled Span:{' '}
+                          <strong className="text-emerald-400">Tomorrow @ 3:40 PM – 5:50 PM</strong>
                         </span>
                       </div>
                     </div>
@@ -599,32 +695,40 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                 {activeType === 'log' && (
                   <>
                     <p className="text-stone-400 leading-relaxed">
-                      Our log input scans your words dynamically for dates and times, creates the
-                      timeline entry correctly, and formats the clean residual title.
+                      Log quick activities with instant time stamping or duration spans. It parses exact times
+                      and <span className="text-stone-200 font-mono">from...to...</span> duration spans automatically.
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                       <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
                         <div className="font-mono text-[9px] text-stone-500 uppercase tracking-widest mb-1.5 font-bold">
-                          Time Recognition
+                          Time & Span Recognition
                         </div>
                         <p className="text-stone-300 leading-relaxed">
                           Type{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
-                            at 3:45pm
-                          </code>{' '}
-                          or{' '}
+                            at3pm20
+                          </code>
+                          ,{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
-                            at 20:15
+                            from 3pm to 4pm
+                          </code>
+                          , or{' '}
+                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
+                            from3pm30to5pm30
                           </code>
                           .
                         </p>
                       </div>
                       <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
                         <div className="font-mono text-[9px] text-stone-500 uppercase tracking-widest mb-1.5 font-bold">
-                          Date Recognition
+                          Date & Shorthands
                         </div>
                         <p className="text-stone-300 leading-relaxed">
-                          Type{' '}
+                          Use{' '}
+                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
+                            3pm40
+                          </code>
+                          ,{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
                             today
                           </code>
@@ -632,7 +736,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
                             tomorrow
                           </code>
-                          , or specific date{' '}
+                          , or{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
                             24/6
                           </code>
@@ -641,20 +745,20 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                       </div>
                     </div>
                     <div className="bg-stone-950/15 border border-stone-900/30 rounded-lg p-3 mt-2">
-                      <span className="font-mono font-bold text-[9px] text-stone-450 uppercase tracking-wider block mb-1">
+                      <span className="font-mono font-bold text-[9px] text-stone-400 uppercase tracking-wider block mb-1">
                         Interactive Example:
                       </span>
                       <span className="font-sans text-stone-200 text-sm leading-relaxed block font-medium">
-                        "Walking to the train station today at 2:30pm"
+                        "Walking dog from 3pm40 to 5pm50 today"
                       </span>
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-mono text-stone-400 border-t border-stone-900/20 pt-1.5">
                         <span>
                           ✓ Clean Title:{' '}
-                          <strong className="text-stone-450">"Walking to the train station"</strong>
+                          <strong className="text-stone-300">"Walking dog"</strong>
                         </span>
                         <span>
-                          ✓ Calculated Date:{' '}
-                          <strong className="text-stone-450">Today @ 2:30 PM</strong>
+                          ✓ Calculated Log Span:{' '}
+                          <strong className="text-stone-300">Today @ 3:40 PM – 5:50 PM (2h 10m duration)</strong>
                         </span>
                       </div>
                     </div>
@@ -665,22 +769,25 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                   <>
                     <p className="text-stone-400 leading-relaxed">
                       Events map visual milestones or specific schedule goals. Type natural
-                      dates/hours in the input to configure the schedule automatically, or click the
-                      custom date-time picker!
+                      dates, start times, or duration spans in the input to configure automatically.
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                       <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
                         <div className="font-mono text-[9px] text-stone-500 uppercase tracking-widest mb-1.5 font-bold">
-                          Time Alignment
+                          Time & Span Alignment
                         </div>
                         <p className="text-stone-300 leading-relaxed">
                           Add phrases like{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-amber-400">
-                            at 9am
-                          </code>{' '}
-                          or{' '}
+                            at3pm20
+                          </code>
+                          ,{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-amber-400">
-                            at 18:30
+                            from 2pm to 3:30pm
+                          </code>
+                          , or{' '}
+                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-amber-400">
+                            from3pmto4pm
                           </code>
                           .
                         </p>
@@ -700,7 +807,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                           </code>
                           , or{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-amber-400">
-                            inXdays
+                            in 3 days
                           </code>{' '}
                           map instantly.
                         </p>
@@ -711,7 +818,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                         Interactive Example:
                       </span>
                       <span className="font-sans text-stone-200 text-sm leading-relaxed block font-medium">
-                        "Sprint planning demonstration today at 3pm"
+                        "Sprint planning demonstration tomorrow from 3pm to 4pm"
                       </span>
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-mono text-stone-400 border-t border-amber-900/20 pt-1.5">
                         <span>
@@ -721,7 +828,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                           </strong>
                         </span>
                         <span>
-                          ✓ Date Set: <strong className="text-amber-400">Today @ 3:00 PM</strong>
+                          ✓ Date Set: <strong className="text-amber-400">Tomorrow @ 3:00 PM – 4:00 PM</strong>
                         </span>
                       </div>
                     </div>
@@ -731,7 +838,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                 {activeType === 'note' && (
                   <>
                     <p className="text-stone-400 leading-relaxed">
-                      Record quick text blocks, diary logs, or logs. You can inject timestamps
+                      Record quick text blocks, diary logs, or reflections. You can inject timestamps
                       inline via plain-text parsing or use the manual custom override below!
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
@@ -743,12 +850,16 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                           Insert{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-blue-400">
                             at 10pm
-                          </code>{' '}
-                          or{' '}
+                          </code>
+                          ,{' '}
+                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-blue-400">
+                            at3pm20
+                          </code>
+                          , or{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-blue-400">
                             at 12:45
-                          </code>{' '}
-                          to date of the logs of note.
+                          </code>
+                          .
                         </p>
                       </div>
                       <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
@@ -791,6 +902,14 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-indigo-400">
                             from 1pm to 3:30pm
                           </code>
+                          ,{' '}
+                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-indigo-400">
+                            from3pmto4pm
+                          </code>
+                          , or{' '}
+                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-indigo-400">
+                            from 3pm40 to 5pm50
+                          </code>
                           .
                         </p>
                       </div>
@@ -802,8 +921,12 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                           Type starting time and duration:{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-indigo-400">
                             at 10am 2h30
-                          </code>{' '}
-                          or{' '}
+                          </code>
+                          ,{' '}
+                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-indigo-400">
+                            at3pm20 45m
+                          </code>
+                          , or{' '}
                           <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-indigo-400">
                             at 5pm 45m
                           </code>
@@ -1390,10 +1513,12 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                   );
                   cleanTitle = textAfterDateRemoval;
 
-                  const { parsedDate: finalDate, textAfterTimeRemoval } = parseSmartTime(
-                    cleanTitle,
-                    dateBase,
-                  );
+                  const {
+                    parsedStart,
+                    parsedEnd,
+                    hasSpan,
+                    textAfterTimeRemoval,
+                  } = parseSmartTimeSpan(cleanTitle, dateBase);
                   cleanTitle = textAfterTimeRemoval;
 
                   const finalTitle = cleanTitle || modalTitle.trim();
@@ -1403,9 +1528,12 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                     type: (activeType === 'event' ? 'event' : 'note') as 'event' | 'note',
                     title: finalTitle,
                     content: modalContent.trim(),
-                    timestamp: finalDate,
+                    timestamp: parsedStart,
                     created_at: getBaseCompletedDate(),
-                    scheduled_at: finalDate,
+                    scheduled_at: parsedStart,
+                    ...(activeType === 'event' && hasSpan && parsedEnd
+                      ? { end_timestamp: parsedEnd }
+                      : {}),
                   };
 
                   await db.entries.add(newEntry);

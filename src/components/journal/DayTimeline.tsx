@@ -351,14 +351,13 @@ export default function DayTimeline({
             </div>
           )}
         </div>
-
         {/* Right Column: Row Display details */}
         <div className="flex-1 min-w-0">
           {/* Row 1: Title + Action Tools */}
           <div className="flex justify-between items-center gap-4">
             <div className="flex-1">
               {isLog && (
-                <>
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
                   {editingLogId === entry.id ? (
                     <input
                       type="text"
@@ -377,19 +376,35 @@ export default function DayTimeline({
                       onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <p
-                      id={`log-title-${entry.id}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingLogId(entry.id);
-                        setEditingLogTitle((entry as Log).title);
-                      }}
-                      className="text-xs font-sans font-semibold text-stone-200 break-words line-clamp-1 hover:text-stone-300 transition-colors"
-                    >
-                      {(entry as Log).title}
-                    </p>
+                    <>
+                      <p
+                        id={`log-title-${entry.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingLogId(entry.id);
+                          setEditingLogTitle((entry as Log).title);
+                        }}
+                        className="text-xs font-sans font-semibold text-stone-200 break-words line-clamp-1 hover:text-stone-300 transition-colors"
+                      >
+                        {(entry as Log).title}
+                      </p>
+                      {(entry as Log).end_timestamp && (
+                        <span
+                          className="inline-flex items-center gap-1 bg-stone-900 border border-stone-800 text-stone-400 rounded-md px-1.5 py-0.5 text-[9px] font-mono shrink-0 select-none"
+                          title={`Logged span: ${formatTime((entry as Log).timestamp)} – ${formatTime((entry as Log).end_timestamp!)}`}
+                        >
+                          <Clock className="w-2.5 h-2.5 text-stone-500" />
+                          <span>
+                            {formatDuration(
+                              new Date((entry as Log).end_timestamp!).getTime() -
+                                new Date((entry as Log).timestamp).getTime(),
+                            )}
+                          </span>
+                        </span>
+                      )}
+                    </>
                   )}
-                </>
+                </div>
               )}
 
               {isTask && (
@@ -459,15 +474,15 @@ export default function DayTimeline({
               {isHabitLog && (
                 <p
                   id={`habitlog-title-${entry.id}`}
-                  className="text-xs font-sans text-emerald-300/90 font-semibold"
+                  className="text-xs font-sans font-semibold text-stone-200 break-words line-clamp-1"
                 >
                   {(entry as HabitLog).title}
                 </p>
               )}
             </div>
 
-            {/* Action Tools */}
-            <div className="flex items-center gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
+            {/* Right-aligned actions: Delete Entry Tool */}
+            <div className="flex items-center gap-1 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
               {isTask && (entry as Task).status === 'todo' && (
                 <button
                   id={`activate-task-btn-${entry.id}`}
@@ -514,7 +529,7 @@ export default function DayTimeline({
 
               {deletingId === entry.id ? (
                 <button
-                  id={`delete-entry-btn-${entry.id}`}
+                  id={`confirm-delete-entry-${entry.id}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDeleteEntry(entry.id);
@@ -543,8 +558,23 @@ export default function DayTimeline({
           {/* Row 2: Custom info triggers */}
           <div className="flex items-center gap-x-1.5 text-xs pb-1">
             {isLog && (
-              <span className="font-mono text-stone-500">
-                Logged at: {formatTime((entry as Log).timestamp)}
+              <span className="font-mono text-stone-500 flex items-center gap-1.5 flex-wrap">
+                {(entry as Log).end_timestamp ? (
+                  <>
+                    <span>
+                      Span: {formatTime((entry as Log).timestamp)} – {formatTime((entry as Log).end_timestamp!)}
+                    </span>
+                    <span className="text-stone-700">·</span>
+                    <span className="text-stone-400">
+                      Duration: {formatDuration(
+                        new Date((entry as Log).end_timestamp!).getTime() -
+                          new Date((entry as Log).timestamp).getTime(),
+                      )}
+                    </span>
+                  </>
+                ) : (
+                  <span>Logged at: {formatTime((entry as Log).timestamp)}</span>
+                )}
               </span>
             )}
 
@@ -554,6 +584,13 @@ export default function DayTimeline({
                   <Clock className="w-3 h-3 inline-block text-stone-500" />
                   {formatTime(entry.created_at)}
                 </span>
+
+                {(entry as Task).scheduled_end_at && (
+                  <span className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 rounded px-2 py-0.5 text-[8px]">
+                    <Calendar className="w-3 h-3 inline-block text-sky-400" />
+                    {formatTime((entry as Task).scheduled_at || (entry as Task).created_at)} – {formatTime((entry as Task).scheduled_end_at!)}
+                  </span>
+                )}
 
                 {(entry as Task).completed_at && (
                   <span className="flex items-center gap-1 bg-[emerald-900] text-emerald-600/90 border border-emerald-600/30 rounded px-2 py-0.5 text-[8px]">
@@ -571,7 +608,9 @@ export default function DayTimeline({
 
             {isEvent && (
               <span className="font-mono text-stone-500">
-                Happens at: {formatTime((entry as Event).timestamp)}
+                {(entry as Event).end_timestamp
+                  ? `Happens: ${formatTime((entry as Event).timestamp)} – ${formatTime((entry as Event).end_timestamp!)} (${formatDuration(new Date((entry as Event).end_timestamp!).getTime() - new Date((entry as Event).timestamp).getTime())})`
+                  : `Happens at: ${formatTime((entry as Event).timestamp)}`}
               </span>
             )}
 

@@ -34,6 +34,7 @@ export interface Task extends BaseEntry {
   status: TaskStatus;
   time_spent: number; // milliseconds
   completed_at?: Date; // the timestamp when completed
+  scheduled_end_at?: Date; // optional end time for scheduled span
   objective_id?: string; // link to an objective
   achievements?: TaskAchievement[];
   content?: string;
@@ -47,6 +48,7 @@ export interface Event extends BaseEntry {
   title: string;
   content: string;
   timestamp: Date;
+  end_timestamp?: Date;
 }
 
 export interface Note extends BaseEntry {
@@ -60,6 +62,7 @@ export interface Log extends BaseEntry {
   type: 'log';
   title: string;
   timestamp: Date;
+  end_timestamp?: Date;
 }
 
 export interface TimeBlock extends BaseEntry {
