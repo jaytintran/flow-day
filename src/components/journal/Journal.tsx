@@ -649,8 +649,12 @@ export default function Journal({
   };
 
   // Quick activate a task for the timer bar
-  const handleActivateTask = (taskId: string) => {
+  const handleActivateTask = async (taskId: string) => {
     setActiveTaskId(taskId);
+    const entry = await db.entries.get(taskId);
+    if (entry && entry.type === 'task' && !entry.scheduled_at && entry.status !== 'in_progress') {
+      await db.entries.update(taskId, { status: 'in_progress' } as any);
+    }
   };
 
   // Carry a task to a new date (by updating scheduled_at)

@@ -26,10 +26,12 @@ export interface TaskAchievement {
   created_at: Date;
 }
 
+export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'dropped';
+
 export interface Task extends BaseEntry {
   type: 'task';
   title: string;
-  status: 'todo' | 'done';
+  status: TaskStatus;
   time_spent: number; // milliseconds
   completed_at?: Date; // the timestamp when completed
   objective_id?: string; // link to an objective
