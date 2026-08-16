@@ -17,6 +17,7 @@ import {
   WalletCards,
   CircleDashed,
   FileText,
+  HelpCircle,
 } from 'lucide-react';
 import {
   DndContext,
@@ -439,6 +440,14 @@ function TaskStatusPickerPopover({ task, onClose }: TaskStatusPickerPopoverProps
       colorClasses: 'text-rose-300 hover:bg-rose-500/10',
       activeClasses: 'bg-rose-500/20 text-rose-200 border-rose-500/40',
     },
+    {
+      status: 'maybe',
+      label: 'Maybe / Later',
+      description: 'Parked for later or undecided',
+      icon: <HelpCircle className="w-3.5 h-3.5 text-indigo-400 stroke-[2.5] shrink-0" />,
+      colorClasses: 'text-indigo-300 hover:bg-indigo-500/10',
+      activeClasses: 'bg-indigo-500/20 text-indigo-200 border-indigo-500/40',
+    },
   ];
 
   return (
@@ -682,6 +691,7 @@ function PaperListModal({
                   const isDone = task.status === 'done';
                   const isDropped = task.status === 'dropped';
                   const isInProgress = task.status === 'in_progress';
+                  const isMaybe = task.status === 'maybe';
                   const isDeleting = deletingId === task.id;
                   return (
                     <div
@@ -700,7 +710,9 @@ function PaperListModal({
                               ? 'bg-amber-500/20 border-amber-500/60 text-amber-400'
                               : isDropped
                                 ? 'bg-rose-950/60 border-rose-800 text-rose-400'
-                                : 'border-stone-700 bg-transparent text-transparent hover:text-stone-500 hover:border-stone-500'
+                                : isMaybe
+                                  ? 'bg-indigo-950/60 border-indigo-700 text-indigo-400'
+                                  : 'border-stone-700 bg-transparent text-transparent hover:text-stone-500 hover:border-stone-500'
                         }`}
                       >
                         {isDone && <Check className="w-2.5 h-2.5 stroke-[3]" />}
@@ -711,6 +723,7 @@ function PaperListModal({
                           />
                         )}
                         {isDropped && <X className="w-2.5 h-2.5 stroke-[3]" />}
+                        {isMaybe && <HelpCircle className="w-2.5 h-2.5 stroke-[2.5]" />}
                       </button>
 
                       {/* Title */}
@@ -722,7 +735,9 @@ function PaperListModal({
                               ? 'line-through text-stone-600 opacity-60'
                               : isInProgress
                                 ? 'text-amber-200/95 font-semibold'
-                                : 'text-stone-300'
+                                : isMaybe
+                                  ? 'text-indigo-200/95 font-semibold'
+                                  : 'text-stone-300'
                         }`}
                       >
                         {task.title}
@@ -932,6 +947,7 @@ function TaskActionContextMenu({
   const isActive = activeTaskId === task.id;
   const isDone = task.status === 'done';
   const isDropped = task.status === 'dropped';
+  const isMaybe = task.status === 'maybe';
   const isDateless = !task.scheduled_at;
 
   useEffect(() => {
@@ -981,7 +997,9 @@ function TaskActionContextMenu({
                 ? 'Completed'
                 : task.status === 'dropped'
                   ? 'Dropped'
-                  : 'To Do'}
+                  : task.status === 'maybe'
+                    ? 'Maybe / Later'
+                    : 'To Do'}
           </span>
         </div>
 
@@ -998,7 +1016,7 @@ function TaskActionContextMenu({
         </button>
 
         {/* 2. Activate as Working Task */}
-        {!isDone && !isDropped && !isActive && (
+        {!isDone && !isDropped && !isMaybe && !isActive && (
           <button
             onClick={() => {
               onClose();
@@ -1135,6 +1153,16 @@ function TaskSection({
     task: Task;
     position: { x: number; y: number };
   } | null>(null);
+  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
+  const [editingTitleValue, setEditingTitleValue] = useState('');
+
+  const saveTitle = async (taskId: string) => {
+    const trimmed = editingTitleValue.trim();
+    if (trimmed) {
+      await db.entries.update(taskId, { title: trimmed } as any);
+    }
+    setEditingTitleId(null);
+  };
 
   const renderMobileTaskRow = (
     task: Task,
@@ -1145,6 +1173,7 @@ function TaskSection({
     const isDone = task.status === 'done';
     const isDropped = task.status === 'dropped';
     const isInProgress = task.status === 'in_progress';
+    const isMaybe = task.status === 'maybe';
     const hasAchievements = task.achievements && task.achievements.length > 0;
     const badge = formatScheduledBadge(task);
     const isDateless = !task.scheduled_at;
@@ -1156,7 +1185,7 @@ function TaskSection({
     const actionButtons = (
       <>
         {/* Activate */}
-        {!isDone && !isDropped && !isActive && (
+        {!isDone && !isDropped && !isMaybe && !isActive && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -1286,7 +1315,9 @@ function TaskSection({
                       ? 'bg-amber-500/20 border-amber-500/60 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
                       : isDropped
                         ? 'bg-rose-950/60 border-rose-800 text-rose-400'
-                        : 'border-stone-700 bg-[#0a0a0a] text-transparent hover:border-stone-500 hover:text-stone-500'
+                        : isMaybe
+                          ? 'bg-indigo-950/60 border-indigo-700 text-indigo-400'
+                          : 'border-stone-700 bg-[#0a0a0a] text-transparent hover:border-stone-500 hover:text-stone-500'
                 }`}
                 title="Change status"
               >
@@ -1298,6 +1329,7 @@ function TaskSection({
                   />
                 )}
                 {isDropped && <X className="w-3 h-3 stroke-[2.5]" />}
+                {isMaybe && <HelpCircle className="w-3.5 h-3.5 stroke-[2.5]" />}
               </button>
             ) : (
               <button
@@ -1327,7 +1359,9 @@ function TaskSection({
                       ? 'text-stone-600 opacity-60'
                       : isInProgress
                         ? 'text-amber-200/95 font-bold'
-                        : 'text-stone-200'
+                        : isMaybe
+                          ? 'text-indigo-200/95 font-medium'
+                          : 'text-stone-200'
                 }`}
               >
                 {isDone && hasAchievements && <span className="mr-1.5 not-italic">🏆</span>}
@@ -1344,9 +1378,15 @@ function TaskSection({
                     Dropped
                   </span>
                 )}
+                {isDateless && isMaybe && (
+                  <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 shrink-0">
+                    Maybe / Later
+                  </span>
+                )}
                 {isDateless &&
                   !isDone &&
                   !isDropped &&
+                  !isMaybe &&
                   taskCategories.map((cat) => {
                     const colorClass = CATEGORY_COLORS[cat.color] ?? CATEGORY_COLORS.violet;
                     return (
@@ -1362,7 +1402,7 @@ function TaskSection({
                   {isDateless &&
                     !isDone &&
                     !isDropped &&
-                    (taskCategories.length > 0 || isInProgress) && (
+                    (taskCategories.length > 0 || isInProgress || isMaybe) && (
                       <span className="text-stone-700 mr-0.5">·</span>
                     )}
                   Created: {formatTime(task.created_at)}
@@ -1413,6 +1453,7 @@ function TaskSection({
     const isDone = task.status === 'done';
     const isDropped = task.status === 'dropped';
     const isInProgress = task.status === 'in_progress';
+    const isMaybe = task.status === 'maybe';
     const hasAchievements = task.achievements && task.achievements.length > 0;
     const badge = formatScheduledBadge(task);
     const isDateless = !task.scheduled_at;
@@ -1437,16 +1478,22 @@ function TaskSection({
         ? 'border-stone-600/60 opacity-60 hover:opacity-100'
         : isInProgress
           ? 'border-amber-200/95 hover:border-amber-200'
-          : listBorder;
+          : isMaybe
+            ? 'border-indigo-400/80 hover:border-indigo-400'
+            : listBorder;
 
     return (
       <SortableRow key={task.id} id={task.id}>
         <div
           id={`tasks-view-desktop-card-${task.id}`}
           onClick={(e) => {
-            if ((e.target as HTMLElement).closest('[data-no-menu]')) {
-              return;
-            }
+            // Left-click anywhere except title opens details
+            if ((e.target as HTMLElement).closest('[data-title-area]')) return;
+            if (editingTitleId === task.id) return;
+            onOpenDetail(task);
+          }}
+          onContextMenu={(e) => {
+            // Right-click anywhere opens context menu
             e.preventDefault();
             setContextMenuTask({
               task,
@@ -1474,7 +1521,9 @@ function TaskSection({
                         ? 'bg-amber-500/20 border-amber-500/60 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
                         : isDropped
                           ? 'bg-rose-950/60 border-rose-800 text-rose-400'
-                          : 'border-stone-700 bg-[#0a0a0a] text-transparent hover:border-stone-500 hover:text-stone-500'
+                          : isMaybe
+                            ? 'bg-indigo-950/60 border-indigo-700 text-indigo-400'
+                            : 'border-stone-700 bg-[#0a0a0a] text-transparent hover:border-stone-500 hover:text-stone-500'
                   }`}
                   title="Change status"
                 >
@@ -1486,6 +1535,7 @@ function TaskSection({
                     />
                   )}
                   {isDropped && <X className="w-3 h-3 stroke-[2.5]" />}
+                  {isMaybe && <HelpCircle className="w-3.5 h-3.5 stroke-[2.5]" />}
                 </button>
               ) : (
                 <button
@@ -1504,24 +1554,52 @@ function TaskSection({
               )}
             </div>
 
-            {/* Title */}
-            <div className="flex-1 min-w-0">
-              <p
-                className={`font-serif text-sm font-semibold line-clamp-2 leading-snug ${
-                  isDone
-                    ? hasAchievements
-                      ? 'text-amber-400/80'
-                      : 'text-emerald-600'
-                    : isDropped
-                      ? 'text-stone-600 opacity-60'
-                      : isInProgress
-                        ? 'text-amber-200/95 font-bold'
-                        : 'text-stone-200'
-                }`}
-              >
-                {isDone && hasAchievements && <span className="mr-1.5 not-italic">🏆</span>}
-                {task.title}
-              </p>
+            {/* Title — left-click to inline-edit */}
+            <div className="flex-1 min-w-0" data-title-area>
+              {editingTitleId === task.id ? (
+                <input
+                  autoFocus
+                  value={editingTitleValue}
+                  onChange={(e) => setEditingTitleValue(e.target.value)}
+                  onBlur={() => saveTitle(task.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      saveTitle(task.id);
+                    } else if (e.key === 'Escape') {
+                      setEditingTitleId(null);
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onContextMenu={(e) => e.stopPropagation()}
+                  className="w-full bg-transparent border-b border-stone-600 focus:border-stone-400 outline-none font-serif text-sm font-semibold leading-snug text-stone-100 pb-0.5 caret-stone-300"
+                />
+              ) : (
+                <p
+                  onClick={(e) => {
+                    // Left-click on title = inline edit
+                    e.stopPropagation();
+                    setEditingTitleId(task.id);
+                    setEditingTitleValue(task.title);
+                  }}
+                  className={`font-serif text-sm font-semibold line-clamp-2 leading-snug cursor-text ${
+                    isDone
+                      ? hasAchievements
+                        ? 'text-amber-400/80'
+                        : 'text-emerald-600'
+                      : isDropped
+                        ? 'text-stone-600 opacity-60'
+                        : isInProgress
+                          ? 'text-amber-200/95 font-bold'
+                          : isMaybe
+                            ? 'text-indigo-200/95 font-medium'
+                            : 'text-stone-200'
+                  }`}
+                >
+                  {isDone && hasAchievements && <span className="mr-1.5 not-italic">🏆</span>}
+                  {task.title}
+                </p>
+              )}
             </div>
           </div>
 
@@ -1545,9 +1623,15 @@ function TaskSection({
                   Dropped
                 </span>
               )}
+              {isDateless && isMaybe && (
+                <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 shrink-0">
+                  Maybe / Later
+                </span>
+              )}
               {isDateless &&
                 !isDone &&
                 !isDropped &&
+                !isMaybe &&
                 taskCategories.map((cat) => {
                   const colorClass = CATEGORY_COLORS[cat.color] ?? CATEGORY_COLORS.violet;
                   return (
@@ -1874,7 +1958,7 @@ export default function TasksView({
   });
   const [isListManagerOpen, setIsListManagerOpen] = useState(false);
   const [datelessStateFilter, setDatelessStateFilter] = useState<
-    'all' | 'todo' | 'in_progress' | 'done' | 'dropped'
+    'all' | 'todo' | 'in_progress' | 'done' | 'dropped' | 'maybe'
   >(() => {
     const saved = localStorage.getItem('flowday-tasks-dateless-state-filter');
     if (
@@ -1882,7 +1966,8 @@ export default function TasksView({
       saved === 'todo' ||
       saved === 'in_progress' ||
       saved === 'done' ||
-      saved === 'dropped'
+      saved === 'dropped' ||
+      saved === 'maybe'
     ) {
       return saved;
     }
@@ -1910,6 +1995,7 @@ export default function TasksView({
   const [datelessCollapsed, setDatelessCollapsed] = useState(false);
   const [completedDatelessCollapsed, setCompletedDatelessCollapsed] = useState(false);
   const [droppedDatelessCollapsed, setDroppedDatelessCollapsed] = useState(false);
+  const [maybeDatelessCollapsed, setMaybeDatelessCollapsed] = useState(false);
 
   // Pagination per section
   const [scheduledPage, setScheduledPage] = useState(0);
@@ -1925,6 +2011,7 @@ export default function TasksView({
   };
   const [completedDatelessPage, setCompletedDatelessPage] = useState(0);
   const [droppedDatelessPage, setDroppedDatelessPage] = useState(0);
+  const [maybeDatelessPage, setMaybeDatelessPage] = useState(0);
   const [completedScheduledPage, setCompletedScheduledPage] = useState(0);
 
   // Optimistic state per section
@@ -1934,6 +2021,7 @@ export default function TasksView({
     null,
   );
   const [optimisticDroppedDateless, setOptimisticDroppedDateless] = useState<Task[] | null>(null);
+  const [optimisticMaybeDateless, setOptimisticMaybeDateless] = useState<Task[] | null>(null);
   const [optimisticCompletedScheduled, setOptimisticCompletedScheduled] = useState<Task[] | null>(
     null,
   );
@@ -1994,18 +2082,20 @@ export default function TasksView({
     return tasks;
   }, [allTasks, statusFilter, searchQuery]);
 
-  // ─── Split into scheduled, active dateless, completed dateless, dropped dateless, and completed scheduled ──────
+  // ─── Split into scheduled, active dateless, completed dateless, dropped dateless, maybe dateless, and completed scheduled ──────
   const {
     scheduledTasks,
     datelessTasks,
     completedDatelessTasks,
     droppedDatelessTasks,
+    maybeDatelessTasks,
     completedScheduledTasks,
   } = useMemo(() => {
     const scheduled: Task[] = [];
     const dateless: Task[] = [];
     const completedDateless: Task[] = [];
     const droppedDateless: Task[] = [];
+    const maybeDateless: Task[] = [];
     const completedScheduled: Task[] = [];
 
     filteredTasks.forEach((t) => {
@@ -2026,6 +2116,8 @@ export default function TasksView({
             completedDateless.push(t);
           } else if (t.status === 'dropped') {
             droppedDateless.push(t);
+          } else if (t.status === 'maybe') {
+            maybeDateless.push(t);
           } else {
             dateless.push(t);
           }
@@ -2070,6 +2162,14 @@ export default function TasksView({
       return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
     });
 
+    // Sort maybe dateless: sort_order, then created_at
+    maybeDateless.sort((a, b) => {
+      const aSort = a.sort_order ?? Infinity;
+      const bSort = b.sort_order ?? Infinity;
+      if (aSort !== bSort) return aSort - bSort;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+
     // Sort completed scheduled: sort_order, then scheduled_at, then created_at
     completedScheduled.sort((a, b) => {
       const aSort = a.sort_order ?? Infinity;
@@ -2086,6 +2186,7 @@ export default function TasksView({
       datelessTasks: dateless,
       completedDatelessTasks: completedDateless,
       droppedDatelessTasks: droppedDateless,
+      maybeDatelessTasks: maybeDateless,
       completedScheduledTasks: completedScheduled,
     };
   }, [filteredTasks, statusFilter]);
@@ -2126,7 +2227,15 @@ export default function TasksView({
     );
   }, [baseDisplayDroppedDateless, selectedListId]);
 
-  // Apply dateless status filter ('all' | 'todo' | 'in_progress' | 'done' | 'dropped')
+  const baseDisplayMaybeDateless = optimisticMaybeDateless ?? maybeDatelessTasks;
+  const listFilteredMaybeDateless = useMemo(() => {
+    if (selectedListId === 'all' || selectedListId === 'none') {
+      return baseDisplayMaybeDateless;
+    }
+    return baseDisplayMaybeDateless.filter((t) => (t.category_ids ?? []).includes(selectedListId));
+  }, [baseDisplayMaybeDateless, selectedListId]);
+
+  // Apply dateless status filter ('all' | 'todo' | 'in_progress' | 'done' | 'dropped' | 'maybe')
   const displayDateless = useMemo(() => {
     if (datelessStateFilter === 'all') return listFilteredDateless;
     if (datelessStateFilter === 'todo')
@@ -2150,6 +2259,13 @@ export default function TasksView({
     return [];
   }, [listFilteredDroppedDateless, datelessStateFilter]);
 
+  const displayMaybeDateless = useMemo(() => {
+    if (datelessStateFilter === 'all' || datelessStateFilter === 'maybe') {
+      return listFilteredMaybeDateless;
+    }
+    return [];
+  }, [listFilteredMaybeDateless, datelessStateFilter]);
+
   // ─── Pagination ────────────────────────────────────────────────────────────
   const scheduledTotalPages = Math.max(1, Math.ceil(displayScheduled.length / PAGE_SIZE));
   const datelessTotalPages = Math.max(1, Math.ceil(displayDateless.length / PAGE_SIZE));
@@ -2161,6 +2277,7 @@ export default function TasksView({
     1,
     Math.ceil(displayDroppedDateless.length / PAGE_SIZE),
   );
+  const maybeDatelessTotalPages = Math.max(1, Math.ceil(displayMaybeDateless.length / PAGE_SIZE));
   const completedScheduledTotalPages = Math.max(
     1,
     Math.ceil(displayCompletedScheduled.length / PAGE_SIZE),
@@ -2172,6 +2289,7 @@ export default function TasksView({
     setDatelessPageMap({});
     setCompletedDatelessPage(0);
     setDroppedDatelessPage(0);
+    setMaybeDatelessPage(0);
     setCompletedScheduledPage(0);
   }, [statusFilter, searchQuery]);
 
@@ -2229,6 +2347,7 @@ export default function TasksView({
     completedDatelessTotalPages - 1,
   );
   const droppedDatelessSafePage = Math.min(droppedDatelessPage, droppedDatelessTotalPages - 1);
+  const maybeDatelessSafePage = Math.min(maybeDatelessPage, maybeDatelessTotalPages - 1);
   const completedScheduledSafePage = Math.min(
     completedScheduledPage,
     completedScheduledTotalPages - 1,
@@ -2276,6 +2395,17 @@ export default function TasksView({
         droppedDatelessTasks,
       ),
     [createDragEndHandler, displayDroppedDateless, droppedDatelessSafePage, droppedDatelessTasks],
+  );
+
+  const handleMaybeDatelessDragEnd = useMemo(
+    () =>
+      createDragEndHandler(
+        displayMaybeDateless,
+        maybeDatelessSafePage,
+        setOptimisticMaybeDateless,
+        maybeDatelessTasks,
+      ),
+    [createDragEndHandler, displayMaybeDateless, maybeDatelessSafePage, maybeDatelessTasks],
   );
 
   const handleCompletedScheduledDragEnd = useMemo(
@@ -2378,6 +2508,17 @@ export default function TasksView({
     [createMoveToPageHandler, displayDroppedDateless, droppedDatelessSafePage],
   );
 
+  const handleMaybeDatelessMoveToPage = useMemo(
+    () =>
+      createMoveToPageHandler(
+        displayMaybeDateless,
+        maybeDatelessSafePage,
+        setOptimisticMaybeDateless,
+        setMaybeDatelessPage,
+      ),
+    [createMoveToPageHandler, displayMaybeDateless, maybeDatelessSafePage],
+  );
+
   const handleCompletedScheduledMoveToPage = useMemo(
     () =>
       createMoveToPageHandler(
@@ -2439,7 +2580,9 @@ export default function TasksView({
 
     // 'all'
     counts['all'] = {
-      active: datelessAll.filter((t) => t.status !== 'done' && t.status !== 'dropped').length,
+      active: datelessAll.filter(
+        (t) => t.status !== 'done' && t.status !== 'dropped' && t.status !== 'maybe',
+      ).length,
       done: datelessAll.filter((t) => t.status === 'done').length,
     };
 
@@ -2449,7 +2592,9 @@ export default function TasksView({
       return ids.length === 0 || !taskLists.some((l) => ids.includes(l.id));
     });
     counts['none'] = {
-      active: noneTasks.filter((t) => t.status !== 'done' && t.status !== 'dropped').length,
+      active: noneTasks.filter(
+        (t) => t.status !== 'done' && t.status !== 'dropped' && t.status !== 'maybe',
+      ).length,
       done: noneTasks.filter((t) => t.status === 'done').length,
     };
 
@@ -2457,7 +2602,9 @@ export default function TasksView({
     taskLists.forEach((list) => {
       const listTasks = datelessAll.filter((t) => (t.category_ids ?? []).includes(list.id));
       counts[list.id] = {
-        active: listTasks.filter((t) => t.status !== 'done' && t.status !== 'dropped').length,
+        active: listTasks.filter(
+          (t) => t.status !== 'done' && t.status !== 'dropped' && t.status !== 'maybe',
+        ).length,
         done: listTasks.filter((t) => t.status === 'done').length,
       };
     });
@@ -2510,8 +2657,8 @@ export default function TasksView({
 
   // State filter buttons for Lists view
   const stateFilterButtons = (
-    <div className="flex items-center gap-1 bg-[#0d0d0d] border border-stone-800/80 rounded-lg p-0.5 shrink-0">
-      {(['all', 'todo', 'in_progress', 'done', 'dropped'] as const).map((st) => (
+    <div className="flex items-center gap-1 bg-[#0d0d0d] border border-stone-800/80 rounded-lg p-0.5 shrink-0 flex-wrap sm:flex-nowrap">
+      {(['all', 'todo', 'in_progress', 'done', 'dropped', 'maybe'] as const).map((st) => (
         <button
           key={st}
           onClick={() => {
@@ -2526,7 +2673,9 @@ export default function TasksView({
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
                   : st === 'dropped'
                     ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm'
-                    : 'bg-stone-800 text-stone-200 shadow-sm border border-stone-700'
+                    : st === 'maybe'
+                      ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm'
+                      : 'bg-stone-800 text-stone-200 shadow-sm border border-stone-700'
               : 'text-stone-500 hover:text-stone-300 border border-transparent'
           }`}
         >
@@ -2538,7 +2687,9 @@ export default function TasksView({
                 ? 'In Progress'
                 : st === 'done'
                   ? 'Completed'
-                  : 'Dropped'}
+                  : st === 'dropped'
+                    ? 'Dropped'
+                    : 'Maybe / Later'}
         </button>
       ))}
     </div>
@@ -2552,8 +2703,11 @@ export default function TasksView({
         (displayDateless.length > 0 ||
           (datelessStateFilter !== 'all' &&
             displayCompletedDateless.length === 0 &&
-            displayDroppedDateless.length === 0) ||
-          (displayCompletedDateless.length === 0 && displayDroppedDateless.length === 0)) && (
+            displayDroppedDateless.length === 0 &&
+            displayMaybeDateless.length === 0) ||
+          (displayCompletedDateless.length === 0 &&
+            displayDroppedDateless.length === 0 &&
+            displayMaybeDateless.length === 0)) && (
           <TaskSection
             label={
               datelessStateFilter === 'in_progress'
@@ -2636,6 +2790,42 @@ export default function TasksView({
             selectedListId={selectedListId}
           />
         )}
+
+      {/* Maybe / Later Dateless Tasks Section (Renders in 'inbox' (Lists) mode) */}
+      {statusFilter === 'inbox' && displayMaybeDateless.length > 0 && (
+        <TaskSection
+          label="Dateless Maybe / Later"
+          icon={<HelpCircle className="w-3.5 h-3.5 text-indigo-400 stroke-[2.5]" />}
+          accentColor="indigo"
+          tasks={displayMaybeDateless}
+          isCollapsed={maybeDatelessCollapsed}
+          onToggleCollapse={() => setMaybeDatelessCollapsed((p) => !p)}
+          deletingId={deletingId}
+          activeTaskId={activeTaskId}
+          totalPages={maybeDatelessTotalPages}
+          page={maybeDatelessPage}
+          setPage={setMaybeDatelessPage}
+          onDeleteEntry={onDeleteEntry}
+          onOpenDetail={onOpenDetail}
+          onToggleTaskStatus={onToggleTaskStatus}
+          onOpenStatusModal={setStatusPickerTask}
+          onActivateTask={onActivateTask}
+          onOpenScheduleModal={setScheduleModalTask}
+          formatTime={formatTime}
+          sensors={sensors}
+          onDragEnd={handleMaybeDatelessDragEnd}
+          handleMoveToPage={handleMaybeDatelessMoveToPage}
+          formatScheduledBadge={formatScheduledBadge}
+          setActiveDate={setActiveDate}
+          taskLists={taskLists}
+          listPickerTaskId={listPickerTaskId}
+          setListPickerTaskId={setListPickerTaskId}
+          moveToPageModalTask={moveToPageModalTask}
+          setMoveToPageModalTask={setMoveToPageModalTask}
+          showContent={showContent}
+          selectedListId={selectedListId}
+        />
+      )}
 
       {/* Dropped Dateless Tasks Section (Renders in 'inbox' (Lists) mode) */}
       {statusFilter === 'inbox' && displayDroppedDateless.length > 0 && (
@@ -3085,7 +3275,9 @@ export default function TasksView({
                 ? Math.min(completedDatelessPage, completedDatelessTotalPages - 1)
                 : moveToPageModalTask.status === 'dropped'
                   ? Math.min(droppedDatelessPage, droppedDatelessTotalPages - 1)
-                  : Math.min(datelessPage, datelessTotalPages - 1)
+                  : moveToPageModalTask.status === 'maybe'
+                    ? Math.min(maybeDatelessPage, maybeDatelessTotalPages - 1)
+                    : Math.min(datelessPage, datelessTotalPages - 1)
           }
           totalPages={
             moveToPageModalTask.scheduled_at
@@ -3096,7 +3288,9 @@ export default function TasksView({
                 ? completedDatelessTotalPages
                 : moveToPageModalTask.status === 'dropped'
                   ? droppedDatelessTotalPages
-                  : datelessTotalPages
+                  : moveToPageModalTask.status === 'maybe'
+                    ? maybeDatelessTotalPages
+                    : datelessTotalPages
           }
           onClose={() => setMoveToPageModalTask(null)}
           onSelectPage={(taskId, page) => {
@@ -3110,6 +3304,8 @@ export default function TasksView({
               handleCompletedDatelessMoveToPage(taskId, page);
             } else if (moveToPageModalTask.status === 'dropped') {
               handleDroppedDatelessMoveToPage(taskId, page);
+            } else if (moveToPageModalTask.status === 'maybe') {
+              handleMaybeDatelessMoveToPage(taskId, page);
             } else {
               handleDatelessMoveToPage(taskId, page);
             }

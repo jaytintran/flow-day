@@ -26,7 +26,7 @@ export interface TaskAchievement {
   created_at: Date;
 }
 
-export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'dropped';
+export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'dropped' | 'maybe';
 
 export interface Task extends BaseEntry {
   type: 'task';

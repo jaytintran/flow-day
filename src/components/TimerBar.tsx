@@ -172,7 +172,11 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
   // Fetch active task and all incomplete tasks
   const tasks = useLiveQuery(() => db.entries.where('type').equals('task').toArray()) || [];
   const todoTasks = tasks.filter(
-    (t) => t.type === 'task' && t.status !== 'done' && t.status !== 'dropped',
+    (t) =>
+      t.type === 'task' &&
+      t.status !== 'done' &&
+      t.status !== 'dropped' &&
+      t.status !== 'maybe',
   ) as Task[];
   const activeTask = tasks.find((t) => t.id === activeTaskId) as Task | undefined;
 
