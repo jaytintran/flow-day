@@ -38,7 +38,7 @@ export interface Task extends BaseEntry {
   objective_id?: string; // link to an objective
   achievements?: TaskAchievement[];
   content?: string;
-  sort_order?: number; // display ordering (used by TasksView DnD)
+  sort_order?: number; // display ordering (used by ListsView DnD)
   category_ids?: string[]; // add this
   starred?: boolean;
 }

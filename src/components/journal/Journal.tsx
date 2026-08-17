@@ -12,7 +12,7 @@ import DetailSheet from '../DetailSheet';
 import DayView from './DayView';
 import TimelineView from './TimelineView';
 import RecordsView from './RecordsView';
-import TasksView from './TasksView';
+import ListsView from './ListsView';
 import GoalsSheet from '../GoalsSheet';
 import ObjectivesSheet from '../ObjectivesSheet';
 import HabitsSheet from '../HabitsSheet';
@@ -25,7 +25,7 @@ import MarkdownPreview from '../MarkdownPreview';
 interface JournalProps {
   activeDate: Date;
   setActiveDate: (date: Date) => void;
-  viewMode: 'day' | 'timeline' | 'records' | 'tasks' | 'hub';
+  viewMode: 'day' | 'timeline' | 'records' | 'lists' | 'hub';
   activeTaskId: string | null;
   setActiveTaskId: (id: string | null) => void;
   activeHubTab?: 'goals' | 'objectives' | 'habits' | 'focus';
@@ -740,31 +740,11 @@ export default function Journal({
   // Formats time strings to elegant short format (e.g. 10:45 AM)
   const formatTime = (dateInput: Date | string): string => {
     const d = new Date(dateInput);
-    const now = new Date();
-    const isToday =
-      d.getFullYear() === now.getFullYear() &&
-      d.getMonth() === now.getMonth() &&
-      d.getDate() === now.getDate();
-
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const isYesterday =
-      d.getFullYear() === yesterday.getFullYear() &&
-      d.getMonth() === yesterday.getMonth() &&
-      d.getDate() === yesterday.getDate();
-
-    const time = d.toLocaleTimeString('en-US', {
+    return d.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
     });
-
-    if (isToday) return time;
-    // if (isYesterday) return `-1d ${time}`;
-
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    return `${dd}/${mm}\n${time}`;
   };
 
   // Group entries of a single day with nested timeblocks logic
@@ -927,7 +907,7 @@ export default function Journal({
       ref={containerRef}
     >
       <div
-        className={`w-full md:mx-auto ${viewMode === 'hub' ? 'h-full md:max-w-9xl flex flex-col' : viewMode === 'tasks' ? 'md:max-w-9xl ' : 'md:max-w-4xl space-y-8'}`}
+        className={`w-full md:mx-auto ${viewMode === 'hub' ? 'h-full md:max-w-9xl flex flex-col' : viewMode === 'lists' ? 'md:max-w-9xl ' : 'md:max-w-4xl space-y-8'}`}
       >
         {viewMode === 'records' ? (
           <RecordsView
@@ -938,8 +918,8 @@ export default function Journal({
             formatTime={formatTime}
             formatDateStringLabel={formatDateStringLabel}
           />
-        ) : viewMode === 'tasks' ? (
-          <TasksView
+        ) : viewMode === 'lists' ? (
+          <ListsView
             entries={entries}
             deletingId={deletingId}
             activeTaskId={activeTaskId}

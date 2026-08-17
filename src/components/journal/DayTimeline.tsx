@@ -25,6 +25,7 @@ import {
 import { TimelineEntry, Task, Log, Event, Note, TimeBlock, HabitLog } from '../../types';
 import { formatDuration, toLocalDateString } from '../../utils';
 import TimePickerSheet from '../TimePickerSheet';
+import TimeRulerOverlay from './TimeRulerOverlay';
 import { db } from '../../db';
 
 function truncateText(text?: string, limit = 100): string {
@@ -90,8 +91,17 @@ export default function DayTimeline({
       return true;
     }
   });
-  // Local state for time picker
+  // Local state for time picker and time ruler
   const [pickerEntry, setPickerEntry] = useState<TimelineEntry | null>(null);
+  const [activeRulerState, setActiveRulerState] = useState<{
+    entry: TimelineEntry;
+    initialDate: Date;
+    originY: number;
+    originX: number;
+  } | null>(null);
+  const holdTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragStartPosRef = React.useRef<{ x: number; y: number; entry: TimelineEntry } | null>(null);
+
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [editingLogTitle, setEditingLogTitle] = useState('');
 
@@ -187,8 +197,8 @@ export default function DayTimeline({
         className="group relative flex items-center gap-2.5 py-3 rounded md:px-3 select-none"
       >
         {/* Left Column 1: Time Gutter */}
-        <div className="w-10 text-right shrink-0">
-          <span className="text-[10px] font-mono font-medium tracking-tight text-violet-400">
+        <div className="w-14 text-right shrink-0 select-none whitespace-nowrap">
+          <span className="text-[10px] font-mono font-medium tracking-tight text-violet-400 whitespace-nowrap">
             {timeLabel}
           </span>
         </div>
@@ -234,6 +244,69 @@ export default function DayTimeline({
     if (entry.type === 'note') return new Date((entry as Note).timestamp);
     if (entry.type === 'habit-log') return new Date((entry as HabitLog).timestamp);
     return new Date(entry.created_at);
+  };
+
+  const handleGutterPointerDown = (
+    e: React.PointerEvent,
+    entry: TimelineEntry,
+  ) => {
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    dragStartPosRef.current = { x: startX, y: startY, entry };
+
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+
+    holdTimerRef.current = setTimeout(() => {
+      if (dragStartPosRef.current) {
+        setActiveRulerState({
+          entry,
+          initialDate: getPickerInitialDate(entry),
+          originY: startY,
+          originX: startX,
+        });
+        dragStartPosRef.current = null;
+      }
+    }, 180);
+  };
+
+  const handleGutterPointerMove = (e: React.PointerEvent) => {
+    if (!dragStartPosRef.current) return;
+    const dist = Math.hypot(
+      e.clientX - dragStartPosRef.current.x,
+      e.clientY - dragStartPosRef.current.y,
+    );
+    if (dist > 6) {
+      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+      const entry = dragStartPosRef.current.entry;
+      setActiveRulerState({
+        entry,
+        initialDate: getPickerInitialDate(entry),
+        originY: dragStartPosRef.current.y,
+        originX: dragStartPosRef.current.x,
+      });
+      dragStartPosRef.current = null;
+    }
+  };
+
+  const handleGutterPointerUp = (e: React.PointerEvent, entry: TimelineEntry) => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (dragStartPosRef.current) {
+      dragStartPosRef.current = null;
+      e.stopPropagation();
+      setPickerEntry(entry);
+    }
+  };
+
+  const handleGutterPointerCancel = () => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    dragStartPosRef.current = null;
   };
 
   // Render individual generic row with customized icons
@@ -284,13 +357,15 @@ export default function DayTimeline({
         }`}
       >
         {/* Left Column 1: Time Gutter */}
-        <div className="w-10 text-right shrink-0 select-none pt-0.5">
+        <div className="w-14 text-right shrink-0 select-none pt-0.5 whitespace-nowrap">
           <span
-            onClick={(e) => {
-              e.stopPropagation();
-              setPickerEntry(entry);
-            }}
-            className={`text-[10px] font-mono font-medium tracking-tight cursor-pointer hover:text-amber-400 transition-colors ${
+            onPointerDown={(e) => handleGutterPointerDown(e, entry)}
+            onPointerMove={handleGutterPointerMove}
+            onPointerUp={(e) => handleGutterPointerUp(e, entry)}
+            onPointerCancel={handleGutterPointerCancel}
+            onClick={(e) => e.stopPropagation()}
+            title="Click to edit · Hold & drag for time ruler"
+            className={`text-[10px] font-mono font-medium tracking-tight cursor-pointer hover:text-amber-400 transition-colors touch-none whitespace-nowrap ${
               isCompletedTask || isHabitLog
                 ? 'text-emerald-600 font-semibold'
                 : isScheduledTime
@@ -925,6 +1000,22 @@ export default function DayTimeline({
             </p>
           </div>
         ))}
+
+      {/* Time Ruler Overlay (Hold & Drag) */}
+      {activeRulerState && (
+        <TimeRulerOverlay
+          entry={activeRulerState.entry}
+          initialDate={activeRulerState.initialDate}
+          originY={activeRulerState.originY}
+          originX={activeRulerState.originX}
+          formatTime={formatTime}
+          onConfirm={(newDate) => {
+            onTimePickerConfirm(activeRulerState.entry, newDate);
+            setActiveRulerState(null);
+          }}
+          onCancel={() => setActiveRulerState(null)}
+        />
+      )}
 
       {/* Time Picker Sheet */}
       <TimePickerSheet

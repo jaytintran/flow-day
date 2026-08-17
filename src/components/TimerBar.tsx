@@ -173,10 +173,7 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
   const tasks = useLiveQuery(() => db.entries.where('type').equals('task').toArray()) || [];
   const todoTasks = tasks.filter(
     (t) =>
-      t.type === 'task' &&
-      t.status !== 'done' &&
-      t.status !== 'dropped' &&
-      t.status !== 'maybe',
+      t.type === 'task' && t.status !== 'done' && t.status !== 'dropped' && t.status !== 'maybe',
   ) as Task[];
   const activeTask = tasks.find((t) => t.id === activeTaskId) as Task | undefined;
 
@@ -440,7 +437,7 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
       className="w-full relative px-4 md:px-6 py-2.5 md:py-3.5 bg-[#121212] border-b border-stone-800/60"
       id="timer-bar-container"
     >
-      <div className="max-w-4xl mx-auto relative" ref={dropdownRef}>
+      <div className="md:max-w-9xl max-md:max-w-4xl mx-auto relative" ref={dropdownRef}>
         <AnimatePresence mode="wait">
           {!activeTaskId ? (
             /* IDLE SEARCH STATE */
@@ -472,7 +469,7 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
                         handleCreateNewTask();
                       }
                     }}
-                    className="w-full h-[46px] pl-10 pr-4 py-3 bg-[#0a0a0a] text-stone-100 hover:bg-[#080808]/50 border border-stone-850 rounded-xl text-sm placeholder-stone-600 focus:outline-none focus:border-amber-500/35 focus:bg-stone-950 transition-all shadow-inner"
+                    className="max-md:w-full md:w-2/3 h-[46px] pl-10 pr-4 py-3 bg-[#0a0a0a] text-stone-100 hover:bg-[#080808]/50 border border-stone-850 rounded-xl text-sm placeholder-stone-600 focus:outline-none focus:border-amber-500/35 focus:bg-stone-950 transition-all shadow-inner"
                   />
                   {isDropdownOpen && (
                     <div className="absolute top-full left-0 right-0 mt-2 max-h-60 overflow-y-auto bg-[#181818] border border-stone-800 rounded-xl shadow-2xl z-55">
@@ -854,7 +851,7 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
                         >
                           <RotateCcw className="w-4 h-4" />
                         </button>
-                        
+
                         <div className="w-px h-6 bg-stone-850/60 mx-1" />
 
                         {isDeletingActiveTask ? (

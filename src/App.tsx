@@ -9,12 +9,13 @@ import DayNavigator from './components/DayNavigator';
 import Journal from './components/journal/Journal';
 import InputBar from './components/InputBar';
 
-type ViewMode = 'day' | 'timeline' | 'records' | 'tasks' | 'hub';
-const VALID_MODES: ViewMode[] = ['day', 'timeline', 'records', 'tasks', 'hub'];
+type ViewMode = 'day' | 'timeline' | 'records' | 'lists' | 'hub';
+const VALID_MODES: ViewMode[] = ['day', 'timeline', 'records', 'lists', 'hub'];
 
 function getInitialViewMode(): ViewMode {
   try {
     const stored = localStorage.getItem('flowday-view-mode');
+    if (stored === 'tasks') return 'lists';
     if (stored && VALID_MODES.includes(stored as ViewMode)) return stored as ViewMode;
   } catch {}
   return 'day';

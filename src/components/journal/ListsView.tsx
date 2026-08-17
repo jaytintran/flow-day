@@ -45,7 +45,7 @@ import { MoreHorizontal } from 'lucide-react';
 import TaskListManagerModal from '../TaskListManagerModal'; // adjust path as needed
 import { TASK_LIST_SCOPE } from '../../utils';
 
-interface TasksViewProps {
+interface ListsViewProps {
   entries: TimelineEntry[];
   deletingId: string | null;
   activeTaskId: string | null;
@@ -1930,7 +1930,7 @@ function ListStrip({ lists, selectedId, onSelect, onManage }: ListStripProps) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export default function TasksView({
+export default function ListsView({
   entries,
   deletingId,
   activeTaskId,
@@ -1942,7 +1942,7 @@ export default function TasksView({
   onCarryTask,
   formatTime,
   formatDateStringLabel,
-}: TasksViewProps) {
+}: ListsViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const showContent = localStorage.getItem('flowday_show_note_event_content') !== 'false';
   const [statusFilter, setStatusFilter] = useState<'inbox' | 'todo' | 'done'>(() => {

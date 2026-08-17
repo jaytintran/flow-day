@@ -22,7 +22,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface InputBarProps {
   activeDate: Date;
-  viewMode?: 'day' | 'timeline' | 'records' | 'tasks' | 'hub';
+  viewMode?: 'day' | 'timeline' | 'records' | 'lists' | 'hub';
 }
 
 // Helper to parse date keyword/string from text
@@ -430,7 +430,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
 
       const activeListId = localStorage.getItem('flowday-tasks-selected-list');
       const autoListIds =
-        viewMode === 'tasks' && activeListId && activeListId !== 'all' && activeListId !== 'none'
+        viewMode === 'lists' && activeListId && activeListId !== 'all' && activeListId !== 'none'
           ? [activeListId]
           : [];
 
@@ -441,9 +441,9 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
         status: 'todo',
         time_spent: 0,
         created_at: getBaseCompletedDate(),
-        // In 'tasks' mode, tasks are dateless (no scheduled_at) unless the user explicitly typed a date/time keyword
+        // In 'lists' mode, tasks are dateless (no scheduled_at) unless the user explicitly typed a date/time keyword
         ...(autoListIds.length > 0 ? { category_ids: autoListIds } : {}),
-        ...(viewMode === 'tasks' && !hasTime ? {} : { scheduled_at: parsedStart }),
+        ...(viewMode === 'lists' && !hasTime ? {} : { scheduled_at: parsedStart }),
         ...(hasSpan && parsedEnd ? { scheduled_end_at: parsedEnd } : {}),
       };
     } else if (activeType === 'log') {
