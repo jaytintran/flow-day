@@ -49,6 +49,8 @@ export interface Event extends BaseEntry {
   content: string;
   timestamp: Date;
   end_timestamp?: Date;
+  category_ids?: string[];
+  pinned?: boolean;
 }
 
 export interface Note extends BaseEntry {
@@ -56,6 +58,8 @@ export interface Note extends BaseEntry {
   title: string;
   content: string;
   timestamp: Date;
+  category_ids?: string[];
+  pinned?: boolean;
 }
 
 export interface Log extends BaseEntry {
@@ -119,7 +123,7 @@ export interface HabitLog extends BaseEntry {
   timestamp: Date; // exact completion time (shown in time gutter)
 }
 
-export type CategoryScope = 'goal' | 'objective' | 'task-list';
+export type CategoryScope = 'goal' | 'objective' | 'task-list' | 'record-category';
 
 // Category — tags for goals or objectives
 export interface Category {

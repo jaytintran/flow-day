@@ -170,3 +170,58 @@ export async function createTaskList(name: string, color: Category['color']): Pr
   await db.categories.add({ ...list, sort_order: existing.length } as any);
   return list;
 }
+
+export const RECORD_CATEGORY_SCOPE = 'record-category' as const;
+
+/** Fetch all record categories, sorted by sort_order then created_at */
+export async function getRecordCategories(): Promise<Category[]> {
+  const categories = await db.categories.where('scope').equals(RECORD_CATEGORY_SCOPE).toArray();
+
+  return categories.sort((a, b) => {
+    const aO = (a as any).sort_order ?? Date.parse(a.created_at.toString());
+    const bO = (b as any).sort_order ?? Date.parse(b.created_at.toString());
+    return aO - bO;
+  });
+}
+
+/** Assign a note/event to a category (toggle: adds if absent, removes if present) */
+export async function toggleRecordCategory(recordId: string, categoryId: string, currentIds: string[]) {
+  const next = currentIds.includes(categoryId)
+    ? currentIds.filter((id) => id !== categoryId)
+    : [...currentIds, categoryId];
+  await db.entries.update(recordId, { category_ids: next } as any);
+}
+
+/** When deleting a record category, strip its id from all entries that reference it */
+export async function migrateRecordsOnCategoryDelete(categoryId: string) {
+  const affected = await db.entries.where('category_ids').equals(categoryId).toArray();
+
+  await db.transaction('rw', db.entries, async () => {
+    for (const entry of affected) {
+      const current = (entry as any).category_ids ?? [];
+      await db.entries.update(entry.id, {
+        category_ids: current.filter((id: string) => id !== categoryId),
+      } as any);
+    }
+  });
+}
+
+/** Create a new record category */
+export async function createRecordCategory(name: string, color: Category['color']): Promise<Category> {
+  const existing = await getRecordCategories();
+  const cat: Category = {
+    id: crypto.randomUUID(),
+    name,
+    color,
+    scope: RECORD_CATEGORY_SCOPE,
+    created_at: new Date(),
+  };
+  await db.categories.add({ ...cat, sort_order: existing.length } as any);
+  return cat;
+}
+
+/** Toggle pinned state on a note or event */
+export async function toggleRecordPin(recordId: string, currentPinned: boolean = false) {
+  await db.entries.update(recordId, { pinned: !currentPinned } as any);
+}
+

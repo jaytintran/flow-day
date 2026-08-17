@@ -60,7 +60,7 @@ export default function App() {
 
       {/* ZONE 2 — MAIN TIMELINE (SCROLLABLE AREA) */}
       <main
-        className="flex-1 overflow-hidden flex flex-col relative bg-[#0a0a0a]"
+        className="flex-1 min-h-0 overflow-hidden flex flex-col relative bg-[#0a0a0a]"
         id="app-scrollable-main"
       >
         {/* Subtle grid lines background overlay */}

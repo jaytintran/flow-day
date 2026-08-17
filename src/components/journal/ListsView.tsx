@@ -526,7 +526,11 @@ interface ListPickerPopoverProps {
 }
 
 function ListPickerPopover({ task, lists, onClose }: ListPickerPopoverProps) {
-  const currentIds = task.category_ids ?? [];
+  const [selectedIds, setSelectedIds] = useState<string[]>(task.category_ids ?? []);
+
+  useEffect(() => {
+    setSelectedIds(task.category_ids ?? []);
+  }, [task.category_ids]);
 
   const COLORS: Record<string, { dot: string; active: string }> = {
     violet: {
@@ -552,9 +556,10 @@ function ListPickerPopover({ task, lists, onClose }: ListPickerPopoverProps) {
   };
 
   const handleToggle = async (listId: string) => {
-    const next = currentIds.includes(listId)
-      ? currentIds.filter((id) => id !== listId)
-      : [...currentIds, listId];
+    const next = selectedIds.includes(listId)
+      ? selectedIds.filter((id) => id !== listId)
+      : [...selectedIds, listId];
+    setSelectedIds(next);
     await db.entries.update(task.id, { category_ids: next } as any);
   };
 
@@ -598,7 +603,7 @@ function ListPickerPopover({ task, lists, onClose }: ListPickerPopoverProps) {
               <div className="flex flex-col gap-1">
                 {lists.map((list) => {
                   const cs = COLORS[list.color] ?? COLORS['violet'];
-                  const isAssigned = currentIds.includes(list.id);
+                  const isAssigned = selectedIds.includes(list.id);
                   return (
                     <button
                       key={list.id}
@@ -1212,30 +1217,20 @@ function TaskSection({
 
         {/* List picker — only for dateless tasks */}
         {!task.scheduled_at && taskLists.length > 0 && (
-          <div className="relative" data-list-picker>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setListPickerTaskId(listPickerTaskId === task.id ? null : task.id);
-              }}
-              className={`p-1.5 bg-stone-900 rounded border transition-colors cursor-pointer ${
-                (task.category_ids ?? []).some((id) => taskLists.some((l) => l.id === id))
-                  ? 'border-violet-700/60 text-violet-400 hover:bg-violet-950/20'
-                  : 'border-stone-700 hover:bg-stone-800 text-stone-400 hover:text-violet-400'
-              }`}
-              title="Assign to list"
-            >
-              <ListTodo className="w-3.5 h-3.5" />
-            </button>
-
-            {listPickerTaskId === task.id && (
-              <ListPickerPopover
-                task={task}
-                lists={taskLists}
-                onClose={() => setListPickerTaskId(null)}
-              />
-            )}
-          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setListPickerTaskId(listPickerTaskId === task.id ? null : task.id);
+            }}
+            className={`p-1.5 bg-stone-900 rounded border transition-colors cursor-pointer ${
+              (task.category_ids ?? []).some((id) => taskLists.some((l) => l.id === id))
+                ? 'border-violet-700/60 text-violet-400 hover:bg-violet-950/20'
+                : 'border-stone-700 hover:bg-stone-800 text-stone-400 hover:text-violet-400'
+            }`}
+            title="Assign to list"
+          >
+            <ListTodo className="w-3.5 h-3.5" />
+          </button>
         )}
 
         {/* Move to Page (only when multiple pages exist) */}
@@ -1782,20 +1777,6 @@ function TaskSection({
           activeTaskId={activeTaskId}
         />
       )}
-
-      {/* List Picker Popover modal when opened */}
-      {listPickerTaskId &&
-        (() => {
-          const task = tasks.find((t) => t.id === listPickerTaskId);
-          if (!task) return null;
-          return (
-            <ListPickerPopover
-              task={task}
-              lists={taskLists}
-              onClose={() => setListPickerTaskId(null)}
-            />
-          );
-        })()}
     </div>
   );
 }
@@ -2530,20 +2511,8 @@ export default function ListsView({
     [createMoveToPageHandler, displayCompletedScheduled, completedScheduledSafePage],
   );
 
-  // ─── Close list picker on outside click ───────────────────────────────────
+  // ─── List picker state ───────────────────────────────────────────────────
   const [listPickerTaskId, setListPickerTaskId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!listPickerTaskId) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('[data-list-picker]')) {
-        setListPickerTaskId(null);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [listPickerTaskId]);
 
   // ─── Schedule handlers ───────────────────────────────────────────────────
   const handleSelectDate = async (taskId: string, date: Date) => {
@@ -3072,9 +3041,9 @@ export default function ListsView({
           </div>
 
           {/* ── DESKTOP: two-column sidebar layout ── */}
-          <div className="hidden md:flex gap-0 mt-3 h-[500px] overflow-hidden">
+          <div className="hidden md:flex gap-0 mt-3 h-[530px] overflow-hidden">
             {/* LEFT COLUMN — List sidebar */}
-            <div className="w-[200px] lg:w-[300px] h-[500px] shrink-0 flex flex-col min-h-0 border-r border-stone-800/60 pr-3 mr-3 items-between">
+            <div className="w-[200px] lg:w-[300px] h-[530px] shrink-0 flex flex-col min-h-0 border-r border-stone-800/60 pr-3 mr-3 items-between">
               {/* Sidebar header: All · None · ··· — pinned, never scrolls */}
               <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-stone-800/60 shrink-0">
                 <button
@@ -3325,6 +3294,20 @@ export default function ListsView({
           deletingId={deletingId}
         />
       )}
+
+      {/* List Picker Modal */}
+      {listPickerTaskId &&
+        (() => {
+          const task = allTasks.find((t) => t.id === listPickerTaskId);
+          if (!task) return null;
+          return (
+            <ListPickerPopover
+              task={task}
+              lists={taskLists}
+              onClose={() => setListPickerTaskId(null)}
+            />
+          );
+        })()}
     </div>
   );
 }

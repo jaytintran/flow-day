@@ -31,7 +31,7 @@ export default function TrophyWall() {
   const starredTasks = useMemo(() => {
     if (!doneTasks) return [];
     return doneTasks.filter(
-      (t) => t.is_starred === true || (t.achievements && t.achievements.length > 0),
+      (t) => t.starred === true || (t.achievements && t.achievements.length > 0),
     );
   }, [doneTasks]);
 

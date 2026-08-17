@@ -250,9 +250,18 @@ export default function DayTimeline({
     e: React.PointerEvent,
     entry: TimelineEntry,
   ) => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
     e.stopPropagation();
+
     const startX = e.clientX;
     const startY = e.clientY;
+    const pointerId = e.pointerId;
+    const targetEl = e.currentTarget as HTMLElement;
+
+    try {
+      targetEl.setPointerCapture(pointerId);
+    } catch {}
+
     dragStartPosRef.current = { x: startX, y: startY, entry };
 
     if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
@@ -265,27 +274,25 @@ export default function DayTimeline({
           originY: startY,
           originX: startX,
         });
-        dragStartPosRef.current = null;
       }
     }, 180);
   };
 
   const handleGutterPointerMove = (e: React.PointerEvent) => {
-    if (!dragStartPosRef.current) return;
+    if (!dragStartPosRef.current || activeRulerState) return;
     const dist = Math.hypot(
       e.clientX - dragStartPosRef.current.x,
       e.clientY - dragStartPosRef.current.y,
     );
-    if (dist > 6) {
+    if (dist > 2) {
       if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
       const entry = dragStartPosRef.current.entry;
       setActiveRulerState({
         entry,
         initialDate: getPickerInitialDate(entry),
-        originY: dragStartPosRef.current.y,
-        originX: dragStartPosRef.current.x,
+        originY: e.clientY,
+        originX: e.clientX,
       });
-      dragStartPosRef.current = null;
     }
   };
 
@@ -294,14 +301,22 @@ export default function DayTimeline({
       clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
     }
-    if (dragStartPosRef.current) {
-      dragStartPosRef.current = null;
+    const hadStart = dragStartPosRef.current;
+    dragStartPosRef.current = null;
+
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+
+    // Only open standard picker modal if the ruler overlay never got activated
+    if (hadStart && !activeRulerState) {
       e.stopPropagation();
       setPickerEntry(entry);
     }
   };
 
-  const handleGutterPointerCancel = () => {
+  const handleGutterPointerCancel = (e: React.PointerEvent) => {
+    if (activeRulerState) return;
     if (holdTimerRef.current) {
       clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
@@ -579,7 +594,7 @@ export default function DayTimeline({
                     e.stopPropagation();
                     const task = entry as Task;
                     const isStarred = !task.starred;
-                    await db.entries.update(task.id, { starred: isStarred });
+                    await db.entries.update(task.id, { starred: isStarred } as any);
                   }}
                   className={`p-1.5 bg-transparent rounded border border-stone-800 hover:bg-stone-850 transition-colors cursor-pointer ${
                     (entry as Task).starred || ((entry as Task).achievements && (entry as Task).achievements!.length > 0)

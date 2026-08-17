@@ -19,7 +19,7 @@ import HabitsSheet from '../HabitsSheet';
 
 import FocusSheet from '../FocusSheet';
 import { Purpose } from '../../types';
-import { Delete, Trash, Star } from 'lucide-react';
+import { Delete, Trash, Star, Pin } from 'lucide-react';
 import MarkdownPreview from '../MarkdownPreview';
 
 interface JournalProps {
@@ -900,14 +900,16 @@ export default function Journal({
         viewMode === 'hub'
           ? 'overflow-hidden pt-3 flex flex-col h-full'
           : viewMode === 'records'
-            ? 'overflow-y-auto pt-0'
-            : 'overflow-y-auto pt-4 md:pt-6'
+            ? 'overflow-y-auto pt-4 md:pt-6'
+            : viewMode === 'lists'
+              ? 'pt-4 md:pt-6'
+              : 'overflow-y-auto pt-4 md:pt-6'
       }`}
       id="timeline-journal-scrollable"
       ref={containerRef}
     >
       <div
-        className={`w-full md:mx-auto ${viewMode === 'hub' ? 'h-full md:max-w-9xl flex flex-col' : viewMode === 'lists' ? 'md:max-w-9xl ' : 'md:max-w-4xl space-y-8'}`}
+        className={`w-full md:mx-auto ${viewMode === 'hub' ? 'h-full md:max-w-9xl flex flex-col' : viewMode === 'lists' || viewMode === 'records' ? 'md:max-w-9xl ' : 'md:max-w-4xl space-y-8'}`}
       >
         {viewMode === 'records' ? (
           <RecordsView
@@ -1186,7 +1188,7 @@ export default function Journal({
                       onClick={async () => {
                         const task = selectedEntry as Task;
                         const nextStarred = !task.starred;
-                        await db.entries.update(task.id, { starred: nextStarred });
+                        await db.entries.update(task.id, { starred: nextStarred } as any);
                         setSelectedEntry({ ...task, starred: nextStarred });
                       }}
                       className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-mono font-bold uppercase tracking-widest cursor-pointer transition-all active:scale-95 ${
@@ -1313,6 +1315,25 @@ export default function Journal({
                       );
                     }}
                   />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const note = selectedEntry as Note;
+                      const nextPinned = !note.pinned;
+                      await db.entries.update(note.id, { pinned: nextPinned } as any);
+                      setSelectedEntry({ ...note, pinned: nextPinned });
+                    }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-mono font-bold uppercase tracking-widest cursor-pointer transition-all active:scale-95 ${
+                      (selectedEntry as Note).pinned
+                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                        : 'bg-[#121212] border-stone-800 text-stone-500 hover:text-stone-300 hover:border-stone-750'
+                    }`}
+                  >
+                    <Pin
+                      className={`w-3 h-3 ${(selectedEntry as Note).pinned ? 'fill-current' : ''}`}
+                    />
+                    {(selectedEntry as Note).pinned ? 'Pinned' : 'Pin'}
+                  </button>
                 </div>
                 {isEditingContent ? (
                   <textarea
@@ -1356,6 +1377,25 @@ export default function Journal({
                       );
                     }}
                   />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const evt = selectedEntry as Event;
+                      const nextPinned = !evt.pinned;
+                      await db.entries.update(evt.id, { pinned: nextPinned } as any);
+                      setSelectedEntry({ ...evt, pinned: nextPinned });
+                    }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-mono font-bold uppercase tracking-widest cursor-pointer transition-all active:scale-95 ${
+                      (selectedEntry as Event).pinned
+                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                        : 'bg-[#121212] border-stone-800 text-stone-500 hover:text-stone-300 hover:border-stone-750'
+                    }`}
+                  >
+                    <Pin
+                      className={`w-3 h-3 ${(selectedEntry as Event).pinned ? 'fill-current' : ''}`}
+                    />
+                    {(selectedEntry as Event).pinned ? 'Pinned' : 'Pin'}
+                  </button>
                 </div>
                 {isEditingContent ? (
                   <textarea

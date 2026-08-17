@@ -103,15 +103,31 @@ export default function TimeRulerOverlay({
     return dist <= radius;
   }, []);
 
-  // Global pointer listeners
+  // Global pointer & touch listeners
   useEffect(() => {
+    let isFinished = false;
+
     const handlePointerMove = (e: PointerEvent) => {
+      if (isFinished) return;
       setCurrentY(e.clientY);
       const overCancel = checkCancelCollision(e.clientX, e.clientY);
       setIsOverCancel(overCancel);
     };
 
+    const handleTouchMove = (e: TouchEvent) => {
+      if (isFinished) return;
+      if (e.cancelable) e.preventDefault();
+      if (e.touches.length > 0) {
+        const touch = e.touches[0];
+        setCurrentY(touch.clientY);
+        const overCancel = checkCancelCollision(touch.clientX, touch.clientY);
+        setIsOverCancel(overCancel);
+      }
+    };
+
     const handlePointerUp = (e: PointerEvent) => {
+      if (isFinished) return;
+      isFinished = true;
       const overCancel = checkCancelCollision(e.clientX, e.clientY);
       if (overCancel) {
         onCancel();
@@ -120,21 +136,41 @@ export default function TimeRulerOverlay({
       }
     };
 
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (isFinished) return;
+      isFinished = true;
+      if (e.changedTouches.length > 0) {
+        const touch = e.changedTouches[0];
+        const overCancel = checkCancelCollision(touch.clientX, touch.clientY);
+        if (overCancel) {
+          onCancel();
+        } else {
+          onConfirm(calculatedDate);
+        }
+      } else {
+        onConfirm(calculatedDate);
+      }
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (isFinished) return;
+        isFinished = true;
         onCancel();
       }
     };
 
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
-    window.addEventListener('pointercancel', onCancel);
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
+    window.addEventListener('touchend', handleTouchEnd, { passive: false });
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
-      window.removeEventListener('pointercancel', onCancel);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [calculatedDate, checkCancelCollision, onCancel, onConfirm]);
@@ -206,7 +242,7 @@ export default function TimeRulerOverlay({
 
         {/* Active time indicator line on the ruler */}
         <div
-          className="absolute -right-2 left-0 h-[2px] bg-amber-400 shadow-[0_0_10px_#f59e0b] -translate-y-1/2 transition-all duration-75 flex items-center justify-end"
+          className="absolute -right-2 left-0 h-[2px] bg-amber-400 shadow-[0_0_10px_#f59e0b] -translate-y-1/2 flex items-center justify-end"
           style={{ top: `${indicatorPct}%` }}
         >
           <div className="w-2.5 h-2.5 rounded-full bg-amber-400 ring-4 ring-amber-400/20 -mr-1" />
@@ -215,19 +251,20 @@ export default function TimeRulerOverlay({
 
       {/* 3. Floating Preview Badge tracking cursor Y */}
       <div
-        className={`absolute left-32 md:left-44 -translate-y-1/2 flex items-center gap-3 transition-all duration-75 pointer-events-none ${
+        className={`fixed left-28 md:left-44 flex items-center gap-2.5 pointer-events-none will-change-transform ${
           isOverCancel ? 'opacity-30 scale-95' : 'opacity-100 scale-100'
         }`}
         style={{
-          top: `${Math.max(TOP_PADDING, Math.min(TOP_PADDING + rulerHeight, currentY))}px`,
+          top: 0,
+          transform: `translate3d(0, ${Math.max(TOP_PADDING, Math.min(TOP_PADDING + rulerHeight, currentY)) - 24}px, 0)`,
         }}
       >
         {/* Horizontal connector guide line */}
-        <div className="w-8 h-[1.5px] bg-amber-400/60" />
+        <div className="w-6 md:w-8 h-[1.5px] bg-amber-400/80 shadow-[0_0_8px_#f59e0b]" />
 
         {/* Floating Time Pill */}
-        <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-stone-900/95 border border-amber-500/40 text-stone-100 shadow-[0_8px_30px_rgba(0,0,0,0.8)] backdrop-blur-md">
-          <span className="text-base font-mono font-bold text-amber-400 tracking-tight">
+        <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#121212] border border-amber-500/50 text-stone-100 shadow-[0_8px_30px_rgba(0,0,0,0.85)] backdrop-blur-md">
+          <span className="text-base md:text-lg font-mono font-bold text-amber-400 tracking-tight">
             {formattedTime}
           </span>
           <span
