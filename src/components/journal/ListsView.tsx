@@ -18,6 +18,9 @@ import {
   CircleDashed,
   FileText,
   HelpCircle,
+  ArrowUpDown,
+  Trophy,
+  Clock,
 } from 'lucide-react';
 import {
   DndContext,
@@ -43,7 +46,7 @@ import { TimelineEntry, Task, TaskStatus, TaskAchievement, Category } from '../.
 import { useLiveQuery } from 'dexie-react-hooks';
 import { MoreHorizontal } from 'lucide-react';
 import TaskListManagerModal from '../TaskListManagerModal'; // adjust path as needed
-import { TASK_LIST_SCOPE } from '../../utils';
+import { TASK_LIST_SCOPE, formatDuration } from '../../utils';
 
 interface ListsViewProps {
   entries: TimelineEntry[];
@@ -359,6 +362,9 @@ interface TaskSectionProps {
   moveToPageModalTask: Task | null;
   setMoveToPageModalTask: (task: Task | null) => void;
   selectedListId?: string;
+  /** When true, tasks within this section are grouped by their primary assigned list */
+  sortByList?: boolean;
+  onToggleSortByList?: () => void;
 }
 
 // ─── Status Picker Popover ──────────────────────────────────────────────────
@@ -514,6 +520,239 @@ function TaskStatusPickerPopover({ task, onClose }: TaskStatusPickerPopoverProps
         </motion.div>
       </motion.div>
     </AnimatePresence>
+  );
+}
+
+// ─── Dateless Trophy Wall ────────────────────────────────────────────────────
+
+interface DatelessTrophyWallProps {
+  tasks: Task[];
+  taskLists: Category[];
+  onOpenDetail: (entry: TimelineEntry) => void;
+  selectedListId?: string;
+  onClose?: () => void;
+}
+
+function DatelessTrophyWall({
+  tasks,
+  taskLists,
+  onOpenDetail,
+  selectedListId = 'all',
+  onClose,
+}: DatelessTrophyWallProps) {
+  // Filter for completed dateless tasks
+  const completedDatelessTasks = useMemo(() => {
+    let list = tasks.filter((t) => !t.scheduled_at && t.status === 'done');
+    if (selectedListId !== 'all' && selectedListId !== 'none') {
+      list = list.filter((t) => (t.category_ids ?? []).includes(selectedListId));
+    } else if (selectedListId === 'none') {
+      list = list.filter((t) => {
+        const ids = t.category_ids ?? [];
+        return ids.length === 0 || !taskLists.some((l) => ids.includes(l.id));
+      });
+    }
+    return list;
+  }, [tasks, selectedListId, taskLists]);
+
+  // Group by completion month/year, sorted newest first
+  const monthGroups = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; year: number; tasks: Task[] }>();
+
+    for (const task of completedDatelessTasks) {
+      const date = task.completed_at ? new Date(task.completed_at) : new Date(task.created_at);
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const key = `${year}-${String(month).padStart(2, '0')}`;
+
+      if (!map.has(key)) {
+        const label = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+        map.set(key, { key, label, year, tasks: [] });
+      }
+      map.get(key)!.tasks.push(task);
+    }
+
+    const groups = Array.from(map.values()).sort((a, b) => b.key.localeCompare(a.key));
+
+    for (const group of groups) {
+      group.tasks.sort((a, b) => {
+        const dateA = a.completed_at
+          ? new Date(a.completed_at).getTime()
+          : new Date(a.created_at).getTime();
+        const dateB = b.completed_at
+          ? new Date(b.completed_at).getTime()
+          : new Date(b.created_at).getTime();
+        return dateB - dateA;
+      });
+    }
+
+    return groups;
+  }, [completedDatelessTasks]);
+
+  const totalCount = completedDatelessTasks.length;
+
+  const formatCompletionDate = (task: Task): string => {
+    const date = task.completed_at ? new Date(task.completed_at) : new Date(task.created_at);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  let lastDisplayedYear: number | null = null;
+
+  return (
+    <div className="bg-[#0e0e0e] rounded-xl border border-stone-800 flex flex-col h-full overflow-hidden">
+      {/* Header with total count and golden glow */}
+      <div className="px-5 py-3.5 border-b border-stone-800 flex items-center justify-between gap-3 shrink-0 bg-[#121212]">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
+          <div className="flex items-baseline gap-2 min-w-0">
+            <span className="font-mono text-xs text-stone-200 uppercase tracking-widest font-bold truncate">
+              Dateless Trophy Wall
+            </span>
+            <span className="text-[10px] font-mono text-stone-500 hidden sm:inline">
+              Completed Dateless Archive
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <span
+            className="font-mono text-xs font-bold text-amber-400"
+            style={{
+              textShadow: '0 0 8px rgba(245, 158, 11, 0.5), 0 0 16px rgba(245, 158, 11, 0.25)',
+            }}
+          >
+            {totalCount} {totalCount === 1 ? 'completed' : 'completed'}
+          </span>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1 rounded-md text-stone-500 hover:text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer"
+              title="Close trophy wall"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div
+        className="flex-1 overflow-y-auto px-5 py-4 scrollbar-none"
+        style={{ scrollbarWidth: 'none' }}
+      >
+        {totalCount === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+            <Trophy className="w-10 h-10 text-stone-800" />
+            <p className="text-stone-500 text-xs font-mono leading-relaxed max-w-xs">
+              No completed dateless tasks yet. Complete your dateless tasks to build your trophy
+              wall!
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-6">
+            {monthGroups.map((group) => {
+              let yearHeader = null;
+              if (lastDisplayedYear !== group.year) {
+                lastDisplayedYear = group.year;
+                yearHeader = (
+                  <div className="flex items-center gap-2 mb-2" key={`year-${group.year}`}>
+                    <span className="font-mono text-[10px] text-amber-500/80 uppercase tracking-[0.2em] font-bold">
+                      {group.year}
+                    </span>
+                    <div className="flex-1 h-px bg-amber-500/20" />
+                  </div>
+                );
+              }
+
+              return (
+                <div key={group.key}>
+                  {yearHeader}
+
+                  {/* Month header with count */}
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-mono text-[11px] text-stone-400 uppercase tracking-widest font-semibold">
+                      {group.label}
+                    </span>
+                    <span className="font-mono text-[10px] text-stone-600">
+                      {group.tasks.length} {group.tasks.length === 1 ? 'task' : 'tasks'}
+                    </span>
+                  </div>
+
+                  {/* Task grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    {group.tasks.map((task) => {
+                      const taskCategories = (task.category_ids ?? [])
+                        .map((id) => taskLists.find((list) => list.id === id))
+                        .filter((list): list is Category => !!list);
+                      const hasAchievements = task.achievements && task.achievements.length > 0;
+
+                      return (
+                        <div
+                          key={task.id}
+                          onClick={() => onOpenDetail(task)}
+                          className="bg-[#111] border border-stone-800/80 hover:border-amber-500/40 rounded-xl p-3 flex flex-col justify-between gap-2.5 transition-all cursor-pointer group shadow-sm hover:shadow-[0_0_12px_rgba(245,158,11,0.06)]"
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 flex items-center justify-center shrink-0 mt-0.5 shadow-[0_0_6px_rgba(16,185,129,0.2)]">
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-1.5">
+                                <span className="text-xs font-serif font-semibold text-stone-200 group-hover:text-amber-200/90 leading-snug line-clamp-2 transition-colors">
+                                  {hasAchievements && <span className="mr-1">🏆</span>}
+                                  {task.title}
+                                </span>
+                              </div>
+
+                              {task.content && task.content.trim() && (
+                                <p className="text-[10px] font-mono text-stone-500 mt-1 line-clamp-2 leading-relaxed">
+                                  {task.content}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Footer: List Badges + Date + Time spent */}
+                          <div className="flex items-center justify-between flex-wrap gap-1 pt-1.5 border-t border-stone-900/60 mt-auto">
+                            <div className="flex items-center flex-wrap gap-1">
+                              {taskCategories.map((cat) => {
+                                const colorClass =
+                                  CATEGORY_COLORS[cat.color] ?? CATEGORY_COLORS.violet;
+                                return (
+                                  <span
+                                    key={cat.id}
+                                    className={`px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider border shrink-0 ${colorClass}`}
+                                  >
+                                    {cat.name}
+                                  </span>
+                                );
+                              })}
+                            </div>
+
+                            <div className="flex items-center gap-2 text-[9px] font-mono text-stone-500 ml-auto shrink-0">
+                              <span>{formatCompletionDate(task)}</span>
+                              {task.time_spent > 0 && (
+                                <span className="flex items-center gap-0.5 text-stone-600">
+                                  <Clock className="w-2.5 h-2.5" />
+                                  {formatDuration(task.time_spent)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1149,9 +1388,39 @@ function TaskSection({
   moveToPageModalTask,
   setMoveToPageModalTask,
   selectedListId,
+  sortByList = false,
+  onToggleSortByList,
 }: TaskSectionProps) {
   const safePage = Math.min(page, totalPages - 1);
-  const pageTasks = tasks.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+
+  // When sortByList is on, re-order the current page's tasks grouped by list.
+  // When viewing a specific list (selectedListId is a real list id), we skip that list
+  // and group by the task's OTHER assigned lists instead — tasks exclusive to the
+  // current list sink to the bottom. In "all"/"none" views, use the primary list normally.
+  const rawPageTasks = tasks.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+  const pageTasks = useMemo(() => {
+    if (!sortByList || taskLists.length === 0) return rawPageTasks;
+    const listOrder = taskLists.map((l) => l.id);
+    const isSpecificList = selectedListId && selectedListId !== 'all' && selectedListId !== 'none';
+    return [...rawPageTasks].sort((a, b) => {
+      // Pick the representative list for each task:
+      // - If viewing a specific list, ignore that list and use the next assigned list
+      // - Otherwise, use the first assigned list in sidebar order
+      const pickList = (t: Task) => {
+        const ids = t.category_ids ?? [];
+        if (isSpecificList) {
+          return ids.find((id) => id !== selectedListId && listOrder.includes(id)) ?? null;
+        }
+        return ids.find((id) => listOrder.includes(id)) ?? null;
+      };
+      const aList = pickList(a);
+      const bList = pickList(b);
+      if (aList === bList) return 0;
+      if (!aList) return 1; // no secondary list → sink to bottom
+      if (!bList) return -1;
+      return listOrder.indexOf(aList) - listOrder.indexOf(bList);
+    });
+  }, [rawPageTasks, sortByList, taskLists, selectedListId]);
 
   const [openRowId, setOpenRowId] = useState<string | null>(null);
   const [contextMenuTask, setContextMenuTask] = useState<{
@@ -1303,7 +1572,7 @@ function TaskSection({
                   e.stopPropagation();
                   onOpenStatusModal(task);
                 }}
-                className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                className={`relative w-5 h-5 rounded-full border flex items-center justify-center transition-all cursor-pointer shrink-0 ${
                   isDone
                     ? 'bg-emerald-600 border-emerald-500 text-stone-950 shadow-[0_0_8px_rgba(16,185,129,0.3)]'
                     : isInProgress
@@ -1316,7 +1585,11 @@ function TaskSection({
                 }`}
                 title="Change status"
               >
-                {isDone && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                {/* Ping ring for completed dateless tasks */}
+                {isDone && isDateless && (
+                  <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-60 pointer-events-none" />
+                )}
+                {isDone && <Check className="w-3.5 h-3.5 stroke-[3] relative z-10" />}
                 {isInProgress && (
                   <CircleDashed
                     className="w-3.5 h-3.5 animate-spin"
@@ -1379,9 +1652,6 @@ function TaskSection({
                   </span>
                 )}
                 {isDateless &&
-                  !isDone &&
-                  !isDropped &&
-                  !isMaybe &&
                   taskCategories.map((cat) => {
                     const colorClass = CATEGORY_COLORS[cat.color] ?? CATEGORY_COLORS.violet;
                     return (
@@ -1395,9 +1665,7 @@ function TaskSection({
                   })}
                 <span className="flex items-center gap-1 text-[10px] font-mono text-stone-500">
                   {isDateless &&
-                    !isDone &&
-                    !isDropped &&
-                    (taskCategories.length > 0 || isInProgress || isMaybe) && (
+                    (taskCategories.length > 0 || isInProgress || isMaybe || isDropped) && (
                       <span className="text-stone-700 mr-0.5">·</span>
                     )}
                   Created: {formatTime(task.created_at)}
@@ -1509,7 +1777,7 @@ function TaskSection({
                     e.stopPropagation();
                     onOpenStatusModal(task);
                   }}
-                  className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
+                  className={`relative w-5 h-5 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
                     isDone
                       ? 'bg-emerald-600 border-emerald-500 text-stone-950 shadow-[0_0_8px_rgba(16,185,129,0.3)]'
                       : isInProgress
@@ -1522,7 +1790,11 @@ function TaskSection({
                   }`}
                   title="Change status"
                 >
-                  {isDone && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                  {/* Ping ring for completed dateless tasks */}
+                  {isDone && isDateless && (
+                    <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-60 pointer-events-none" />
+                  )}
+                  {isDone && <Check className="w-3.5 h-3.5 stroke-[3] relative z-10" />}
                   {isInProgress && (
                     <CircleDashed
                       className="w-3.5 h-3.5 animate-spin"
@@ -1624,9 +1896,6 @@ function TaskSection({
                 </span>
               )}
               {isDateless &&
-                !isDone &&
-                !isDropped &&
-                !isMaybe &&
                 taskCategories.map((cat) => {
                   const colorClass = CATEGORY_COLORS[cat.color] ?? CATEGORY_COLORS.violet;
                   return (
@@ -1695,30 +1964,47 @@ function TaskSection({
           </span>
         </button>
 
-        {/* Redesigned Pagination UI directly next to the header (on the right) */}
-        {!isCollapsed && tasks.length > 0 && totalPages > 1 && (
-          <div className="flex items-center gap-2 text-[11px] font-mono font-bold uppercase tracking-widest text-stone-500">
+        <div className="flex items-center gap-1.5">
+          {/* Sort by list toggle — shown when taskLists are available */}
+          {!isCollapsed && taskLists.length > 0 && onToggleSortByList && (
             <button
-              onClick={() => setPage(Math.max(0, page - 1))}
-              disabled={safePage === 0}
-              className="text-stone-500 hover:text-stone-200 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
-              title="Previous Page"
+              onClick={onToggleSortByList}
+              title={sortByList ? 'Disable list sorting' : 'Sort by assigned list'}
+              className={`p-1 rounded-md transition-all cursor-pointer ${
+                sortByList
+                  ? 'text-violet-400 bg-violet-500/10 border border-violet-500/30'
+                  : 'text-stone-600 hover:text-stone-300 border border-transparent hover:bg-stone-800'
+              }`}
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ArrowUpDown className="w-3 h-3" />
             </button>
-            <span className="select-none">
-              {safePage + 1} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-              disabled={safePage >= totalPages - 1}
-              className="text-stone-500 hover:text-stone-200 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
-              title="Next Page"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+          )}
+
+          {/* Pagination UI */}
+          {!isCollapsed && tasks.length > 0 && totalPages > 1 && (
+            <div className="flex items-center gap-2 text-[11px] font-mono font-bold uppercase tracking-widest text-stone-500">
+              <button
+                onClick={() => setPage(Math.max(0, page - 1))}
+                disabled={safePage === 0}
+                className="text-stone-500 hover:text-stone-200 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                title="Previous Page"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="select-none">
+                {safePage + 1} / {totalPages}
+              </span>
+              <button
+                onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
+                disabled={safePage >= totalPages - 1}
+                className="text-stone-500 hover:text-stone-200 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                title="Next Page"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Collapsible Content */}
@@ -1978,6 +2264,10 @@ export default function ListsView({
   const [droppedDatelessCollapsed, setDroppedDatelessCollapsed] = useState(false);
   const [maybeDatelessCollapsed, setMaybeDatelessCollapsed] = useState(false);
 
+  // Sort-by-list toggle (per section)
+  const [datelessSortByList, setDatelessListSort] = useState(false);
+  const [completedDatelessSortByList, setCompletedDatelessListSort] = useState(false);
+
   // Pagination per section
   const [scheduledPage, setScheduledPage] = useState(0);
   const [datelessPageMap, setDatelessPageMap] = useState<Record<string, number>>({});
@@ -2015,6 +2305,9 @@ export default function ListsView({
 
   // Paper list modal
   const [isPaperListOpen, setIsPaperListOpen] = useState(false);
+
+  // Dateless Trophy Wall view toggle
+  const [isDatelessTrophyWallOpen, setIsDatelessTrophyWallOpen] = useState(false);
 
   // Schedule calendar modal
   const [scheduleModalTask, setScheduleModalTask] = useState<Task | null>(null);
@@ -2720,6 +3013,8 @@ export default function ListsView({
             setMoveToPageModalTask={setMoveToPageModalTask}
             showContent={showContent}
             selectedListId={selectedListId}
+            sortByList={datelessSortByList}
+            onToggleSortByList={() => setDatelessListSort((p) => !p)}
           />
         )}
 
@@ -2757,6 +3052,8 @@ export default function ListsView({
             setMoveToPageModalTask={setMoveToPageModalTask}
             showContent={showContent}
             selectedListId={selectedListId}
+            sortByList={completedDatelessSortByList}
+            onToggleSortByList={() => setCompletedDatelessListSort((p) => !p)}
           />
         )}
 
@@ -2957,6 +3254,21 @@ export default function ListsView({
           >
             <ClipboardList className="w-3.5 h-3.5" />
           </button>
+
+          {/* Dateless Trophy Wall toggle button */}
+          <button
+            onClick={() => setIsDatelessTrophyWallOpen((prev) => !prev)}
+            className={`px-1.75 py-1.5 rounded-lg border transition-all cursor-pointer ${
+              isDatelessTrophyWallOpen
+                ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.15)]'
+                : 'border-stone-800 text-stone-500 hover:text-amber-400 hover:bg-stone-800'
+            }`}
+            title={
+              isDatelessTrophyWallOpen ? 'Back to Task Lists' : 'Completed Dateless Trophy Wall'
+            }
+          >
+            <Trophy className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {/* Actions */}
@@ -2964,9 +3276,12 @@ export default function ListsView({
           {/* Status filter */}
           <div className="flex items-center gap-1 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 w-fit">
             <button
-              onClick={() => handleStatusFilterChange('inbox')}
+              onClick={() => {
+                handleStatusFilterChange('inbox');
+                setIsDatelessTrophyWallOpen(false);
+              }}
               className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-                statusFilter === 'inbox'
+                statusFilter === 'inbox' && !isDatelessTrophyWallOpen
                   ? 'bg-stone-800 text-stone-200 shadow-sm'
                   : 'text-stone-500 hover:text-stone-300'
               }`}
@@ -2975,7 +3290,10 @@ export default function ListsView({
             </button>
 
             <button
-              onClick={() => handleStatusFilterChange('todo')}
+              onClick={() => {
+                handleStatusFilterChange('todo');
+                setIsDatelessTrophyWallOpen(false);
+              }}
               className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
                 statusFilter === 'todo'
                   ? 'bg-stone-800 text-stone-200 shadow-sm'
@@ -2985,7 +3303,10 @@ export default function ListsView({
               Scheduled
             </button>
             <button
-              onClick={() => handleStatusFilterChange('done')}
+              onClick={() => {
+                handleStatusFilterChange('done');
+                setIsDatelessTrophyWallOpen(false);
+              }}
               className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
                 statusFilter === 'done'
                   ? 'bg-emerald-900/60 text-emerald-300 shadow-sm'
@@ -3035,15 +3356,27 @@ export default function ListsView({
                   </div>
                 );
               })()}
-              {stateFilterButtons}
+              {!isDatelessTrophyWallOpen && stateFilterButtons}
             </div>
-            {taskSectionsContent}
+            {isDatelessTrophyWallOpen ? (
+              <div className="mt-2">
+                <DatelessTrophyWall
+                  tasks={allTasks}
+                  taskLists={taskLists}
+                  onOpenDetail={onOpenDetail}
+                  selectedListId={selectedListId}
+                  onClose={() => setIsDatelessTrophyWallOpen(false)}
+                />
+              </div>
+            ) : (
+              taskSectionsContent
+            )}
           </div>
 
           {/* ── DESKTOP: two-column sidebar layout ── */}
           <div className="hidden md:flex gap-0 mt-3 h-[530px] overflow-hidden">
             {/* LEFT COLUMN — List sidebar */}
-            <div className="w-[200px] lg:w-[300px] h-[530px] shrink-0 flex flex-col min-h-0 border-r border-stone-800/60 pr-3 mr-3 items-between">
+            <div className="w-[200px] lg:w-[300px] h-full overflow-y-auto shrink-0 flex flex-col min-h-0 border-r border-stone-800/60 pr-3 mr-3 items-between">
               {/* Sidebar header: All · None · ··· — pinned, never scrolls */}
               <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-stone-800/60 shrink-0">
                 <button
@@ -3166,45 +3499,59 @@ export default function ListsView({
               )}
             </div>
 
-            {/* RIGHT COLUMN — Task sections */}
+            {/* RIGHT COLUMN — Task sections OR Dateless Trophy Wall */}
             <div className="flex-1 min-w-0 min-h-0 flex flex-col">
-              {/* Active list header & state filter */}
-              {(() => {
-                const activeList = taskLists.find((l) => l.id === selectedListId);
-                const cs = activeList
-                  ? (LIST_COLORS[activeList.color] ?? LIST_COLORS['violet'])
-                  : null;
-                const counts = listTaskCounts[selectedListId] ?? { active: 0, done: 0 };
-                return (
-                  <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
-                    <div className="flex items-center gap-2">
-                      {cs && activeList && (
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${cs.dot}`} />
-                      )}
-                      <h3 className="text-[11px] font-mono font-bold uppercase tracking-widest text-stone-400">
-                        {selectedListId === 'all'
-                          ? 'All Tasks'
-                          : selectedListId === 'none'
-                            ? 'Uncategorized'
-                            : (activeList?.name ?? 'Tasks')}
-                      </h3>
-                      <span className="text-[9px] font-mono text-stone-600 tabular-nums ml-1">
-                        {counts.active > 0 && `${counts.active} active`}
-                        {counts.active > 0 && counts.done > 0 && ' · '}
-                        {counts.done > 0 && `${counts.done} done`}
-                      </span>
-                    </div>
-                    {stateFilterButtons}
+              {isDatelessTrophyWallOpen ? (
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <DatelessTrophyWall
+                    tasks={allTasks}
+                    taskLists={taskLists}
+                    onOpenDetail={onOpenDetail}
+                    selectedListId={selectedListId}
+                    onClose={() => setIsDatelessTrophyWallOpen(false)}
+                  />
+                </div>
+              ) : (
+                <>
+                  {/* Active list header & state filter */}
+                  {(() => {
+                    const activeList = taskLists.find((l) => l.id === selectedListId);
+                    const cs = activeList
+                      ? (LIST_COLORS[activeList.color] ?? LIST_COLORS['violet'])
+                      : null;
+                    const counts = listTaskCounts[selectedListId] ?? { active: 0, done: 0 };
+                    return (
+                      <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
+                        <div className="flex items-center gap-2">
+                          {cs && activeList && (
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${cs.dot}`} />
+                          )}
+                          <h3 className="text-[11px] font-mono font-bold uppercase tracking-widest text-stone-400">
+                            {selectedListId === 'all'
+                              ? 'All Tasks'
+                              : selectedListId === 'none'
+                                ? 'Uncategorized'
+                                : (activeList?.name ?? 'Tasks')}
+                          </h3>
+                          <span className="text-[9px] font-mono text-stone-600 tabular-nums ml-1">
+                            {counts.active > 0 && `${counts.active} active`}
+                            {counts.active > 0 && counts.done > 0 && ' · '}
+                            {counts.done > 0 && `${counts.done} done`}
+                          </span>
+                        </div>
+                        {stateFilterButtons}
+                      </div>
+                    );
+                  })()}
+                  {/* Scrollable task content — independent from left sidebar */}
+                  <div
+                    className="flex-1 min-h-0 overflow-y-auto pr-1"
+                    style={{ scrollbarWidth: 'thin', scrollbarColor: '#3d3d3d transparent' }}
+                  >
+                    {taskSectionsContent}
                   </div>
-                );
-              })()}
-              {/* Scrollable task content — independent from left sidebar */}
-              <div
-                className="flex-1 min-h-0 overflow-y-auto pr-1"
-                style={{ scrollbarWidth: 'thin', scrollbarColor: '#3d3d3d transparent' }}
-              >
-                {taskSectionsContent}
-              </div>
+                </>
+              )}
             </div>
           </div>
         </>

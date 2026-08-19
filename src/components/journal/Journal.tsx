@@ -902,7 +902,7 @@ export default function Journal({
           : viewMode === 'records'
             ? 'overflow-y-auto pt-4 md:pt-6'
             : viewMode === 'lists'
-              ? 'pt-4 md:pt-6'
+              ? 'overflow-y-auto pt-4 md:pt-6'
               : 'overflow-y-auto pt-4 md:pt-6'
       }`}
       id="timeline-journal-scrollable"

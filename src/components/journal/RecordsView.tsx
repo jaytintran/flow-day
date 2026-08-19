@@ -19,11 +19,7 @@ import {
 import { useLiveQuery } from 'dexie-react-hooks';
 import { TimelineEntry, Event, Note, Category } from '../../types';
 import { db } from '../../db';
-import {
-  toLocalDateString,
-  RECORD_CATEGORY_SCOPE,
-  toggleRecordPin,
-} from '../../utils';
+import { toLocalDateString, RECORD_CATEGORY_SCOPE, toggleRecordPin } from '../../utils';
 import RecordCategoryManagerModal from './RecordCategoryManagerModal';
 import RecordCategoryPickerModal from './RecordCategoryPickerModal';
 
@@ -117,10 +113,7 @@ export default function RecordsView({
 
   // All base records (events & notes)
   const allRecords = useMemo(() => {
-    return entries.filter((e) => e.type === 'event' || e.type === 'note') as (
-      | Event
-      | Note
-    )[];
+    return entries.filter((e) => e.type === 'event' || e.type === 'note') as (Event | Note)[];
   }, [entries]);
 
   // Category counts
@@ -531,7 +524,9 @@ export default function RecordsView({
         {/* Active category label row (mirrors ListsView mobile active label) */}
         <div className="flex items-center gap-1.5 mb-2 min-w-0">
           {activeCategory && (
-            <span className={`w-2 h-2 rounded-full shrink-0 ${(CAT_COLORS[activeCategory.color] ?? CAT_COLORS['violet']).dot}`} />
+            <span
+              className={`w-2 h-2 rounded-full shrink-0 ${(CAT_COLORS[activeCategory.color] ?? CAT_COLORS['violet']).dot}`}
+            />
           )}
           <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-stone-400 truncate">
             {selectedCategoryId === 'all'
@@ -546,7 +541,7 @@ export default function RecordsView({
       {/* ─── DESKTOP (>= md): Option B — identical sidebar to ListsView ─── */}
       <div className="flex gap-0 items-start">
         {/* LEFT COLUMN — identical to ListsView sidebar column */}
-        <div className="hidden md:flex flex-col w-[200px] lg:w-[260px] shrink-0 border-r border-stone-800/60 pr-3 mr-3 min-h-0 max-h-[calc(100vh-200px)] overflow-hidden">
+        <div className="hidden md:flex flex-col w-[200px] lg:w-[300px] h-full overflow-y-auto shrink-0 border-r border-stone-800/60 pr-3 mr-3 min-h-0 max-h-[calc(100vh-200px)] overflow-hidden">
           {/* Sidebar header: All · None · ··· — identical to ListsView */}
           <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-stone-800/60 shrink-0">
             <button
@@ -620,7 +615,9 @@ export default function RecordsView({
                   {count > 0 && (
                     <span
                       className={`text-[9px] font-mono font-bold tabular-nums min-w-[14px] text-center ${
-                        isActive ? 'text-current opacity-80' : 'text-stone-500 group-hover:text-stone-400'
+                        isActive
+                          ? 'text-current opacity-80'
+                          : 'text-stone-500 group-hover:text-stone-400'
                       }`}
                     >
                       {count}
@@ -647,7 +644,9 @@ export default function RecordsView({
           <div className="hidden md:flex items-center justify-between gap-2 shrink-0">
             <div className="flex items-center gap-2">
               {activeCategory && (
-                <span className={`w-2 h-2 rounded-full shrink-0 ${(CAT_COLORS[activeCategory.color] ?? CAT_COLORS['violet']).dot}`} />
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${(CAT_COLORS[activeCategory.color] ?? CAT_COLORS['violet']).dot}`}
+                />
               )}
               <h3 className="text-[11px] font-mono font-bold uppercase tracking-widest text-stone-400">
                 {selectedCategoryId === 'all'
@@ -677,7 +676,9 @@ export default function RecordsView({
                 <button
                   onClick={() => setFilterType('all')}
                   className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-                    filterType === 'all' ? 'bg-stone-800 text-stone-200 shadow-sm' : 'text-stone-500 hover:text-stone-300'
+                    filterType === 'all'
+                      ? 'bg-stone-800 text-stone-200 shadow-sm'
+                      : 'text-stone-500 hover:text-stone-300'
                   }`}
                 >
                   All
@@ -685,7 +686,9 @@ export default function RecordsView({
                 <button
                   onClick={() => setFilterType('event')}
                   className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-                    filterType === 'event' ? 'bg-indigo-900/60 text-indigo-300 shadow-sm' : 'text-stone-500 hover:text-stone-300'
+                    filterType === 'event'
+                      ? 'bg-indigo-900/60 text-indigo-300 shadow-sm'
+                      : 'text-stone-500 hover:text-stone-300'
                   }`}
                 >
                   Events
@@ -693,7 +696,9 @@ export default function RecordsView({
                 <button
                   onClick={() => setFilterType('note')}
                   className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-                    filterType === 'note' ? 'bg-blue-900/60 text-blue-300 shadow-sm' : 'text-stone-500 hover:text-stone-300'
+                    filterType === 'note'
+                      ? 'bg-blue-900/60 text-blue-300 shadow-sm'
+                      : 'text-stone-500 hover:text-stone-300'
                   }`}
                 >
                   Notes
@@ -778,9 +783,7 @@ export default function RecordsView({
 
       {/* ─── MODALS ─── */}
       {/* Category Manager Modal */}
-      {isManagerOpen && (
-        <RecordCategoryManagerModal onClose={() => setIsManagerOpen(false)} />
-      )}
+      {isManagerOpen && <RecordCategoryManagerModal onClose={() => setIsManagerOpen(false)} />}
 
       {/* Category Picker Popover */}
       {pickerRecord && (
