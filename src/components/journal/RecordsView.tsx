@@ -22,6 +22,7 @@ import { db } from '../../db';
 import { toLocalDateString, RECORD_CATEGORY_SCOPE, toggleRecordPin } from '../../utils';
 import RecordCategoryManagerModal from './RecordCategoryManagerModal';
 import RecordCategoryPickerModal from './RecordCategoryPickerModal';
+import CategoryIcon from '../CategoryIcon';
 
 interface RecordsViewProps {
   entries: TimelineEntry[];
@@ -251,7 +252,12 @@ export default function RecordsView({
                   className={`inline-flex items-center gap-1 text-[8px] font-mono font-semibold px-2 py-0.5 rounded-full border transition-all cursor-pointer ${cs.active}`}
                   title={`Filter by ${cat.name}`}
                 >
-                  <span className={`w-1.5 h-1.5 rounded-full ${cs.dot}`} />
+                  <CategoryIcon
+                    name={cat.icon}
+                    color={cat.color}
+                    className="w-2.5 h-2.5"
+                    fallback="Tag"
+                  />
                   <span className="truncate max-w-[80px]">{cat.name}</span>
                 </button>
               );
@@ -499,6 +505,12 @@ export default function RecordsView({
                       : `${cs.active} border-stone-800 !text-stone-100 hover:text-stone-300 hover:border-stone-700`
                   }`}
                 >
+                  <CategoryIcon
+                    name={cat.icon}
+                    color={cat.color}
+                    className="w-3 h-3"
+                    fallback="Tag"
+                  />
                   {cat.name}
                 </button>
               );
@@ -524,8 +536,11 @@ export default function RecordsView({
         {/* Active category label row (mirrors ListsView mobile active label) */}
         <div className="flex items-center gap-1.5 mb-2 min-w-0">
           {activeCategory && (
-            <span
-              className={`w-2 h-2 rounded-full shrink-0 ${(CAT_COLORS[activeCategory.color] ?? CAT_COLORS['violet']).dot}`}
+            <CategoryIcon
+              name={activeCategory.icon}
+              color={activeCategory.color}
+              className="w-3.5 h-3.5"
+              fallback="Tag"
             />
           )}
           <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-stone-400 truncate">
@@ -539,7 +554,7 @@ export default function RecordsView({
       </div>
 
       {/* ─── DESKTOP (>= md): Option B — identical sidebar to ListsView ─── */}
-      <div className="flex gap-0 items-start">
+      <div className="flex flex-1 min-h-0 h-[530px] overflow-hidden gap-0 items-stretch">
         {/* LEFT COLUMN — identical to ListsView sidebar column */}
         <div className="hidden md:flex flex-col w-[200px] lg:w-[300px] h-full overflow-y-auto shrink-0 border-r border-stone-800/60 pr-3 mr-3 min-h-0 max-h-[calc(100vh-200px)] overflow-hidden">
           {/* Sidebar header: All · None · ··· — identical to ListsView */}
@@ -603,8 +618,13 @@ export default function RecordsView({
                       : 'bg-transparent border-transparent text-stone-400 hover:bg-stone-900 hover:border-stone-800 hover:text-stone-200'
                   }`}
                 >
-                  {/* Color dot */}
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${cs.dot}`} />
+                  {/* Category icon */}
+                  <CategoryIcon
+                    name={cat.icon}
+                    color={cat.color}
+                    className="w-3.5 h-3.5"
+                    fallback="Tag"
+                  />
 
                   {/* Category name */}
                   <span className="flex-1 min-w-0 text-[11px] font-mono font-semibold truncate">
@@ -639,13 +659,16 @@ export default function RecordsView({
         </div>
 
         {/* RIGHT COLUMN — content area */}
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col space-y-4">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col space-y-4 overflow-y-auto">
           {/* Desktop: active category label + type filter — identical to ListsView right column header */}
           <div className="hidden md:flex items-center justify-between gap-2 shrink-0">
             <div className="flex items-center gap-2">
               {activeCategory && (
-                <span
-                  className={`w-2 h-2 rounded-full shrink-0 ${(CAT_COLORS[activeCategory.color] ?? CAT_COLORS['violet']).dot}`}
+                <CategoryIcon
+                  name={activeCategory.icon}
+                  color={activeCategory.color}
+                  className="w-3.5 h-3.5"
+                  fallback="Tag"
                 />
               )}
               <h3 className="text-[11px] font-mono font-bold uppercase tracking-widest text-stone-400">

@@ -8,35 +8,13 @@ import { AnimatePresence, motion } from 'motion/react';
 import { X, Check, Tag } from 'lucide-react';
 import { db } from '../../db';
 import { Category, Event, Note } from '../../types';
+import CategoryIcon, { getCategoryColor } from '../CategoryIcon';
 
 interface RecordCategoryPickerModalProps {
   record: Event | Note;
   categories: Category[];
   onClose: () => void;
 }
-
-const COLORS: Record<string, { dot: string; active: string }> = {
-  violet: {
-    dot: 'bg-violet-500',
-    active: 'text-violet-300 border-violet-500/40 bg-violet-500/10',
-  },
-  sky: { dot: 'bg-sky-500', active: 'text-sky-300 border-sky-500/40 bg-sky-500/10' },
-  emerald: {
-    dot: 'bg-emerald-500',
-    active: 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10',
-  },
-  amber: { dot: 'bg-amber-500', active: 'text-amber-300 border-amber-500/40 bg-amber-500/10' },
-  rose: { dot: 'bg-rose-500', active: 'text-rose-300 border-rose-500/40 bg-rose-500/10' },
-  indigo: {
-    dot: 'bg-indigo-500',
-    active: 'text-indigo-300 border-indigo-500/40 bg-indigo-500/10',
-  },
-  teal: { dot: 'bg-teal-500', active: 'text-teal-300 border-teal-500/40 bg-teal-500/10' },
-  orange: {
-    dot: 'bg-orange-500',
-    active: 'text-orange-300 border-orange-500/40 bg-orange-500/10',
-  },
-};
 
 export default function RecordCategoryPickerModal({
   record,
@@ -57,7 +35,10 @@ export default function RecordCategoryPickerModal({
     await db.entries.update(record.id, { category_ids: next } as any);
   };
 
-  const title = record.type === 'note' ? (record as Note).title || 'Untitled Note' : (record as Event).title || 'Untitled Event';
+  const title =
+    record.type === 'note'
+      ? (record as Note).title || 'Untitled Note'
+      : (record as Event).title || 'Untitled Event';
 
   return (
     <AnimatePresence>
@@ -99,9 +80,7 @@ export default function RecordCategoryPickerModal({
             {categories.length === 0 ? (
               <div className="text-center py-6">
                 <Tag className="w-6 h-6 text-stone-700 mx-auto mb-2" />
-                <p className="text-xs font-mono text-stone-500">
-                  No categories yet.
-                </p>
+                <p className="text-xs font-mono text-stone-500">No categories yet.</p>
                 <p className="text-[10px] font-sans text-stone-600 mt-1">
                   Create categories from the categories manager.
                 </p>
@@ -109,7 +88,7 @@ export default function RecordCategoryPickerModal({
             ) : (
               <div className="flex flex-col gap-1 max-h-64 overflow-y-auto">
                 {categories.map((cat) => {
-                  const cs = COLORS[cat.color] ?? COLORS['indigo'];
+                  const colorDef = getCategoryColor(cat.color);
                   const isAssigned = selectedIds.includes(cat.id);
                   return (
                     <button
@@ -117,11 +96,16 @@ export default function RecordCategoryPickerModal({
                       onClick={() => handleToggle(cat.id)}
                       className={`flex items-center gap-2.5 w-full px-3 py-2.5 rounded-lg border text-xs font-mono transition-all cursor-pointer ${
                         isAssigned
-                          ? cs.active
+                          ? colorDef.pill
                           : 'border-transparent text-stone-400 hover:bg-stone-800 hover:text-stone-200'
                       }`}
                     >
-                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${cs.dot}`} />
+                      <CategoryIcon
+                        name={cat.icon}
+                        color={cat.color}
+                        className="w-4 h-4"
+                        fallback="Tag"
+                      />
                       <span className="truncate flex-1 text-left">{cat.name}</span>
                       {isAssigned && <Check className="w-3.5 h-3.5 shrink-0 stroke-[3]" />}
                     </button>

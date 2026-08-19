@@ -157,12 +157,17 @@ export async function migrateTasksOnListDelete(listId: string) {
 }
 
 /** Create a new task-list category */
-export async function createTaskList(name: string, color: Category['color']): Promise<Category> {
+export async function createTaskList(
+  name: string,
+  color: Category['color'],
+  icon?: string,
+): Promise<Category> {
   const existing = await getTaskLists();
   const list: Category = {
     id: crypto.randomUUID(),
     name,
     color,
+    icon: icon || 'ListTodo',
     scope: TASK_LIST_SCOPE,
     created_at: new Date(),
   };
@@ -207,12 +212,17 @@ export async function migrateRecordsOnCategoryDelete(categoryId: string) {
 }
 
 /** Create a new record category */
-export async function createRecordCategory(name: string, color: Category['color']): Promise<Category> {
+export async function createRecordCategory(
+  name: string,
+  color: Category['color'],
+  icon?: string,
+): Promise<Category> {
   const existing = await getRecordCategories();
   const cat: Category = {
     id: crypto.randomUUID(),
     name,
     color,
+    icon: icon || 'Tag',
     scope: RECORD_CATEGORY_SCOPE,
     created_at: new Date(),
   };

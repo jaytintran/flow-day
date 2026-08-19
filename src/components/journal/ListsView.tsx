@@ -46,6 +46,7 @@ import { TimelineEntry, Task, TaskStatus, TaskAchievement, Category } from '../.
 import { useLiveQuery } from 'dexie-react-hooks';
 import { MoreHorizontal } from 'lucide-react';
 import TaskListManagerModal from '../TaskListManagerModal'; // adjust path as needed
+import CategoryIcon from '../CategoryIcon';
 import { TASK_LIST_SCOPE, formatDuration } from '../../utils';
 
 interface ListsViewProps {
@@ -724,8 +725,9 @@ function DatelessTrophyWall({
                                 return (
                                   <span
                                     key={cat.id}
-                                    className={`px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider border shrink-0 ${colorClass}`}
+                                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider border shrink-0 ${colorClass}`}
                                   >
+                                    <CategoryIcon name={cat.icon} color={cat.color} className="w-2.5 h-2.5" fallback="ListTodo" />
                                     {cat.name}
                                   </span>
                                 );
@@ -853,7 +855,7 @@ function ListPickerPopover({ task, lists, onClose }: ListPickerPopoverProps) {
                           : 'border-transparent text-stone-400 hover:bg-stone-800 hover:text-stone-200'
                       }`}
                     >
-                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${cs.dot}`} />
+                      <CategoryIcon name={list.icon} color={list.color} className="w-4 h-4" fallback="ListTodo" />
                       <span className="truncate flex-1 text-left">{list.name}</span>
                       {isAssigned && <Check className="w-3.5 h-3.5 shrink-0 stroke-[3]" />}
                     </button>
@@ -1657,8 +1659,9 @@ function TaskSection({
                     return (
                       <span
                         key={cat.id}
-                        className={`px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider border shrink-0 ${colorClass}`}
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider border shrink-0 ${colorClass}`}
                       >
+                        <CategoryIcon name={cat.icon} color={cat.color} className="w-2.5 h-2.5" fallback="ListTodo" />
                         {cat.name}
                       </span>
                     );
@@ -1901,8 +1904,9 @@ function TaskSection({
                   return (
                     <span
                       key={cat.id}
-                      className={`px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider border shrink-0 ${colorClass}`}
+                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider border shrink-0 ${colorClass}`}
                     >
+                      <CategoryIcon name={cat.icon} color={cat.color} className="w-2.5 h-2.5" fallback="ListTodo" />
                       {cat.name}
                     </span>
                   );
@@ -2171,7 +2175,7 @@ function ListStrip({ lists, selectedId, onSelect, onManage }: ListStripProps) {
                   : `${cs.active} border-stone-800 !text-stone-100 hover:text-stone-300 hover:border-stone-700`
               }`}
             >
-              {/* <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cs.dot}`} /> */}
+              <CategoryIcon name={list.icon} color={list.color} className="w-3 h-3" fallback="ListTodo" />
               {list.name}
             </button>
           );
@@ -3343,8 +3347,13 @@ export default function ListsView({
                   : null;
                 return (
                   <div className="flex items-center gap-1.5 min-w-0">
-                    {cs && activeList && (
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${cs.dot}`} />
+                    {activeList && (
+                      <CategoryIcon
+                        name={activeList.icon}
+                        color={activeList.color}
+                        className="w-3.5 h-3.5"
+                        fallback="ListTodo"
+                      />
                     )}
                     <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-stone-400 truncate">
                       {selectedListId === 'all'
@@ -3446,8 +3455,13 @@ export default function ListsView({
                           : 'bg-transparent border-transparent text-stone-400 hover:bg-stone-900 hover:border-stone-800 hover:text-stone-200'
                       }`}
                     >
-                      {/* Color dot */}
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${cs.dot}`} />
+                      {/* List Icon */}
+                      <CategoryIcon
+                        name={list.icon}
+                        color={list.color}
+                        className="w-3.5 h-3.5"
+                        fallback="ListTodo"
+                      />
 
                       {/* List name */}
                       <span className="flex-1 min-w-0 text-[11px] font-mono font-semibold truncate">
@@ -3523,8 +3537,13 @@ export default function ListsView({
                     return (
                       <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
                         <div className="flex items-center gap-2">
-                          {cs && activeList && (
-                            <span className={`w-2 h-2 rounded-full shrink-0 ${cs.dot}`} />
+                          {activeList && (
+                            <CategoryIcon
+                              name={activeList.icon}
+                              color={activeList.color}
+                              className="w-3.5 h-3.5"
+                              fallback="ListTodo"
+                            />
                           )}
                           <h3 className="text-[11px] font-mono font-bold uppercase tracking-widest text-stone-400">
                             {selectedListId === 'all'

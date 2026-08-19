@@ -125,13 +125,13 @@ export interface HabitLog extends BaseEntry {
 
 export type CategoryScope = 'goal' | 'objective' | 'task-list' | 'record-category';
 
-// Category — tags for goals or objectives
 export interface Category {
   id: string;
   name: string;
   color: 'emerald' | 'sky' | 'violet' | 'rose' | 'amber' | 'indigo' | 'teal' | 'orange';
   scope: CategoryScope;
   created_at: Date;
+  icon?: string;
 }
 
 export interface Purpose {
