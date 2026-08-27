@@ -1,0 +1,15 @@
+{
+  "linter": {
+    "enabled": false
+  },
+  "overrides": [
+    {
+      "include": [
+        "dist/**/*"
+      ],
+      "linter": {
+        "enabled": false
+      }
+    }
+  ]
+}
