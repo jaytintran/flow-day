@@ -1,42 +1,23 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Roboto+Condensed:ital,wght@0,300..800;1,300..800&family=Roboto:ital,wght@0,300..800;1,300..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Mozilla+Headline:wght@200..700&family=Rubik:ital,wght@0,300..900;1,300..900&display=swap');
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: 'Roboto', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-serif: 'Roboto', ui-sans-serif, system-ui, sans-serif;
-  --font-condensed: 'Roboto Condensed', 'Roboto', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-sans: 'Mozilla Headline', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Mozilla Headline', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Mozilla Headline', ui-monospace, monospace;
 
-  --color-stone-950: #0b0f11;
-  --color-stone-900: #12181b;
-  --color-stone-850: #182024;
-  --color-stone-800: #222c32;
-  --color-stone-700: #334149;
-  --color-stone-600: #475a63;
-  --color-stone-500: #627883;
-  --color-stone-400: #869da7;
-  --color-stone-300: #b0c3cc;
-  --color-stone-200: #d1dee3;
-  --color-stone-100: #e7eff2;
-  --color-stone-50: #f3f8f9;
-
-  /* Nordic Sage accents */
-  --color-sage-50: #f0fdf9;
-  --color-sage-100: #ccfbf1;
-  --color-sage-200: #99f6e4;
-  --color-sage-300: #5eead4;
-  --color-sage-400: #2dd4bf;
-  --color-sage-500: #14b8a6;
-  --color-sage-600: #0d9488;
+  --color-stone-950: #0a0a0a;
+  --color-stone-900: #121212;
+  --color-stone-850: #181818;
+  --color-stone-800: #262626;
+  --color-stone-700: #404040;
 }
 
 @layer base {
   body {
-    background-color: #0b0f11;
-    color: #d1dee3;
+    background-color: #0a0a0a;
+    color: #d6d3d1;
     font-family: var(--font-sans);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
   }
 
   /* Bleed the full app edge-to-edge on mobile notch devices */
@@ -50,18 +31,18 @@
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #0b0f11;
+    background: #0a0a0a;
   }
   ::-webkit-scrollbar-thumb {
-    background: #222c32;
+    background: #262626;
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #334149;
+    background: #404040;
   }
 
   * {
-    scrollbar-color: #222c32 transparent;
+    scrollbar-color: #262626 transparent;
   }
 
   .scrollbar-none::-webkit-scrollbar {
@@ -94,7 +75,7 @@
 /* Custom dark mode scrollbar for modals & popovers */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #222c32 transparent;
+  scrollbar-color: #2a2a2a transparent;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -107,10 +88,10 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #222c32;
+  background: #2a2a2a;
   border-radius: 9999px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #334149;
+  background: #404040;
 }
