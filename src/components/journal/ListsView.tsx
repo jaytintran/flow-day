@@ -972,7 +972,7 @@ function MobileTaskItem({
 						>
 							{isDone && <Check className="w-3.5 h-3.5 stroke-[3]" />}
 							{isInProgress && (
-								<Loader2 className="w-3.5 h-3.5 text-amber-400 stroke-[2.5] animate-spin" />
+								<CircleDashed className="w-3.5 h-3.5 text-amber-400 stroke-[2.5]" />
 							)}
 							{isDropped && <X className="w-3.5 h-3.5 stroke-[2.5]" />}
 							{isMaybe && <HelpCircle className="w-3.5 h-3.5 stroke-[2.5]" />}
@@ -1188,7 +1188,7 @@ function DesktopTaskCard({
 					>
 						{isDone && <Check className="w-2.5 h-2.5 stroke-[3]" />}
 						{isInProgress && (
-							<Loader2 className="w-2.5 h-2.5 text-amber-400 stroke-[2.5] animate-spin" />
+							<CircleDashed className="w-2.5 h-2.5 text-amber-400 stroke-[2.5]" />
 						)}
 						{isDropped && <X className="w-2.5 h-2.5 stroke-[2.5]" />}
 						{isMaybe && <HelpCircle className="w-2.5 h-2.5 stroke-[2.5]" />}

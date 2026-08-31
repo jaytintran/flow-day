@@ -62,38 +62,44 @@ export default function DetailSheet({
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
+              drag="y"
+              dragConstraints={{ top: 0 }}
+              dragElastic={{ top: 0, bottom: 0.5 }}
+              onDragEnd={(_, info) => {
+                if (info.offset.y > 100 || info.velocity.y > 300) {
+                  onClose();
+                }
+              }}
               transition={{ type: 'spring', damping: 32, stiffness: 340, mass: 0.7 }}
               style={{ willChange: 'transform' }}
               className="relative w-full h-[85vh] bg-[#121212] border-t border-stone-850 rounded-t-2xl shadow-2xl z-10 flex flex-col overflow-hidden pb-6"
             >
-              {/* Drag Handle & Close header */}
+              {/* Drag Handle & Header */}
               <div className="flex-none flex flex-col items-center pt-3 pb-2 border-b border-stone-850/60 relative">
+                {/* Drag Handle Pill with accessible touch padding & click-to-close */}
                 <button
+                  type="button"
                   onClick={onClose}
-                  className="w-12 h-1 bg-stone-700 hover:bg-stone-500 rounded-full mb-3 transition-colors cursor-pointer"
-                />
-                <div className="w-full px-5 flex justify-between items-center">
+                  aria-label="Close sheet"
+                  className="p-2 -my-2 flex items-center justify-center cursor-pointer group"
+                >
+                  <div className="w-12 h-1.5 bg-stone-700 group-hover:bg-stone-500 rounded-full transition-colors" />
+                </button>
+                <div className="w-full px-5 flex justify-between items-center mt-1">
                   <span
                     className={`text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border ${chipClass}`}
                   >
                     {label}
                   </span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={handleAccept}
-                      title="Accept changes"
-                      className="p-1 text-emerald-500 hover:text-emerald-400 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
-                    >
-                      <Check className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={handleCancel}
-                      title="Cancel changes"
-                      className="p-1 text-rose-500 hover:text-rose-400 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    title="Close"
+                    aria-label="Close"
+                    className="p-1 text-stone-400 hover:text-stone-200 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
 
@@ -122,24 +128,15 @@ export default function DetailSheet({
                   {label}
                 </span>
 
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={handleAccept}
-                    title="Accept changes"
-                    className="p-1 text-emerald-500 hover:text-emerald-400 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <Check className="w-5 h-5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCancel}
-                    title="Cancel changes"
-                    className="p-1 text-rose-500 hover:text-rose-400 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  title="Close"
+                  aria-label="Close"
+                  className="p-1 text-stone-400 hover:text-stone-200 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
               {/* Content area */}
