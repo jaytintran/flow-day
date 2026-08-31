@@ -23,6 +23,7 @@ import {
   Edit3,
   X,
   BarChart2,
+  Clock,
 } from 'lucide-react';
 import HabitConsistencyModal from './HabitConsistencyModal';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -72,6 +73,22 @@ export default function DayNavigator({
   const stripRef = useRef<HTMLDivElement>(null);
   const [stripCanScrollRight, setStripCanScrollRight] = useState(false);
   const [stripCanScrollLeft, setStripCanScrollLeft] = useState(false);
+  const [isMobileViewMenuOpen, setIsMobileViewMenuOpen] = useState(false);
+  const mobileViewMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (mobileViewMenuRef.current && !mobileViewMenuRef.current.contains(e.target as Node)) {
+        setIsMobileViewMenuOpen(false);
+      }
+    };
+    if (isMobileViewMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMobileViewMenuOpen]);
 
   // Load entries reactively
   const entries = useLiveQuery(() => db.entries.toArray()) || [];
@@ -397,37 +414,132 @@ export default function DayNavigator({
   });
 
   const iconButtonGroup = (
-    <div className="flex items-center gap-0.5 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 shrink-0">
-      <button
-        id="toggle-calendar-btn"
-        onClick={() => {
-          setIsCalendarOpen(!isCalendarOpen);
-          setIsTrophyOpen(false);
-        }}
-        className={`p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
-          isCalendarOpen
-            ? 'bg-amber-500/10 text-amber-500'
-            : 'text-stone-500 hover:text-stone-300 hover:bg-stone-800/50'
-        }`}
-        title="Choose specific date"
-      >
-        <Calendar className="w-[18px] h-[18px]" />
-      </button>
-      <button
-        id="toggle-trophy-btn"
-        onClick={() => {
-          setIsTrophyOpen(!isTrophyOpen);
-          setIsCalendarOpen(false);
-        }}
-        className={`p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
-          isTrophyOpen
-            ? 'bg-amber-500/10 text-amber-500'
-            : 'text-stone-500 hover:text-stone-300 hover:bg-stone-800/50'
-        }`}
-        title="Achievements & Highlighted wins"
-      >
-        <Trophy className="w-[18px] h-[18px]" />
-      </button>
+    <div className="flex items-center gap-2 shrink-0">
+      {/* Mobile-only View Mode Selector Dropdown */}
+      <div className="relative md:hidden" ref={mobileViewMenuRef}>
+        <button
+          type="button"
+          onClick={() => {
+            setIsMobileViewMenuOpen(!isMobileViewMenuOpen);
+            setIsCalendarOpen(false);
+            setIsTrophyOpen(false);
+          }}
+          className={`flex items-center gap-2 px-3 h-9 rounded-lg border transition-all cursor-pointer select-none active:scale-95 ${
+            isMobileViewMenuOpen
+              ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
+              : 'bg-[#0a0a0a] border-amber-500/30 hover:border-amber-500/50 text-stone-100'
+          }`}
+          title="Switch View Mode"
+        >
+          {/* Active View Icon */}
+          <div className="w-4 h-4 flex items-center justify-center text-amber-400 shrink-0">
+            {viewMode === 'lists' && <ListTodo className="w-4 h-4" />}
+            {viewMode === 'day' && <Calendar className="w-4 h-4" />}
+            {viewMode === 'timeline' && <Clock className="w-4 h-4" />}
+            {viewMode === 'records' && <BarChart2 className="w-4 h-4" />}
+            {viewMode === 'hub' && <Target className="w-4 h-4" />}
+          </div>
+
+          <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-300">
+            {viewMode === 'lists' && 'Lists'}
+            {viewMode === 'day' && 'Day'}
+            {viewMode === 'timeline' && 'Timeline'}
+            {viewMode === 'records' && 'Records'}
+            {viewMode === 'hub' && 'Hub'}
+          </span>
+
+          <ChevronDown
+            className={`w-3.5 h-3.5 text-amber-400/80 transition-transform duration-200 ${
+              isMobileViewMenuOpen ? 'rotate-180 text-amber-400' : ''
+            }`}
+          />
+        </button>
+
+        {isMobileViewMenuOpen && (
+          <div className="absolute right-0 top-full mt-2 w-44 bg-[#141414] border border-stone-800 rounded-xl shadow-2xl z-50 p-1.5 flex flex-col gap-1 backdrop-blur-xl">
+            <div className="px-2 py-1 text-[9px] font-mono font-bold uppercase tracking-widest text-stone-500 border-b border-stone-800/60 mb-0.5">
+              Select View
+            </div>
+            {[
+              { id: 'lists', label: 'Lists', desc: 'Task manager', icon: ListTodo },
+              { id: 'day', label: 'Day', desc: 'Daily schedule', icon: Calendar },
+              { id: 'timeline', label: 'Timeline', desc: 'Continuous stream', icon: Clock },
+              { id: 'records', label: 'Records', desc: 'Catalog & logs', icon: BarChart2 },
+              { id: 'hub', label: 'Hub', desc: 'Goals & focus', icon: Target },
+            ].map((item) => {
+              const IconComp = item.icon;
+              const isSelected = viewMode === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setViewMode(item.id as any);
+                    setIsMobileViewMenuOpen(false);
+                  }}
+                  className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-mono transition-all cursor-pointer text-left ${
+                    isSelected
+                      ? 'bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30'
+                      : 'text-stone-300 hover:bg-stone-800/80 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <div
+                    className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
+                      isSelected
+                        ? 'bg-amber-500/20 text-amber-400'
+                        : 'bg-stone-900 text-stone-500'
+                    }`}
+                  >
+                    <IconComp className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="leading-tight font-bold">{item.label}</span>
+                    <span className="text-[9px] text-stone-500 truncate leading-tight font-normal">
+                      {item.desc}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Calendar & Trophy Buttons */}
+      <div className="flex items-center gap-0.5 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 h-9 shrink-0">
+        <button
+          id="toggle-calendar-btn"
+          onClick={() => {
+            setIsCalendarOpen(!isCalendarOpen);
+            setIsTrophyOpen(false);
+            setIsMobileViewMenuOpen(false);
+          }}
+          className={`h-full px-2 rounded-md active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
+            isCalendarOpen
+              ? 'bg-amber-500/10 text-amber-500'
+              : 'text-stone-500 hover:text-stone-300 hover:bg-stone-800/50'
+          }`}
+          title="Choose specific date"
+        >
+          <Calendar className="w-[18px] h-[18px]" />
+        </button>
+        <button
+          id="toggle-trophy-btn"
+          onClick={() => {
+            setIsTrophyOpen(!isTrophyOpen);
+            setIsCalendarOpen(false);
+            setIsMobileViewMenuOpen(false);
+          }}
+          className={`h-full px-2 rounded-md active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
+            isTrophyOpen
+              ? 'bg-amber-500/10 text-amber-500'
+              : 'text-stone-500 hover:text-stone-300 hover:bg-stone-800/50'
+          }`}
+          title="Achievements & Highlighted wins"
+        >
+          <Trophy className="w-[18px] h-[18px]" />
+        </button>
+      </div>
     </div>
   );
 
@@ -506,9 +618,9 @@ export default function DayNavigator({
             </div>
           )}
 
-          {/* 3. View Mode Switcher pill style */}
+          {/* 3. View Mode Switcher pill style (Desktop only) */}
           <div
-            className="flex gap-1 bg-stone-900 border border-stone-800 rounded-full p-1 w-full md:w-auto overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+            className="hidden md:flex gap-1 bg-stone-900 border border-stone-800 rounded-full p-1 md:w-auto overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
             id="view-mode-switcher"
           >
             <button

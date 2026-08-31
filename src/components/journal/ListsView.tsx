@@ -17,6 +17,7 @@ import {
 	X,
 	ClipboardList,
 	CircleDashed,
+	Loader2,
 	HelpCircle,
 	Trophy,
 	Folder,
@@ -782,12 +783,19 @@ function MobileTaskItem({
 
 	const [isMobileSwiped, setIsMobileSwiped] = useState(false);
 	const isDraggingSwipe = useRef(false);
+	const isSwipeDisabled = isDone || isDropped;
 	const hasFolders = !!(
 		availableFolders &&
 		availableFolders.length > 0 &&
 		onOpenFolderPicker
 	);
-	const maxSwipeLeft = hasFolders ? -225 : -190;
+
+	let buttonCount = 2; // Schedule + Delete
+	if (!isActive && !isDone && !isDropped) buttonCount += 1; // Activate
+	if (taskLists.length > 0) buttonCount += 1; // List Picker
+	if (hasFolders) buttonCount += 1; // Folder Picker
+	const maxSwipeLeft = isSwipeDisabled ? 0 : -(buttonCount * 42 + 8);
+
 	const hasMetadata = !!(
 		(task.content && task.content.trim()) ||
 		task.scheduled_at ||
@@ -797,108 +805,98 @@ function MobileTaskItem({
 	return (
 		<SortableRow id={task.id}>
 			<div className="relative overflow-hidden rounded-xl">
-				{/* Underlying Mobile Action Tray */}
-				<div className="absolute inset-y-0 right-0 flex items-center pr-2 gap-1 bg-stone-900 border border-stone-800 rounded-xl z-0">
-					<button
-						type="button"
-						onClick={(e) => {
-							e.stopPropagation();
-							setIsMobileSwiped(false);
-							onOpenStatusModal(task);
-						}}
-						className="p-2 rounded-lg text-stone-400 hover:text-stone-200 bg-stone-800/80 transition-colors cursor-pointer"
-						title="Change status"
-					>
-						<CircleDashed className="w-4 h-4" />
-					</button>
+				{/* Underlying Mobile Action Tray (Transparent Background, Active Tasks Only) */}
+				{!isSwipeDisabled && (
+					<div className="absolute inset-y-0 right-0 flex items-center pr-2 gap-1.5 bg-transparent z-0">
+						{!isDone && !isDropped && !isActive && (
+							<button
+								type="button"
+								onClick={(e) => {
+									e.stopPropagation();
+									setIsMobileSwiped(false);
+									onActivateTask(task.id);
+								}}
+								className="p-2 rounded-xl text-amber-400 bg-stone-900 border border-amber-500/30 hover:bg-stone-800 transition-colors cursor-pointer shadow-md"
+								title="Activate timer"
+							>
+								<Play className="w-4 h-4 fill-current" />
+							</button>
+						)}
 
-					{!isDone && !isDropped && !isActive && (
 						<button
 							type="button"
 							onClick={(e) => {
 								e.stopPropagation();
 								setIsMobileSwiped(false);
-								onActivateTask(task.id);
+								onOpenScheduleModal(task);
 							}}
-							className="p-2 rounded-lg text-amber-400 bg-amber-500/10 border border-amber-500/30 transition-colors cursor-pointer"
-							title="Activate timer"
+							className="p-2 rounded-xl text-stone-300 hover:text-amber-400 bg-stone-900 border border-stone-800 hover:border-stone-700 transition-colors cursor-pointer shadow-md"
+							title="Schedule date"
 						>
-							<Play className="w-4 h-4 fill-current" />
+							<Calendar className="w-4 h-4" />
 						</button>
-					)}
 
-					<button
-						type="button"
-						onClick={(e) => {
-							e.stopPropagation();
-							setIsMobileSwiped(false);
-							onOpenScheduleModal(task);
-						}}
-						className="p-2 rounded-lg text-stone-400 hover:text-amber-400 bg-stone-800/80 transition-colors cursor-pointer"
-						title="Schedule date"
-					>
-						<Calendar className="w-4 h-4" />
-					</button>
+						{taskLists.length > 0 && (
+							<button
+								type="button"
+								onClick={(e) => {
+									e.stopPropagation();
+									setIsMobileSwiped(false);
+									onOpenListPicker(task);
+								}}
+								className="p-2 rounded-xl text-stone-300 hover:text-violet-400 bg-stone-900 border border-stone-800 hover:border-stone-700 transition-colors cursor-pointer shadow-md"
+								title="Assign to list"
+							>
+								<ListTodo className="w-4 h-4" />
+							</button>
+						)}
 
-					{taskLists.length > 0 && (
+						{/* Move to Folder */}
+						{hasFolders && onOpenFolderPicker && (
+							<button
+								type="button"
+								onClick={(e) => {
+									e.stopPropagation();
+									setIsMobileSwiped(false);
+									onOpenFolderPicker(task);
+								}}
+								className="p-2 rounded-xl text-stone-300 hover:text-amber-300 bg-stone-900 border border-stone-800 hover:border-stone-700 transition-colors cursor-pointer shadow-md"
+								title="Move to folder"
+							>
+								<FolderInput className="w-4 h-4" />
+							</button>
+						)}
+
 						<button
 							type="button"
 							onClick={(e) => {
 								e.stopPropagation();
 								setIsMobileSwiped(false);
-								onOpenListPicker(task);
+								onDeleteEntry(task.id);
 							}}
-							className="p-2 rounded-lg text-stone-400 hover:text-violet-400 bg-stone-800/80 transition-colors cursor-pointer"
-							title="Assign to list"
+							className={`p-2 rounded-xl transition-colors cursor-pointer shadow-md ${
+								deletingId === task.id
+									? "text-red-400 bg-red-950 border border-red-800"
+									: "text-stone-300 hover:text-red-400 bg-stone-900 border border-stone-800 hover:border-stone-700"
+							}`}
+							title="Delete task"
 						>
-							<ListTodo className="w-4 h-4" />
+							<Trash2 className="w-4 h-4" />
 						</button>
-					)}
-
-					{/* Move to Folder */}
-					{hasFolders && onOpenFolderPicker && (
-						<button
-							type="button"
-							onClick={(e) => {
-								e.stopPropagation();
-								setIsMobileSwiped(false);
-								onOpenFolderPicker(task);
-							}}
-							className="p-2 rounded-lg text-stone-400 hover:text-amber-300 bg-stone-800/80 transition-colors cursor-pointer"
-							title="Move to folder"
-						>
-							<FolderInput className="w-4 h-4" />
-						</button>
-					)}
-
-					<button
-						type="button"
-						onClick={(e) => {
-							e.stopPropagation();
-							setIsMobileSwiped(false);
-							onDeleteEntry(task.id);
-						}}
-						className={`p-2 rounded-lg transition-colors cursor-pointer ${
-							deletingId === task.id
-								? "text-red-400 bg-red-950 border border-red-800"
-								: "text-stone-400 hover:text-red-400 bg-stone-800/80"
-						}`}
-						title="Delete task"
-					>
-						<Trash2 className="w-4 h-4" />
-					</button>
-				</div>
+					</div>
+				)}
 
 				{/* Main Mobile Row Card */}
 				<motion.div
-					drag="x"
-					dragConstraints={{ left: maxSwipeLeft, right: 0 }}
+					drag={isSwipeDisabled ? false : "x"}
+					dragConstraints={isSwipeDisabled ? { left: 0, right: 0 } : { left: maxSwipeLeft, right: 0 }}
 					dragElastic={0.05}
-					animate={{ x: isMobileSwiped ? maxSwipeLeft : 0 }}
+					animate={{ x: !isSwipeDisabled && isMobileSwiped ? maxSwipeLeft : 0 }}
 					onDragStart={() => {
-						isDraggingSwipe.current = true;
+						if (!isSwipeDisabled) isDraggingSwipe.current = true;
 					}}
 					onDragEnd={(_, info) => {
+						if (isSwipeDisabled) return;
 						setTimeout(() => {
 							isDraggingSwipe.current = false;
 						}, 100);
@@ -936,23 +934,24 @@ function MobileTaskItem({
 							type="button"
 							onClick={(e) => {
 								e.stopPropagation();
-								onToggleTaskStatus(task);
+								onOpenStatusModal(task);
 							}}
 							className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all cursor-pointer active:scale-95 ${
 								isDone
 									? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.2)]"
 									: isInProgress
-										? "border-amber-500/50 bg-amber-500/10 text-amber-400"
+										? "border-amber-500/50 bg-amber-500/10 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.2)]"
 										: isDropped
 											? "border-rose-500/40 bg-rose-500/10 text-rose-400"
 											: isMaybe
 												? "border-indigo-500/40 bg-indigo-500/10 text-indigo-400"
 												: "border-stone-700 hover:border-stone-500 bg-stone-900/80 text-stone-400 hover:text-stone-200"
 							}`}
+							title="Click to change status"
 						>
 							{isDone && <Check className="w-3.5 h-3.5 stroke-[3]" />}
 							{isInProgress && (
-								<CircleDashed className="w-3.5 h-3.5 stroke-[2.5]" />
+								<Loader2 className="w-3.5 h-3.5 text-amber-400 stroke-[2.5] animate-spin" />
 							)}
 							{isDropped && <X className="w-3.5 h-3.5 stroke-[2.5]" />}
 							{isMaybe && <HelpCircle className="w-3.5 h-3.5 stroke-[2.5]" />}
@@ -1130,29 +1129,24 @@ function DesktopTaskCard({
 						type="button"
 						onClick={(e) => {
 							e.stopPropagation();
-							onToggleTaskStatus(task);
-						}}
-						onContextMenu={(e) => {
-							e.preventDefault();
-							e.stopPropagation();
 							onOpenStatusModal(task);
 						}}
 						className={`w-4 h-4 mt-0.5 rounded border flex items-center justify-center shrink-0 transition-all cursor-pointer active:scale-95 ${
 							isDone
 								? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.2)]"
 								: isInProgress
-									? "border-amber-500/50 bg-amber-500/10 text-amber-400"
+									? "border-amber-500/50 bg-amber-500/10 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.2)]"
 									: isDropped
 										? "border-rose-500/40 bg-rose-500/10 text-rose-400"
 										: isMaybe
 											? "border-indigo-500/40 bg-indigo-500/10 text-indigo-400"
 											: "border-stone-700 hover:border-stone-500 bg-stone-900/80 text-stone-400 hover:text-stone-200"
 						}`}
-						title="Click to toggle Done, right-click for status picker"
+						title="Click to change status"
 					>
 						{isDone && <Check className="w-2.5 h-2.5 stroke-[3]" />}
 						{isInProgress && (
-							<CircleDashed className="w-2.5 h-2.5 stroke-[2.5]" />
+							<Loader2 className="w-2.5 h-2.5 text-amber-400 stroke-[2.5] animate-spin" />
 						)}
 						{isDropped && <X className="w-2.5 h-2.5 stroke-[2.5]" />}
 						{isMaybe && <HelpCircle className="w-2.5 h-2.5 stroke-[2.5]" />}
