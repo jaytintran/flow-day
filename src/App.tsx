@@ -45,7 +45,12 @@ export default function App() {
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         {/* Task Timer Bar Row */}
-        <TimerBar activeTaskId={activeTaskId} setActiveTaskId={setActiveTaskId} />
+        <TimerBar
+          activeTaskId={activeTaskId}
+          setActiveTaskId={setActiveTaskId}
+          viewMode={viewMode}
+          activeDate={activeDate}
+        />
 
         {/* Day Navigator, Calendar and Switcher Control Row */}
         <DayNavigator

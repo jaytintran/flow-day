@@ -36,6 +36,8 @@ import GoalPickerSheet from './GoalPickerSheet';
 interface TimerBarProps {
   activeTaskId: string | null;
   setActiveTaskId: (id: string | null) => void;
+  viewMode?: 'day' | 'timeline' | 'records' | 'lists' | 'hub';
+  activeDate?: Date;
 }
 
 const TIMER_STORAGE_KEY = 'timerbar_state_v1';
@@ -60,9 +62,15 @@ function clearTimerState() {
   localStorage.removeItem(TIMER_STORAGE_KEY);
 }
 
-export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProps) {
+export default function TimerBar({
+  activeTaskId,
+  setActiveTaskId,
+  viewMode,
+  activeDate,
+}: TimerBarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const [localTimeSpent, setLocalTimeSpent] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
 
@@ -108,6 +116,8 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const sessionStartRef = useRef<number | null>(null);
   const elapsedBeforeRef = useRef<number>(0);
+  // Tracks working milliseconds accumulated ONLY during the current active session
+  const sessionWorkedMsRef = useRef<number>(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const restoredTaskIdRef = useRef<string | null>(null);
@@ -127,6 +137,7 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
     elapsedBeforeRef.current = wallElapsed;
     setLocalTimeSpent(wallElapsed);
     sessionStartRef.current = Date.now();
+    sessionWorkedMsRef.current = 0;
     setIsRunning(true);
     setActiveTaskId(saved.taskId);
   }, []); // intentionally empty — one-time mount only
@@ -201,6 +212,7 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
+        setSelectedIndex(-1);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -222,16 +234,16 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
       setLocalTimeSpent(0);
       sessionStartRef.current = null;
       elapsedBeforeRef.current = 0;
+      sessionWorkedMsRef.current = 0;
       return;
     }
 
     // Case 3: new task selected by user — but only proceed once Dexie has it
-    // If activeTask is still undefined, Dexie hasn't resolved yet — do nothing,
-    // the effect will NOT re-fire (activeTaskId didn't change), so we wait.
     if (!activeTask) return;
 
     elapsedBeforeRef.current = activeTask.time_spent;
     setLocalTimeSpent(activeTask.time_spent);
+    sessionWorkedMsRef.current = 0;
     setIsRunning(true);
     sessionStartRef.current = Date.now();
 
@@ -280,6 +292,7 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
       const updatedTime = elapsedBeforeRef.current + delta;
 
       elapsedBeforeRef.current = updatedTime;
+      sessionWorkedMsRef.current += delta;
       setLocalTimeSpent(updatedTime);
 
       // Update IndexedDB to avoid loss
@@ -312,54 +325,94 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
     });
   };
 
-  const sessionInitTimeRef = useRef<number>(Date.now());
-
   // Helper: auto-create a timeline log entry for this session
-  const logWorkingSession = async (task: Task, startMs: number, endMs: number) => {
-    if (endMs - startMs < 5000) return; // Skip trivial taps under 5s
+  // Rule 1: Never create log entry for dated tasks (they already exist on the Day timeline)
+  // Rule 2: Only create for dateless tasks when working session >= 5 minutes (300,000 ms)
+  const logWorkingSession = async (task: Task, sessionDurationMs: number) => {
+    if (task.scheduled_at) return;
+    const FIVE_MINUTES_MS = 5 * 60 * 1000;
+    if (sessionDurationMs < FIVE_MINUTES_MS) return;
+
+    const end = new Date();
+    const start = new Date(end.getTime() - sessionDurationMs);
+
     await db.entries.add({
       id: crypto.randomUUID(),
       type: 'log',
       title: task.title,
-      timestamp: new Date(startMs),
-      end_timestamp: new Date(endMs),
+      timestamp: start,
+      end_timestamp: end,
       category_ids: task.category_ids,
       created_at: new Date(),
     } as any);
   };
 
-  // Stop / Finish working session, save progress, log session to timeline, and deactivate
+  // Stop working session, save progress, log session if applicable, and deactivate
   const handleStop = async () => {
     if (!activeTaskId) return;
 
     const now = Date.now();
-    const sessionStart = sessionInitTimeRef.current || now;
+    let finalTimeSpent = elapsedBeforeRef.current;
+    let addedSessionSlice = 0;
 
-    let finalTimeSpent = localTimeSpent;
     if (isRunning && sessionStartRef.current !== null) {
-      const delta = now - sessionStartRef.current;
-      finalTimeSpent = elapsedBeforeRef.current + delta;
+      addedSessionSlice = now - sessionStartRef.current;
+      finalTimeSpent = elapsedBeforeRef.current + addedSessionSlice;
     }
+
+    const totalSessionDuration = sessionWorkedMsRef.current + addedSessionSlice;
 
     await db.entries.update(activeTaskId, {
       time_spent: finalTimeSpent,
     } as any);
 
     if (activeTask) {
-      await logWorkingSession(activeTask, sessionStart, now);
+      await logWorkingSession(activeTask, totalSessionDuration);
     }
 
-    // Also accumulate to linked objective
-    const stopDelta = finalTimeSpent - (elapsedBeforeRef.current || 0);
-    await accumulateLinkedObjective(activeTaskId, stopDelta);
-    setActiveTaskId(null);
+    if (addedSessionSlice > 0) {
+      await accumulateLinkedObjective(activeTaskId, addedSessionSlice);
+    }
 
+    sessionWorkedMsRef.current = 0;
+    sessionStartRef.current = null;
+    setActiveTaskId(null);
     clearTimerState();
   };
 
-  // Finish session: saves session, logs to timeline, and keeps task status open for manual completion
+  // Finish session: saves session, completes task (status: 'done', completed_at), and deactivates
   const handleFinish = async () => {
-    await handleStop();
+    if (!activeTaskId) return;
+
+    const now = Date.now();
+    let finalTimeSpent = elapsedBeforeRef.current;
+    let addedSessionSlice = 0;
+
+    if (isRunning && sessionStartRef.current !== null) {
+      addedSessionSlice = now - sessionStartRef.current;
+      finalTimeSpent = elapsedBeforeRef.current + addedSessionSlice;
+    }
+
+    const totalSessionDuration = sessionWorkedMsRef.current + addedSessionSlice;
+
+    await db.entries.update(activeTaskId, {
+      time_spent: finalTimeSpent,
+      status: 'done',
+      completed_at: new Date(),
+    } as any);
+
+    if (activeTask) {
+      await logWorkingSession(activeTask, totalSessionDuration);
+    }
+
+    if (addedSessionSlice > 0) {
+      await accumulateLinkedObjective(activeTaskId, addedSessionSlice);
+    }
+
+    sessionWorkedMsRef.current = 0;
+    sessionStartRef.current = null;
+    setActiveTaskId(null);
+    clearTimerState();
   };
 
   const [isDeletingActiveTask, setIsDeletingActiveTask] = useState(false);
@@ -387,6 +440,7 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
     if (!activeTaskId) return;
     setLocalTimeSpent(0);
     elapsedBeforeRef.current = 0;
+    sessionWorkedMsRef.current = 0;
     sessionStartRef.current = Date.now();
     await db.entries.update(activeTaskId, {
       time_spent: 0,
@@ -404,6 +458,7 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
   const handleSelectTask = (taskId: string) => {
     setActiveTaskId(taskId);
     setIsDropdownOpen(false);
+    setSelectedIndex(-1);
     setSearchQuery('');
   };
 
@@ -416,18 +471,26 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
     setIsGoalPickerOpen(false);
   };
 
-  // Create a new task directly from search input
+  // Create a new task directly from search input with view-awareness
   const handleCreateNewTask = async () => {
     if (!searchQuery.trim()) return;
     const newId = crypto.randomUUID();
+
+    // View-aware scheduling:
+    // If in Day view, attach scheduled_at to activeDate (or today).
+    // If in Lists (or other views), leave scheduled_at undefined so it appears in Lists view.
+    const scheduledDate = viewMode === 'day' && activeDate ? activeDate : undefined;
+
     const newTask: Task = {
       id: newId,
       type: 'task',
       title: searchQuery.trim(),
       status: 'todo',
       time_spent: 0,
+      ...(scheduledDate ? { scheduled_at: scheduledDate } : {}),
       created_at: new Date(),
     };
+
     await db.entries.add(newTask);
     handleSelectTask(newId);
   };
@@ -436,6 +499,34 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
   const filteredTasks = todoTasks.filter((task) =>
     task.title.toLowerCase().includes(searchQuery.toLowerCase()),
   );
+
+  const hasCreateOption = searchQuery.trim() !== '';
+  const totalOptionsCount = filteredTasks.length + (hasCreateOption ? 1 : 0);
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isDropdownOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      setIsDropdownOpen(true);
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev + 1 < totalOptionsCount ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev - 1 >= 0 ? prev - 1 : totalOptionsCount - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (selectedIndex >= 0 && selectedIndex < filteredTasks.length) {
+        handleSelectTask(filteredTasks[selectedIndex].id);
+      } else if (hasCreateOption) {
+        handleCreateNewTask();
+      }
+    } else if (e.key === 'Escape') {
+      setIsDropdownOpen(false);
+      setSelectedIndex(-1);
+    }
+  };
 
   return (
     <div
@@ -467,45 +558,58 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
                     onChange={(e) => {
                       setSearchQuery(e.target.value);
                       setIsDropdownOpen(true);
+                      setSelectedIndex(-1);
                     }}
                     onFocus={() => setIsDropdownOpen(true)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && searchQuery.trim() !== '') {
-                        handleCreateNewTask();
-                      }
-                    }}
+                    onKeyDown={handleSearchKeyDown}
                     className="max-md:w-full md:w-2/3 h-[46px] pl-10 pr-4 py-3 bg-[#0a0a0a] text-stone-100 hover:bg-[#080808]/50 border border-stone-850 rounded-xl text-sm placeholder-stone-600 focus:outline-none focus:border-amber-500/35 focus:bg-stone-950 transition-all shadow-inner"
                   />
                   {isDropdownOpen && (
                     <div className="absolute top-full left-0 right-0 mt-2 max-h-60 overflow-y-auto bg-[#181818] border border-stone-800 rounded-xl shadow-2xl z-55">
                       {filteredTasks.length > 0 ? (
-                        filteredTasks.map((task) => (
-                          <button
-                            key={task.id}
-                            id={`task-select-btn-${task.id}`}
-                            onClick={() => handleSelectTask(task.id)}
-                            className="w-full text-left px-4 py-3 text-xs sm:text-sm border-b border-stone-850/60 hover:bg-stone-900/50 flex justify-between items-center text-stone-300 hover:text-amber-500 transition-colors"
-                          >
-                            <span className="truncate font-medium">{task.title}</span>
-                            <span className="text-[10px] font-mono text-stone-550 bg-stone-950/40 px-2 py-0.5 rounded border border-stone-900/60 shrink-0">
-                              {formatDuration(task.time_spent)}
-                            </span>
-                          </button>
-                        ))
+                        filteredTasks.map((task, index) => {
+                          const isSelected = selectedIndex === index;
+                          return (
+                            <button
+                              key={task.id}
+                              id={`task-select-btn-${task.id}`}
+                              onClick={() => handleSelectTask(task.id)}
+                              className={`w-full text-left px-4 py-3 text-xs sm:text-sm border-b border-stone-850/60 flex justify-between items-center transition-colors cursor-pointer ${
+                                isSelected
+                                  ? 'bg-stone-850 text-amber-400'
+                                  : 'text-stone-300 hover:bg-stone-900/50 hover:text-amber-500'
+                              }`}
+                            >
+                              <span className="truncate font-medium">{task.title}</span>
+                              <span className="text-[10px] font-mono text-stone-550 bg-stone-950/40 px-2 py-0.5 rounded border border-stone-900/60 shrink-0">
+                                {formatDuration(task.time_spent)}
+                              </span>
+                            </button>
+                          );
+                        })
                       ) : (
                         <div className="px-4 py-4 text-stone-500 text-xs sm:text-sm italic text-center">
                           No matching tasks found
                         </div>
                       )}
 
-                      {searchQuery.trim() !== '' && (
+                      {hasCreateOption && (
                         <button
                           id="create-task-btn"
                           onClick={handleCreateNewTask}
-                          className="w-full text-left px-4 py-3 bg-stone-900/60 border-t border-stone-850 hover:bg-stone-900 flex items-center gap-2 text-amber-500 font-mono font-bold uppercase tracking-wider text-[10px]"
+                          className={`w-full text-left px-4 py-3 border-t border-stone-850 flex items-center gap-2 font-mono font-bold uppercase tracking-wider text-[10px] cursor-pointer ${
+                            selectedIndex === filteredTasks.length
+                              ? 'bg-amber-500/20 text-amber-400'
+                              : 'bg-stone-900/60 hover:bg-stone-900 text-amber-500'
+                          }`}
                         >
                           <Plus className="w-3.5 h-3.5" />
                           Create and Start: "{searchQuery.trim()}"
+                          {viewMode === 'day' && (
+                            <span className="ml-auto text-[9px] text-stone-500 lowercase">
+                              (Day view)
+                            </span>
+                          )}
                         </button>
                       )}
                     </div>
