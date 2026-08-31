@@ -877,7 +877,7 @@ export default function DayTimeline({
       {isFromTimelineView && (
         <div
           id={`spine-day-${labelString}`}
-          className={`sticky top-[56px] z-20 flex items-center justify-between py-2 px-3 rounded-xl border backdrop-blur-xl transition-all my-2 ${
+          className={`sticky top-[106px] sm:top-[66px] z-20 flex items-center justify-between py-2 px-3 rounded-xl border backdrop-blur-xl transition-all my-2.5 ${
             isToday
               ? 'bg-[#14120a]/95 border-amber-500/35 shadow-[0_0_15px_rgba(245,158,11,0.08)] text-amber-300'
               : 'bg-[#0e0e0e]/95 border-stone-800/80 hover:border-stone-700 text-stone-300'
@@ -1001,7 +1001,7 @@ export default function DayTimeline({
                 return null;
               })}
 
-            {/* Habit logs grouped into a collapsible section at the bottom */}
+            {/* Habit logs grouped into a sleek horizontal ritual strip */}
             {(() => {
               const habitItems = items.filter(
                 (item) => item.type === 'standalone' && item.entry.type === 'habit-log',
@@ -1009,51 +1009,64 @@ export default function DayTimeline({
               if (habitItems.length === 0) return null;
 
               return (
-                <>
-                  <div className="flex items-center gap-3 px-3 py-2">
-                    <button
-                      onClick={() =>
-                        setHabitsCollapsed((v) => {
-                          const next = !v;
-                          try {
-                            localStorage.setItem(HABITS_COLLAPSE_KEY, String(next));
-                          } catch {}
-                          return next;
-                        })
-                      }
-                      className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] text-emerald-600 hover:text-emerald-400 transition-colors cursor-pointer shrink-0"
-                    >
-                      <Repeat2 className="w-3 h-3" />
-                      <span>
-                        {habitItems.length} Habit{habitItems.length !== 1 ? 's' : ''} Done
+                <div className="pt-2.5 pb-1 relative z-10">
+                  {/* Section Header */}
+                  <div className="flex items-center justify-between px-3 mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400/90">
+                        Habits Completed ({habitItems.length})
                       </span>
-                      {habitsCollapsed ? (
-                        <ChevronRight className="w-3 h-3" />
-                      ) : (
-                        <ChevronDown className="w-3 h-3" />
-                      )}
-                    </button>
-                    <div className="flex-1 h-px bg-stone-900 self-center" />
+                    </div>
+                    {habitItems.length > 2 && (
+                      <span className="text-[9px] font-mono text-stone-600 hidden sm:inline">
+                        Scroll for more →
+                      </span>
+                    )}
                   </div>
 
-                  {!habitsCollapsed && (
-                    <div className="space-y-0">
-                      {habitItems.map((item) =>
-                        renderStandaloneRow(
-                          (
-                            item as {
-                              type: 'standalone';
-                              entry: TimelineEntry;
-                              sortTime: number;
-                            }
-                          ).entry,
-                          false,
-                          false,
-                        ),
-                      )}
-                    </div>
-                  )}
-                </>
+                  {/* Horizontal Scrollable Rail */}
+                  <div className="flex items-center gap-2 overflow-x-auto px-3 py-1 scrollbar-none">
+                    {habitItems.map((item) => {
+                      const entry = (item as { type: 'standalone'; entry: TimelineEntry }).entry as HabitLog;
+                      const emojiMatch = entry.title?.match(
+                        /^(\p{Extended_Pictographic}|\p{Emoji_Presentation})/u,
+                      );
+                      const emoji = emojiMatch ? emojiMatch[0] : null;
+                      const cleanTitle = emoji
+                        ? entry.title.replace(emoji, '').trim()
+                        : entry.title;
+
+                      return (
+                        <div
+                          key={entry.id}
+                          onClick={() => handleOpenDetail(entry)}
+                          className="group/habit flex items-center gap-2.5 px-3 py-1.5 bg-[#121212] hover:bg-[#181818] border border-emerald-500/20 hover:border-emerald-500/40 rounded-xl transition-all cursor-pointer select-none shrink-0 shadow-sm"
+                          title="Click to view details"
+                        >
+                          {/* Circular Habit Icon */}
+                          <div className="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.2)]">
+                            {emoji ? (
+                              <span className="text-xs leading-none">{emoji}</span>
+                            ) : (
+                              <Repeat2 className="w-3 h-3 text-emerald-400" />
+                            )}
+                          </div>
+
+                          {/* Title & Done Time */}
+                          <div className="flex flex-col min-w-0 pr-1">
+                            <span className="text-xs font-sans font-semibold text-stone-200 group-hover/habit:text-white truncate max-w-[130px]">
+                              {cleanTitle}
+                            </span>
+                            <span className="text-[9px] font-mono text-emerald-400 font-medium leading-tight">
+                              ✔ {formatTime(entry.timestamp)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               );
             })()}
 
