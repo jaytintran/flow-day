@@ -998,6 +998,7 @@ export default function Journal({
 					/>
 				) : viewMode === "day" ? (
 					<DayView
+						activeDate={activeDate}
 						activeDayString={activeDayString}
 						dayRenderItems={dayRenderItems}
 						collapsedDays={collapsedDays}
