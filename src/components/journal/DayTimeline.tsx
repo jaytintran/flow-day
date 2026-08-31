@@ -875,94 +875,96 @@ export default function DayTimeline({
   return (
     <div className="w-full relative" key={labelString}>
       {isFromTimelineView && (
-        <div
-          id={`spine-day-${labelString}`}
-          className={`sticky top-[102px] sm:top-[60px] z-20 flex items-center justify-between py-2.5 px-0 border-b transition-all w-full ${
-            isToday
-              ? 'bg-[#0a0a0a] border-amber-500/35 text-amber-300 shadow-[0_6px_20px_rgba(0,0,0,0.9)]'
-              : 'bg-[#0a0a0a] border-stone-850 text-stone-300 shadow-[0_6px_20px_rgba(0,0,0,0.9)]'
-          }`}
-        >
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <button
-              onClick={() => toggleDayCollapse(labelString)}
-              className="p-1 rounded-lg text-stone-500 hover:text-amber-400 hover:bg-stone-800/60 transition-colors cursor-pointer"
-              title={isCollapsed ? 'Expand day' : 'Collapse day'}
-            >
-              {isCollapsed ? (
-                <ChevronRight className="w-3.5 h-3.5" />
-              ) : (
-                <ChevronDown className="w-3.5 h-3.5" />
-              )}
-            </button>
+        <div className="sticky top-[106px] sm:top-[66px] z-20 bg-[#0a0a0a] py-1.5 transition-all w-full">
+          <div
+            id={`spine-day-${labelString}`}
+            className={`flex items-center justify-between py-2 px-3 rounded-xl border transition-all ${
+              isToday
+                ? 'bg-[#14120a] border-amber-500/35 text-amber-300'
+                : 'bg-[#0e0e0e] border-stone-800/80 hover:border-stone-700 text-stone-300'
+            }`}
+          >
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <button
+                onClick={() => toggleDayCollapse(labelString)}
+                className="p-1 rounded-lg text-stone-500 hover:text-amber-400 hover:bg-stone-800/60 transition-colors cursor-pointer"
+                title={isCollapsed ? 'Expand day' : 'Collapse day'}
+              >
+                {isCollapsed ? (
+                  <ChevronRight className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                )}
+              </button>
 
-            {/* Day Milestone Marker */}
-            <div
-              className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
-                isToday
-                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.3)]'
-                  : 'bg-stone-900 border-stone-700 text-stone-400'
-              }`}
-            >
-              {isToday ? (
-                <Sparkles className="w-3 h-3 text-amber-400 fill-amber-400/30" />
-              ) : (
-                <Calendar className="w-3 h-3 text-stone-400" />
-              )}
-            </div>
-
-            <button
-              onClick={() => setActiveDate(new Date(labelString))}
-              className="flex items-center gap-2 text-left cursor-pointer group/title min-w-0"
-              title="Click to view in Day View"
-            >
-              <span
-                className={`text-xs font-mono font-bold uppercase tracking-wider transition-colors ${
+              {/* Day Milestone Marker */}
+              <div
+                className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
                   isToday
-                    ? 'text-amber-300 group-hover/title:text-amber-200'
-                    : 'text-stone-200 group-hover/title:text-amber-400'
+                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-400'
+                    : 'bg-stone-900 border-stone-700 text-stone-400'
                 }`}
               >
-                {formatDateStringLabel(labelString)}
-              </span>
+                {isToday ? (
+                  <Sparkles className="w-3 h-3 text-amber-400 fill-amber-400/30" />
+                ) : (
+                  <Calendar className="w-3 h-3 text-stone-400" />
+                )}
+              </div>
 
-              {isToday && (
-                <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-widest bg-amber-500/20 border border-amber-500/40 text-amber-300">
-                  Today
+              <button
+                onClick={() => setActiveDate(new Date(labelString))}
+                className="flex items-center gap-2 text-left cursor-pointer group/title min-w-0"
+                title="Click to view in Day View"
+              >
+                <span
+                  className={`text-xs font-mono font-bold uppercase tracking-wider transition-colors ${
+                    isToday
+                      ? 'text-amber-300 group-hover/title:text-amber-200'
+                      : 'text-stone-200 group-hover/title:text-amber-400'
+                  }`}
+                >
+                  {formatDateStringLabel(labelString)}
+                </span>
+
+                {isToday && (
+                  <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-widest bg-amber-500/20 border border-amber-500/40 text-amber-300">
+                    Today
+                  </span>
+                )}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1.5 text-[10px] font-mono text-stone-500 shrink-0">
+              {summaryCounts.tasks > 0 && (
+                <span className="text-amber-400/80 font-semibold">
+                  {summaryCounts.tasks} task{summaryCounts.tasks !== 1 ? 's' : ''}
                 </span>
               )}
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1.5 text-[10px] font-mono text-stone-500 shrink-0">
-            {summaryCounts.tasks > 0 && (
-              <span className="text-amber-400/80 font-semibold">
-                {summaryCounts.tasks} task{summaryCounts.tasks !== 1 ? 's' : ''}
-              </span>
-            )}
-            {summaryCounts.events > 0 && (
-              <span className="text-indigo-400/80 font-semibold">
-                {summaryCounts.events} event{summaryCounts.events !== 1 ? 's' : ''}
-              </span>
-            )}
-            {summaryCounts.notes > 0 && (
-              <span className="text-blue-400/80 font-semibold">
-                {summaryCounts.notes} note{summaryCounts.notes !== 1 ? 's' : ''}
-              </span>
-            )}
-            {summaryCounts.habits > 0 && (
-              <span className="text-emerald-400/80 font-semibold">
-                {summaryCounts.habits} habit{summaryCounts.habits !== 1 ? 's' : ''}
-              </span>
-            )}
-            {summaryCounts.tasks === 0 &&
-              summaryCounts.events === 0 &&
-              summaryCounts.notes === 0 &&
-              summaryCounts.habits === 0 && (
-                <span>
-                  {items.length} {items.length === 1 ? 'entry' : 'entries'}
+              {summaryCounts.events > 0 && (
+                <span className="text-indigo-400/80 font-semibold">
+                  {summaryCounts.events} event{summaryCounts.events !== 1 ? 's' : ''}
                 </span>
               )}
+              {summaryCounts.notes > 0 && (
+                <span className="text-blue-400/80 font-semibold">
+                  {summaryCounts.notes} note{summaryCounts.notes !== 1 ? 's' : ''}
+                </span>
+              )}
+              {summaryCounts.habits > 0 && (
+                <span className="text-emerald-400/80 font-semibold">
+                  {summaryCounts.habits} habit{summaryCounts.habits !== 1 ? 's' : ''}
+                </span>
+              )}
+              {summaryCounts.tasks === 0 &&
+                summaryCounts.events === 0 &&
+                summaryCounts.notes === 0 &&
+                summaryCounts.habits === 0 && (
+                  <span>
+                    {items.length} {items.length === 1 ? 'entry' : 'entries'}
+                  </span>
+                )}
+            </div>
           </div>
         </div>
       )}

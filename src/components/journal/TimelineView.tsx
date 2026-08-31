@@ -228,10 +228,11 @@ export default function TimelineView({
   }, [sortedTimelineDays, timelineDaysMap, getDayRenderItems, statusFilter, typeFilter, sortOrder]);
 
   return (
-    <div className="space-y-2" ref={containerRef}>
-      {/* ─── Timeline Top Filter & Sort Bar (Full-Width Solid Opaque Shelf) ─── */}
-      <div className="sticky top-0 z-30 bg-[#0a0a0a] border-b border-stone-800/80 pt-3 pb-3 px-0 transition-all shadow-[0_4px_20px_rgba(0,0,0,0.9)]">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+    <div className="space-y-3" ref={containerRef}>
+      {/* ─── Timeline Top Filter & Sort Bar ───────────────────────────────── */}
+      <div className="sticky top-0 z-30 bg-[#0a0a0a] pt-3 pb-2 transition-all">
+        <div className="bg-[#0e0e0e] border border-stone-800/80 rounded-2xl p-2.5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
           {/* Status Filter Tabs (All / To Do / Done) */}
           <div className="flex items-center gap-1 bg-black/40 border border-stone-800/80 p-1 rounded-xl w-full sm:w-auto overflow-x-auto scrollbar-none">
             <button
@@ -326,6 +327,7 @@ export default function TimelineView({
           </div>
         </div>
       </div>
+    </div>
 
       {/* ─── Timeline Days Content ────────────────────────────────────────── */}
       {filteredDaysData.validDays.length > 0 ? (
