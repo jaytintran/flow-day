@@ -816,7 +816,7 @@ function MobileTaskItem({
 	);
 
 	return (
-		<SortableRow id={task.id}>
+		<SortableRow id={task.id} disabled={false} hideHandle={false}>
 			<div className="relative overflow-hidden rounded-xl">
 				{/* Underlying Mobile Action Tray (Hidden until swiped, fade-in transition) */}
 				{!isSwipeDisabled && (
@@ -910,10 +910,10 @@ function MobileTaskItem({
 					dragConstraints={isSwipeDisabled ? { left: 0, right: 0 } : { left: maxSwipeLeft, right: 0 }}
 					dragElastic={0.05}
 					animate={{ x: !isSwipeDisabled && isMobileSwiped ? maxSwipeLeft : 0 }}
+					style={{ willChange: "transform" }}
 					onDragStart={() => {
 						if (!isSwipeDisabled) {
 							isDraggingSwipe.current = true;
-							setIsMobileSwiped(true);
 						}
 					}}
 					onDragEnd={(_, info) => {
@@ -921,9 +921,9 @@ function MobileTaskItem({
 						setTimeout(() => {
 							isDraggingSwipe.current = false;
 						}, 100);
-						if (info.offset.x < -30) {
+						if (info.offset.x < -35 || (info.offset.x < -15 && info.velocity.x < -80)) {
 							setIsMobileSwiped(true);
-						} else if (info.offset.x > 15) {
+						} else if (info.offset.x > 15 || info.velocity.x > 80) {
 							setIsMobileSwiped(false);
 						}
 					}}

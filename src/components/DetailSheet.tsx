@@ -53,15 +53,17 @@ export default function DetailSheet({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
               onClick={onClose}
-              className="absolute inset-0 bg-black/60 backdrop-blur-xs"
+              className="absolute inset-0 bg-black/70"
             />
             {/* Sheet container */}
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              transition={{ type: 'spring', damping: 32, stiffness: 340, mass: 0.7 }}
+              style={{ willChange: 'transform' }}
               className="relative w-full h-[85vh] bg-[#121212] border-t border-stone-850 rounded-t-2xl shadow-2xl z-10 flex flex-col overflow-hidden pb-6"
             >
               {/* Drag Handle & Close header */}
