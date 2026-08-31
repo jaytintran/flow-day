@@ -5,7 +5,6 @@
 
 import React, { useState } from 'react';
 import DayTimeline, { RenderItem } from './DayTimeline';
-import DayScratchpad from './DayScratchpad';
 import { TimelineEntry, Task } from '../../types';
 import { ChevronDown, ChevronRight, Calendar, Trash2, Sparkles, AlertCircle, Play } from 'lucide-react';
 
@@ -241,9 +240,6 @@ export default function DayView({
         formatDateStringLabel={formatDateStringLabel}
         onTimePickerConfirm={onTimePickerConfirm}
       />
-
-      {/* Persistent Day Scratchpad */}
-      <DayScratchpad activeDate={activeDate} />
     </div>
   );
 }

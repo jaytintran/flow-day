@@ -8,6 +8,7 @@ import TimerBar from './components/TimerBar';
 import DayNavigator from './components/DayNavigator';
 import Journal from './components/journal/Journal';
 import InputBar from './components/InputBar';
+import DayScratchpad from './components/journal/DayScratchpad';
 
 type ViewMode = 'day' | 'timeline' | 'records' | 'lists' | 'hub';
 const VALID_MODES: ViewMode[] = ['day', 'timeline', 'records', 'lists', 'hub'];
@@ -36,6 +37,24 @@ export default function App() {
     'goals',
   );
 
+  const [isScratchpadOpen, setIsScratchpadOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('flowday_day_scratchpad_is_open') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleScratchpad = useCallback(() => {
+    setIsScratchpadOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('flowday_day_scratchpad_is_open', String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0a0a0a] text-stone-200 font-sans selection:bg-stone-800 selection:text-stone-100 relative select-none">
       {/* ZONE 1 — HEADER (FIXED TOP) */}
@@ -60,6 +79,8 @@ export default function App() {
           setViewMode={setViewMode}
           activeHubTab={activeHubTab}
           setActiveHubTab={setActiveHubTab}
+          isScratchpadOpen={isScratchpadOpen}
+          toggleScratchpad={toggleScratchpad}
         />
       </header>
 
@@ -92,6 +113,14 @@ export default function App() {
           <InputBar activeDate={activeDate} viewMode={viewMode} />
         </footer>
       )}
+
+      {/* GLOBAL PERSISTENT SCRATCHPAD */}
+      <DayScratchpad
+        activeDate={activeDate}
+        viewMode={viewMode}
+        isOpen={isScratchpadOpen}
+        onToggle={toggleScratchpad}
+      />
     </div>
   );
 }

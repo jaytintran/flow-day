@@ -24,6 +24,7 @@ import {
   X,
   BarChart2,
   Clock,
+  StickyNote,
 } from 'lucide-react';
 import HabitConsistencyModal from './HabitConsistencyModal';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -39,6 +40,8 @@ interface DayNavigatorProps {
   setViewMode: (mode: 'day' | 'timeline' | 'records' | 'lists' | 'hub') => void;
   activeHubTab?: 'goals' | 'objectives' | 'habits' | 'focus';
   setActiveHubTab?: (tab: 'goals' | 'objectives' | 'habits' | 'focus') => void;
+  isScratchpadOpen?: boolean;
+  toggleScratchpad?: () => void;
 }
 
 export default function DayNavigator({
@@ -48,6 +51,8 @@ export default function DayNavigator({
   setViewMode,
   activeHubTab,
   setActiveHubTab,
+  isScratchpadOpen,
+  toggleScratchpad,
 }: DayNavigatorProps) {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isTrophyOpen, setIsTrophyOpen] = useState(false);
@@ -505,8 +510,22 @@ export default function DayNavigator({
         )}
       </div>
 
-      {/* Calendar & Trophy Buttons */}
+      {/* Scratchpad, Calendar & Trophy Buttons */}
       <div className="flex items-center gap-0.5 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 h-9 shrink-0">
+        {toggleScratchpad && (
+          <button
+            id="toggle-scratchpad-btn"
+            onClick={toggleScratchpad}
+            className={`h-full px-2 rounded-md active:scale-95 transition-all flex items-center justify-center cursor-pointer relative ${
+              isScratchpadOpen
+                ? 'bg-amber-500 text-stone-950 shadow-sm'
+                : 'text-stone-500 hover:text-amber-400 hover:bg-stone-800/50'
+            }`}
+            title="Scratchpad"
+          >
+            <StickyNote className="w-[18px] h-[18px]" />
+          </button>
+        )}
         <button
           id="toggle-calendar-btn"
           onClick={() => {
