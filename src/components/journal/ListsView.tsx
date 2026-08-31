@@ -974,32 +974,53 @@ function MobileTaskItem({
 							</span>
 						</div>
 
-						{isDone && (
-							<button
-								type="button"
-								onClick={(e) => {
-									e.stopPropagation();
-									if (onToggleAccomplishment) {
-										onToggleAccomplishment(task);
-									} else {
-										db.entries.update(task.id, {
-											is_accomplishment: !task.is_accomplishment,
-										} as any);
-									}
-								}}
-								className={`p-1.5 rounded-lg border transition-all cursor-pointer shrink-0 ${
-									task.is_accomplishment
-										? "bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.25)]"
-										: "bg-stone-900/40 border-stone-800 text-stone-600 hover:text-amber-400"
-								}`}
-								title="Toggle Accomplishment"
-							>
-								<Trophy
-									className={`w-3.5 h-3.5 ${
-										task.is_accomplishment ? "fill-amber-400" : ""
+						{/* Right Actions for Completed / Dropped Tasks */}
+						{(isDone || isDropped) && (
+							<div className="flex items-center gap-1 shrink-0">
+								{isDone && (
+									<button
+										type="button"
+										onClick={(e) => {
+											e.stopPropagation();
+											if (onToggleAccomplishment) {
+												onToggleAccomplishment(task);
+											} else {
+												db.entries.update(task.id, {
+													is_accomplishment: !task.is_accomplishment,
+												} as any);
+											}
+										}}
+										className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+											task.is_accomplishment
+												? "bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.25)]"
+												: "bg-stone-900/40 border-stone-800 text-stone-600 hover:text-amber-400"
+										}`}
+										title="Toggle Accomplishment"
+									>
+										<Trophy
+											className={`w-3.5 h-3.5 ${
+												task.is_accomplishment ? "fill-amber-400" : ""
+											}`}
+										/>
+									</button>
+								)}
+
+								<button
+									type="button"
+									onClick={(e) => {
+										e.stopPropagation();
+										onDeleteEntry(task.id);
+									}}
+									className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+										deletingId === task.id
+											? "bg-red-950 border-red-800 text-red-400"
+											: "bg-stone-900/40 border-stone-800 text-stone-500 hover:text-red-400 hover:bg-stone-850"
 									}`}
-								/>
-							</button>
+									title="Delete task"
+								>
+									<Trash2 className="w-3.5 h-3.5" />
+								</button>
+							</div>
 						)}
 					</div>
 
