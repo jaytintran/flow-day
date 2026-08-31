@@ -228,9 +228,9 @@ export default function TimelineView({
   }, [sortedTimelineDays, timelineDaysMap, getDayRenderItems, statusFilter, typeFilter, sortOrder]);
 
   return (
-    <div className="space-y-4" ref={containerRef}>
-      {/* ─── Timeline Top Filter & Sort Bar ───────────────────────────────── */}
-      <div className="sticky top-0 z-30 bg-[#0c0c0c]/90 backdrop-blur-xl border border-stone-800/80 rounded-2xl p-2.5 shadow-xl transition-all">
+    <div className="space-y-2" ref={containerRef}>
+      {/* ─── Timeline Top Filter & Sort Bar (Full-Width Solid Opaque Shelf) ─── */}
+      <div className="sticky top-0 z-30 bg-[#0a0a0a] border-b border-stone-800/80 pt-1 pb-2.5 px-0 transition-all">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
           {/* Status Filter Tabs (All / To Do / Done) */}
           <div className="flex items-center gap-1 bg-black/40 border border-stone-800/80 p-1 rounded-xl w-full sm:w-auto overflow-x-auto scrollbar-none">
