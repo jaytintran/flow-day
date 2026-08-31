@@ -21,6 +21,7 @@ import {
   Repeat2,
   Hourglass,
   Star,
+  Sparkles,
 } from 'lucide-react';
 import { TimelineEntry, Task, Log, Event, Note, TimeBlock, HabitLog } from '../../types';
 import { formatDuration, toLocalDateString } from '../../utils';
@@ -42,7 +43,8 @@ export type RenderItem =
       sortTime: number;
     }
   | { type: 'standalone'; entry: TimelineEntry; sortTime: number }
-  | { type: 'sleep'; timeStr: string; sortTime: number };
+  | { type: 'sleep'; timeStr: string; sortTime: number }
+  | { type: 'now_needle'; sortTime: number };
 
 interface DayTimelineProps {
   items: RenderItem[];
@@ -147,28 +149,65 @@ export default function DayTimeline({
   }, []);
 
   const enrichedItems = useMemo(() => {
-    if (!sleepEnabled || !sleepTime) return items;
+    const combined: RenderItem[] = [...items];
 
-    // Parse sleepTime (e.g. "23:00" -> hours=23, minutes=0)
-    const [hoursStr, minutesStr] = sleepTime.split(':');
-    const hours = parseInt(hoursStr, 10);
-    const minutes = parseInt(minutesStr, 10);
-    if (isNaN(hours) || isNaN(minutes)) return items;
+    if (sleepEnabled && sleepTime) {
+      // Parse sleepTime (e.g. "23:00" -> hours=23, minutes=0)
+      const [hoursStr, minutesStr] = sleepTime.split(':');
+      const hours = parseInt(hoursStr, 10);
+      const minutes = parseInt(minutesStr, 10);
+      if (!isNaN(hours) && !isNaN(minutes)) {
+        // Create Date for sleep time on this specific day
+        const sleepDate = new Date(labelString);
+        sleepDate.setHours(hours, minutes, 0, 0);
+        combined.push({
+          type: 'sleep',
+          timeStr: sleepTime,
+          sortTime: sleepDate.getTime(),
+        });
+      }
+    }
 
-    // Create Date for sleep time on this specific day
-    const sleepDate = new Date(labelString);
-    sleepDate.setHours(hours, minutes, 0, 0);
-    const sortTime = sleepDate.getTime();
+    // Live Now Needle for Today (only in TimelineView)
+    const todayStr = toLocalDateString(new Date());
+    if (labelString === todayStr && isFromTimelineView) {
+      combined.push({
+        type: 'now_needle',
+        sortTime: Date.now(),
+      });
+    }
 
-    const sleepItem: RenderItem = {
-      type: 'sleep',
-      timeStr: sleepTime,
-      sortTime,
-    };
-
-    const combined = [...items, sleepItem];
     return combined.sort((a, b) => a.sortTime - b.sortTime);
-  }, [items, sleepTime, labelString]);
+  }, [items, sleepEnabled, sleepTime, labelString, isFromTimelineView]);
+
+  const renderNowNeedle = () => {
+    const nowStr = formatTime(new Date());
+    return (
+      <div
+        key="live-now-needle"
+        className="group relative flex items-center gap-2.5 py-2 rounded md:px-3 select-none z-10"
+      >
+        {/* Left Column 1: Time Gutter */}
+        <div className="w-14 text-right shrink-0 select-none whitespace-nowrap">
+          <span className="text-[9px] font-mono font-bold tracking-wider text-amber-400 bg-amber-500/15 border border-amber-500/40 px-1.5 py-0.5 rounded shadow-[0_0_8px_rgba(245,158,11,0.25)]">
+            NOW
+          </span>
+        </div>
+
+        {/* Left Column 2: Glowing Beacon Node directly on spine */}
+        <div className="w-5 h-5 flex items-center justify-center relative shrink-0 z-10 bg-[#0a0a0a] rounded-full">
+          <div className="w-2.5 h-2.5 rounded-full bg-amber-400 border border-amber-200 shadow-[0_0_8px_rgba(245,158,11,1)] relative z-10" />
+          <div className="w-4 h-4 rounded-full bg-amber-400/40 animate-ping absolute" />
+        </div>
+
+        {/* Right Column: Radiant Laser line */}
+        <div className="flex-1 min-w-0 flex items-center gap-2">
+          <div className="flex-1 h-px bg-gradient-to-r from-amber-500/80 via-amber-500/30 to-transparent" />
+          <span className="text-[9px] font-mono text-amber-400/90 shrink-0 font-medium">{nowStr}</span>
+        </div>
+      </div>
+    );
+  };
 
   const renderSleepRow = (timeStr: string, sortTime: number) => {
     const sleepDate = new Date(sortTime);
@@ -204,7 +243,7 @@ export default function DayTimeline({
         </div>
 
         {/* Left Column 2: Icon */}
-        <div className="w-5 h-5 flex items-center justify-center relative shrink-0 z-10">
+        <div className="w-5 h-5 flex items-center justify-center relative shrink-0 z-10 bg-[#0a0a0a] rounded-full">
           <div className="w-6 h-6 rounded-full border border-violet-500/20 bg-violet-500/10 text-violet-400 flex items-center justify-center">
             <span className="text-[11px]">🌙</span>
           </div>
@@ -830,97 +869,119 @@ export default function DayTimeline({
     return counts;
   }, [items]);
 
+  const todayStr = toLocalDateString(new Date());
+  const isToday = labelString === todayStr;
+
   return (
     <div className="w-full relative" key={labelString}>
       {isFromTimelineView && (
-        <div id={`spine-day-${labelString}`} className="flex items-center gap-0 bg-[#0a0a0a]">
-          <button
-            onClick={() => toggleDayCollapse(labelString)}
-            className="w-10 flex items-center justify-center shrink-0 py-4 text-stone-600 hover:text-amber-500 transition-colors cursor-pointer"
-            title={isCollapsed ? 'Expand day' : 'Collapse day'}
-          >
-            {isCollapsed ? (
-              <ChevronRight className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveDate(new Date(labelString))}
-            className="text-xs uppercase font-mono font-bold tracking-widest hover:text-amber-500 text-stone-500 transition-colors cursor-pointer py-4 flex-1 text-left"
-          >
-            {formatDateStringLabel(labelString)}
-            <span className="ml-2 text-[10px] font-normal normal-case text-stone-500 hidden sm:inline">
-              {summaryCounts.tasks > 0 ||
-              summaryCounts.events > 0 ||
-              summaryCounts.notes > 0 ||
-              summaryCounts.habits > 0 ||
-              summaryCounts.timeBlocks > 0 ? (
-                <>
-                  {summaryCounts.tasks > 0 && (
-                    <span className="text-amber-400/80">
-                      {summaryCounts.tasks} task{summaryCounts.tasks !== 1 ? 's' : ''}
-                    </span>
-                  )}
-                  {summaryCounts.events > 0 && (
-                    <>
-                      {summaryCounts.tasks > 0 && <span className="text-stone-700"> · </span>}
-                      <span className="text-indigo-400/80">
-                        {summaryCounts.events} event{summaryCounts.events !== 1 ? 's' : ''}
-                      </span>
-                    </>
-                  )}
-                  {summaryCounts.notes > 0 && (
-                    <>
-                      {(summaryCounts.tasks > 0 || summaryCounts.events > 0) && (
-                        <span className="text-stone-700"> · </span>
-                      )}
-                      <span className="text-blue-400/80">
-                        {summaryCounts.notes} note{summaryCounts.notes !== 1 ? 's' : ''}
-                      </span>
-                    </>
-                  )}
-                  {summaryCounts.habits > 0 && (
-                    <>
-                      {(summaryCounts.tasks > 0 ||
-                        summaryCounts.events > 0 ||
-                        summaryCounts.notes > 0) && <span className="text-stone-700"> · </span>}
-                      <span className="text-emerald-400/80">
-                        {summaryCounts.habits} habit{summaryCounts.habits !== 1 ? 's' : ''}
-                      </span>
-                    </>
-                  )}
-                  {summaryCounts.timeBlocks > 0 && (
-                    <>
-                      {(summaryCounts.tasks > 0 ||
-                        summaryCounts.events > 0 ||
-                        summaryCounts.notes > 0 ||
-                        summaryCounts.habits > 0) && <span className="text-stone-700"> · </span>}
-                      <span className="text-stone-400/80">
-                        {summaryCounts.timeBlocks} block{summaryCounts.timeBlocks !== 1 ? 's' : ''}
-                      </span>
-                    </>
-                  )}
-                </>
+        <div
+          id={`spine-day-${labelString}`}
+          className={`sticky top-[56px] z-20 flex items-center justify-between py-2 px-3 rounded-xl border backdrop-blur-xl transition-all my-2 ${
+            isToday
+              ? 'bg-[#14120a]/95 border-amber-500/35 shadow-[0_0_15px_rgba(245,158,11,0.08)] text-amber-300'
+              : 'bg-[#0e0e0e]/95 border-stone-800/80 hover:border-stone-700 text-stone-300'
+          }`}
+        >
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <button
+              onClick={() => toggleDayCollapse(labelString)}
+              className="p-1 rounded-lg text-stone-500 hover:text-amber-400 hover:bg-stone-800/60 transition-colors cursor-pointer"
+              title={isCollapsed ? 'Expand day' : 'Collapse day'}
+            >
+              {isCollapsed ? (
+                <ChevronRight className="w-3.5 h-3.5" />
               ) : (
-                `${items.length} ${items.length === 1 ? 'entry' : 'entries'}`
+                <ChevronDown className="w-3.5 h-3.5" />
               )}
-            </span>
-          </button>
+            </button>
+
+            {/* Day Milestone Marker */}
+            <div
+              className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
+                isToday
+                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.3)]'
+                  : 'bg-stone-900 border-stone-700 text-stone-400'
+              }`}
+            >
+              {isToday ? (
+                <Sparkles className="w-3 h-3 text-amber-400 fill-amber-400/30" />
+              ) : (
+                <Calendar className="w-3 h-3 text-stone-400" />
+              )}
+            </div>
+
+            <button
+              onClick={() => setActiveDate(new Date(labelString))}
+              className="flex items-center gap-2 text-left cursor-pointer group/title min-w-0"
+              title="Click to view in Day View"
+            >
+              <span
+                className={`text-xs font-mono font-bold uppercase tracking-wider transition-colors ${
+                  isToday
+                    ? 'text-amber-300 group-hover/title:text-amber-200'
+                    : 'text-stone-200 group-hover/title:text-amber-400'
+                }`}
+              >
+                {formatDateStringLabel(labelString)}
+              </span>
+
+              {isToday && (
+                <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-widest bg-amber-500/20 border border-amber-500/40 text-amber-300">
+                  Today
+                </span>
+              )}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-[10px] font-mono text-stone-500 shrink-0">
+            {summaryCounts.tasks > 0 && (
+              <span className="text-amber-400/80 font-semibold">
+                {summaryCounts.tasks} task{summaryCounts.tasks !== 1 ? 's' : ''}
+              </span>
+            )}
+            {summaryCounts.events > 0 && (
+              <span className="text-indigo-400/80 font-semibold">
+                {summaryCounts.events} event{summaryCounts.events !== 1 ? 's' : ''}
+              </span>
+            )}
+            {summaryCounts.notes > 0 && (
+              <span className="text-blue-400/80 font-semibold">
+                {summaryCounts.notes} note{summaryCounts.notes !== 1 ? 's' : ''}
+              </span>
+            )}
+            {summaryCounts.habits > 0 && (
+              <span className="text-emerald-400/80 font-semibold">
+                {summaryCounts.habits} habit{summaryCounts.habits !== 1 ? 's' : ''}
+              </span>
+            )}
+            {summaryCounts.tasks === 0 &&
+              summaryCounts.events === 0 &&
+              summaryCounts.notes === 0 &&
+              summaryCounts.habits === 0 && (
+                <span>
+                  {items.length} {items.length === 1 ? 'entry' : 'entries'}
+                </span>
+              )}
+          </div>
         </div>
       )}
 
-      {/* Timeline spine line — only in timeline mode, when expanded */}
+      {/* Continuous timeline spine line passing through icons */}
       {isFromTimelineView && !isCollapsed && (
-        <div className="absolute top-0 left-0 w-10 bottom-0 pointer-events-none z-0">
-          <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-stone-800/60" />
+        <div className="absolute top-0 bottom-0 left-[76px] md:left-[88px] w-px pointer-events-none z-0">
+          <div
+            className={`w-full h-full ${
+              isToday
+                ? 'bg-gradient-to-b from-amber-500/50 via-amber-400/80 to-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.5)]'
+                : 'bg-stone-800/70'
+            }`}
+          />
         </div>
       )}
 
       {!isCollapsed &&
         (enrichedItems.length > 0 ? (
-          // AFTER
           <div className="space-y-0 pt-1">
             {/* Non-habit items render normally */}
             {enrichedItems
@@ -934,6 +995,8 @@ export default function DayTimeline({
                   return renderStandaloneRow(item.entry, false, false);
                 } else if (item.type === 'bracket') {
                   return renderBracketItem(item.block, item.children);
+                } else if (item.type === 'now_needle') {
+                  return renderNowNeedle();
                 }
                 return null;
               })}
