@@ -87,6 +87,23 @@ export default function Settings() {
     } catch {}
   };
 
+  const [showDayPhases, setShowDayPhases] = useState(() => {
+    try {
+      const stored = localStorage.getItem('flowday_show_day_phases');
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const handleToggleShowDayPhases = (val: boolean) => {
+    setShowDayPhases(val);
+    try {
+      localStorage.setItem('flowday_show_day_phases', String(val));
+      window.dispatchEvent(new CustomEvent('flowday-settings-change'));
+    } catch {}
+  };
+
   const {
     pat,
     setPat,
@@ -307,6 +324,27 @@ export default function Settings() {
                         />
                       </div>
                     )}
+                  </div>
+
+                  {/* Daylight Phases toggle row */}
+                  <div className="flex items-center justify-between p-3.5 bg-stone-900/40 border border-stone-850 rounded-xl">
+                    <div className="flex flex-col gap-1 pr-4">
+                      <span className="text-xs text-stone-200 font-semibold font-sans">
+                        Daylight Phases (Day View)
+                      </span>
+                      <span className="text-[10px] font-mono text-stone-500">
+                        Display Morning, Noon, Afternoon, and Evening blocks in Day view.
+                      </span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={showDayPhases}
+                        onChange={(e) => handleToggleShowDayPhases(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-stone-800 rounded-full peer peer-focus:outline-none peer-checked:bg-amber-500/80 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-stone-500 peer-checked:after:bg-stone-950 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
+                    </label>
                   </div>
                 </div>
 

@@ -46,6 +46,61 @@ export type RenderItem =
   | { type: 'sleep'; timeStr: string; sortTime: number }
   | { type: 'now_needle'; sortTime: number };
 
+export const DAY_PHASES = [
+  {
+    id: 'morning',
+    title: 'Morning',
+    icon: '🌅',
+    timeRange: '06:00 AM – 12:00 PM',
+    startHour: 0,
+    endHour: 12,
+    emptyText: 'Set your morning intentions & start fresh.',
+    borderClasses: 'border-amber-500/25 hover:border-amber-500/40',
+    bgClasses: 'bg-gradient-to-b from-amber-950/15 via-[#111111]/70 to-[#0e0e0e]/90',
+    headerBadge: 'bg-amber-500/10 border-amber-500/30 text-amber-300',
+    dotColor: 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.5)]',
+  },
+  {
+    id: 'noon',
+    title: 'Noon',
+    icon: '☀️',
+    timeRange: '12:00 PM – 02:00 PM',
+    startHour: 12,
+    endHour: 14,
+    emptyText: 'Enjoy your lunch break!',
+    borderClasses: 'border-yellow-500/25 hover:border-yellow-500/40',
+    bgClasses: 'bg-gradient-to-b from-yellow-950/15 via-[#111111]/70 to-[#0e0e0e]/90',
+    headerBadge: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300',
+    dotColor: 'bg-yellow-400 shadow-[0_0_8px_rgba(234,179,8,0.5)]',
+  },
+  {
+    id: 'afternoon',
+    title: 'Afternoon',
+    icon: '🌤️',
+    timeRange: '02:00 PM – 06:00 PM',
+    startHour: 14,
+    endHour: 18,
+    emptyText: 'Power through your focus sessions & meetings.',
+    borderClasses: 'border-orange-500/25 hover:border-orange-500/40',
+    bgClasses: 'bg-gradient-to-b from-orange-950/15 via-[#111111]/70 to-[#0e0e0e]/90',
+    headerBadge: 'bg-orange-500/10 border-orange-500/30 text-orange-300',
+    dotColor: 'bg-orange-400 shadow-[0_0_8px_rgba(249,115,22,0.5)]',
+  },
+  {
+    id: 'evening',
+    title: 'Evening',
+    icon: '🌙',
+    timeRange: '06:00 PM – 11:00 PM',
+    startHour: 18,
+    endHour: 24,
+    emptyText: "Unwind, review today's wins, and recharge.",
+    borderClasses: 'border-indigo-500/25 hover:border-indigo-500/40',
+    bgClasses: 'bg-gradient-to-b from-indigo-950/15 via-[#111111]/70 to-[#0e0e0e]/90',
+    headerBadge: 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300',
+    dotColor: 'bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.5)]',
+  },
+];
+
 interface DayTimelineProps {
   items: RenderItem[];
   labelString: string;
@@ -96,13 +151,22 @@ export default function DayTimeline({
   // Local state for time picker and time ruler
   const [pickerEntry, setPickerEntry] = useState<TimelineEntry | null>(null);
   const [activeRulerState, setActiveRulerState] = useState<{
-    entry: TimelineEntry;
+    entry: TimelineEntry | TimeBlock;
     initialDate: Date;
+    initialEndDate?: Date;
+    mode: 'start' | 'end' | 'span';
     originY: number;
     originX: number;
   } | null>(null);
   const holdTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dragStartPosRef = React.useRef<{ x: number; y: number; entry: TimelineEntry } | null>(null);
+  const dragStartPosRef = React.useRef<{
+    x: number;
+    y: number;
+    entry: TimelineEntry | TimeBlock;
+    mode: 'start' | 'end' | 'span';
+    initialDate: Date;
+    initialEndDate?: Date;
+  } | null>(null);
 
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [editingLogTitle, setEditingLogTitle] = useState('');
@@ -110,6 +174,15 @@ export default function DayTimeline({
   const [showTimelineContent, setShowTimelineContent] = useState(() => {
     try {
       const stored = localStorage.getItem('flowday_show_note_event_content');
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const [showDayPhases, setShowDayPhases] = useState(() => {
+    try {
+      const stored = localStorage.getItem('flowday_show_day_phases');
       return stored === null ? true : stored === 'true';
     } catch {
       return true;
@@ -142,6 +215,8 @@ export default function DayTimeline({
         setSleepTime(storedSleep || '23:00');
         const storedSleepEnabled = localStorage.getItem('flowday_sleep_enabled');
         setSleepEnabled(storedSleepEnabled === null ? true : storedSleepEnabled === 'true');
+        const storedPhases = localStorage.getItem('flowday_show_day_phases');
+        setShowDayPhases(storedPhases === null ? true : storedPhases === 'true');
       } catch {}
     };
     window.addEventListener('flowday-settings-change', handleSettingsChange);
@@ -285,9 +360,57 @@ export default function DayTimeline({
     return new Date(entry.created_at);
   };
 
+  const getEntrySpan = (entry: TimelineEntry) => {
+    let startDate: Date | null = null;
+    let endDate: Date | null = null;
+
+    if (entry.type === 'task') {
+      const task = entry as Task;
+      const start = task.scheduled_at || task.created_at;
+      if (task.scheduled_end_at && start) {
+        startDate = new Date(start);
+        endDate = new Date(task.scheduled_end_at);
+      }
+    } else if (entry.type === 'log') {
+      const log = entry as Log;
+      if (log.end_timestamp) {
+        startDate = new Date(log.timestamp);
+        endDate = new Date(log.end_timestamp);
+      }
+    } else if (entry.type === 'event') {
+      const event = entry as Event;
+      if (event.end_timestamp) {
+        startDate = new Date(event.timestamp);
+        endDate = new Date(event.end_timestamp);
+      }
+    }
+
+    if (startDate && endDate && endDate.getTime() > startDate.getTime()) {
+      const durationMs = endDate.getTime() - startDate.getTime();
+      return {
+        hasSpan: true,
+        startDate,
+        endDate,
+        durationMs,
+        durationLabel: formatDuration(durationMs),
+      };
+    }
+
+    return {
+      hasSpan: false,
+      startDate: new Date(entry.created_at),
+      endDate: new Date(entry.created_at),
+      durationMs: 0,
+      durationLabel: '',
+    };
+  };
+
   const handleGutterPointerDown = (
     e: React.PointerEvent,
-    entry: TimelineEntry,
+    entry: TimelineEntry | TimeBlock,
+    mode: 'start' | 'end' | 'span' = 'start',
+    customStartDate?: Date,
+    customEndDate?: Date,
   ) => {
     if (e.button !== 0 && e.pointerType === 'mouse') return;
     e.stopPropagation();
@@ -301,15 +424,34 @@ export default function DayTimeline({
       targetEl.setPointerCapture(pointerId);
     } catch {}
 
-    dragStartPosRef.current = { x: startX, y: startY, entry };
+    const initStartDate =
+      customStartDate ||
+      ('start_at' in entry
+        ? new Date(entry.start_at)
+        : getPickerInitialDate(entry as TimelineEntry));
+
+    const initEndDate =
+      customEndDate ||
+      ('end_at' in entry ? new Date(entry.end_at) : undefined);
+
+    dragStartPosRef.current = {
+      x: startX,
+      y: startY,
+      entry,
+      mode,
+      initialDate: initStartDate,
+      initialEndDate: initEndDate,
+    };
 
     if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
 
     holdTimerRef.current = setTimeout(() => {
       if (dragStartPosRef.current) {
         setActiveRulerState({
-          entry,
-          initialDate: getPickerInitialDate(entry),
+          entry: dragStartPosRef.current.entry,
+          initialDate: dragStartPosRef.current.initialDate,
+          initialEndDate: dragStartPosRef.current.initialEndDate,
+          mode: dragStartPosRef.current.mode,
           originY: startY,
           originX: startX,
         });
@@ -325,17 +467,18 @@ export default function DayTimeline({
     );
     if (dist > 2) {
       if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-      const entry = dragStartPosRef.current.entry;
       setActiveRulerState({
-        entry,
-        initialDate: getPickerInitialDate(entry),
+        entry: dragStartPosRef.current.entry,
+        initialDate: dragStartPosRef.current.initialDate,
+        initialEndDate: dragStartPosRef.current.initialEndDate,
+        mode: dragStartPosRef.current.mode,
         originY: e.clientY,
         originX: e.clientX,
       });
     }
   };
 
-  const handleGutterPointerUp = (e: React.PointerEvent, entry: TimelineEntry) => {
+  const handleGutterPointerUp = (e: React.PointerEvent, entry: TimelineEntry | TimeBlock) => {
     if (holdTimerRef.current) {
       clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
@@ -348,9 +491,79 @@ export default function DayTimeline({
     } catch {}
 
     // Only open standard picker modal if the ruler overlay never got activated
-    if (hadStart && !activeRulerState) {
+    if (hadStart && !activeRulerState && !('block_type' in entry || 'children_ids' in entry)) {
       e.stopPropagation();
-      setPickerEntry(entry);
+      setPickerEntry(entry as TimelineEntry);
+    }
+  };
+
+  const handleConfirmSpanRuler = async (newStart: Date, newEnd?: Date) => {
+    if (!activeRulerState) return;
+    const { entry, mode, initialDate, initialEndDate } = activeRulerState;
+
+    // Validate that End Time is strictly after Start Time
+    if (mode === 'end' && newEnd) {
+      if (newEnd.getTime() <= initialDate.getTime()) {
+        alert('End time cannot be earlier than or equal to start time.');
+        setActiveRulerState(null);
+        return;
+      }
+    } else if (mode === 'start' && initialEndDate) {
+      if (newStart.getTime() >= initialEndDate.getTime()) {
+        alert('Start time cannot be later than or equal to end time.');
+        setActiveRulerState(null);
+        return;
+      }
+    }
+
+    setActiveRulerState(null);
+
+    // If it's a TimeBlock bracket
+    if ('block_type' in entry || 'children_ids' in entry) {
+      const block = entry as TimeBlock;
+      if (mode === 'start') {
+        await db.entries.update(block.id, { start_at: newStart } as any);
+      } else if (mode === 'end' && newEnd) {
+        await db.entries.update(block.id, { end_at: newEnd } as any);
+      } else if (mode === 'span' && newEnd) {
+        await db.entries.update(block.id, { start_at: newStart, end_at: newEnd } as any);
+      }
+      return;
+    }
+
+    // If it's a TimelineEntry
+    const timelineEntry = entry as TimelineEntry;
+    if (timelineEntry.type === 'task') {
+      const task = timelineEntry as Task;
+      if (mode === 'start') {
+        await db.entries.update(task.id, { scheduled_at: newStart } as any);
+      } else if (mode === 'end' && newEnd) {
+        await db.entries.update(task.id, { scheduled_end_at: newEnd } as any);
+      } else if (mode === 'span' && newEnd) {
+        await db.entries.update(task.id, { scheduled_at: newStart, scheduled_end_at: newEnd } as any);
+      }
+    } else if (timelineEntry.type === 'log') {
+      const log = timelineEntry as Log;
+      if (mode === 'start') {
+        await db.entries.update(log.id, { timestamp: newStart } as any);
+      } else if (mode === 'end' && newEnd) {
+        await db.entries.update(log.id, { end_timestamp: newEnd } as any);
+      } else if (mode === 'span' && newEnd) {
+        await db.entries.update(log.id, { timestamp: newStart, end_timestamp: newEnd } as any);
+      }
+    } else if (timelineEntry.type === 'event') {
+      const event = timelineEntry as Event;
+      if (mode === 'start') {
+        await db.entries.update(event.id, { timestamp: newStart } as any);
+      } else if (mode === 'end' && newEnd) {
+        await db.entries.update(event.id, { end_timestamp: newEnd } as any);
+      } else if (mode === 'span' && newEnd) {
+        await db.entries.update(event.id, { timestamp: newStart, end_timestamp: newEnd } as any);
+      }
+    } else if (timelineEntry.type === 'note') {
+      await db.entries.update(timelineEntry.id, { timestamp: newStart } as any);
+    } else if (timelineEntry.type === 'habit-log') {
+      await db.entries.update(timelineEntry.id, { timestamp: newStart } as any);
     }
   };
 
@@ -401,38 +614,93 @@ export default function DayTimeline({
       primaryTime = formatTime((entry as HabitLog).timestamp);
     }
 
+    const span = getEntrySpan(entry);
+
     return (
       <div
         key={entry.id}
         id={`entry-${entry.id}`}
         onClick={() => !isHabitLog && entry.type !== 'log' && handleOpenDetail(entry)}
-        className={`group relative flex items-start gap-2.5 py-2 rounded md:px-3 transition-colors border-stone-900/50 last:border-b-0 ${
+        className={`group relative flex items-center gap-2.5 py-2.5 rounded md:px-3 transition-colors border-stone-900/50 last:border-b-0 ${
           isHabitLog || entry.type === 'log' ? '' : 'hover:bg-stone-900/40 cursor-pointer'
         }`}
       >
         {/* Left Column 1: Time Gutter */}
-        <div className="w-14 text-right shrink-0 select-none pt-0.5 whitespace-nowrap">
-          <span
-            onPointerDown={(e) => handleGutterPointerDown(e, entry)}
-            onPointerMove={handleGutterPointerMove}
-            onPointerUp={(e) => handleGutterPointerUp(e, entry)}
-            onPointerCancel={handleGutterPointerCancel}
-            onClick={(e) => e.stopPropagation()}
-            title="Click to edit · Hold & drag for time ruler"
-            className={`text-[10px] font-mono font-medium tracking-tight cursor-pointer hover:text-amber-400 transition-colors touch-none whitespace-nowrap ${
-              isCompletedTask || isHabitLog
-                ? 'text-emerald-600 font-semibold'
-                : isScheduledTime
-                  ? 'text-sky-500'
-                  : 'text-stone-500'
-            }`}
-          >
-            {primaryTime}
-          </span>
-        </div>
+        {span.hasSpan ? (
+          <div className="w-14 text-right shrink-0 select-none flex flex-col items-end justify-between self-stretch py-2 whitespace-nowrap min-h-[92px]">
+            {/* Top: Start Time */}
+            <span
+              onPointerDown={(e) =>
+                handleGutterPointerDown(e, entry, 'start', span.startDate, span.endDate)
+              }
+              onPointerMove={handleGutterPointerMove}
+              onPointerUp={(e) => handleGutterPointerUp(e, entry)}
+              onPointerCancel={handleGutterPointerCancel}
+              onClick={(e) => e.stopPropagation()}
+              title="Drag to adjust Start Time"
+              className="text-[9px] font-mono font-bold text-sky-400 hover:text-amber-300 cursor-ns-resize transition-colors whitespace-nowrap tracking-tight leading-none"
+            >
+              {formatTime(span.startDate)}
+            </span>
 
-        {/* Left Column 2: Icon Dot */}
-        <div className="w-5 h-5 flex items-center justify-center relative shrink-0 z-10 mt-0.5">
+            {/* Connecting Vertical Rail & Center Duration Badge */}
+            <div className="w-full flex items-center justify-end my-2 relative pr-1.5 flex-1 min-h-[36px]">
+              <div className="absolute right-0 top-0 bottom-0 w-[1.5px] bg-gradient-to-b from-sky-400/80 via-amber-400/80 to-sky-400/80 rounded-full" />
+              <button
+                type="button"
+                onPointerDown={(e) =>
+                  handleGutterPointerDown(e, entry, 'span', span.startDate, span.endDate)
+                }
+                onPointerMove={handleGutterPointerMove}
+                onPointerUp={(e) => handleGutterPointerUp(e, entry)}
+                onPointerCancel={handleGutterPointerCancel}
+                onClick={(e) => e.stopPropagation()}
+                title="Drag to shift entire time span"
+                className="relative z-10 px-1 py-0.5 text-[8px] font-mono font-bold rounded bg-[#161616] border border-amber-500/40 text-amber-400 shadow-md hover:border-amber-400 hover:scale-105 active:scale-95 cursor-grab transition-all"
+              >
+                {span.durationLabel}
+              </button>
+            </div>
+
+            {/* Bottom: End Time */}
+            <span
+              onPointerDown={(e) =>
+                handleGutterPointerDown(e, entry, 'end', span.startDate, span.endDate)
+              }
+              onPointerMove={handleGutterPointerMove}
+              onPointerUp={(e) => handleGutterPointerUp(e, entry)}
+              onPointerCancel={handleGutterPointerCancel}
+              onClick={(e) => e.stopPropagation()}
+              title="Drag to adjust End Time"
+              className="text-[9px] font-mono font-bold text-sky-400/80 hover:text-amber-300 cursor-ns-resize transition-colors whitespace-nowrap tracking-tight leading-none"
+            >
+              {formatTime(span.endDate)}
+            </span>
+          </div>
+        ) : (
+          <div className="w-14 text-right shrink-0 select-none whitespace-nowrap self-center">
+            <span
+              onPointerDown={(e) => handleGutterPointerDown(e, entry, 'start')}
+              onPointerMove={handleGutterPointerMove}
+              onPointerUp={(e) => handleGutterPointerUp(e, entry)}
+              onPointerCancel={handleGutterPointerCancel}
+              onClick={(e) => e.stopPropagation()}
+              title="Click to edit · Hold & drag for time ruler"
+              className={`text-[10px] font-mono font-medium tracking-tight cursor-pointer hover:text-amber-400 transition-colors touch-none whitespace-nowrap ${
+                isCompletedTask || isHabitLog
+                  ? 'text-emerald-600 font-semibold'
+                  : isScheduledTime
+                    ? 'text-sky-500'
+                    : 'text-stone-500'
+              }`}
+            >
+              {primaryTime}
+            </span>
+          </div>
+        )}
+
+        {/* Left Column 2: Icon Dot / Checkbox (Centered vertically) */}
+        <div className="w-5 h-5 flex items-center justify-center relative shrink-0 z-10 self-center">
           {isTask && (
             <button
               id={`task-status-btn-${entry.id}`}
@@ -481,7 +749,7 @@ export default function DayTimeline({
           )}
         </div>
         {/* Right Column: Row Display details */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
           {/* Row 1: Title + Action Tools */}
           <div className="flex justify-between items-center gap-4">
             <div className="flex-1">
@@ -983,7 +1251,160 @@ export default function DayTimeline({
       )}
 
       {!isCollapsed &&
-        (enrichedItems.length > 0 ? (
+        (!isFromTimelineView && showDayPhases ? (
+          /* Day View with 4 Themed Daylight Phase Blocks */
+          <div className="space-y-4 pt-1">
+            {DAY_PHASES.map((phase) => {
+              const phaseItems = enrichedItems.filter((item) => {
+                if (item.type === 'standalone' && item.entry.type === 'habit-log') return false;
+                if (item.type === 'sleep') return false;
+                const hour = new Date(item.sortTime).getHours();
+                return hour >= phase.startHour && hour < phase.endHour;
+              });
+
+              const isCurrentPhase =
+                isToday &&
+                (() => {
+                  const currentH = new Date().getHours();
+                  return currentH >= phase.startHour && currentH < phase.endHour;
+                })();
+
+              return (
+                <div
+                  key={`phase-block-${phase.id}`}
+                  className={`rounded-2xl border ${phase.borderClasses} ${phase.bgClasses} p-3 sm:p-4 transition-all relative overflow-hidden shadow-sm`}
+                >
+                  {/* Phase Header */}
+                  <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-stone-850/60">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm leading-none">{phase.icon}</span>
+                      <span className="text-xs font-mono font-bold uppercase tracking-wider text-stone-200">
+                        {phase.title}
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border ${phase.headerBadge}`}
+                      >
+                        {phase.timeRange}
+                      </span>
+                      {isCurrentPhase && (
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-widest bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                          Active Now
+                        </span>
+                      )}
+                    </div>
+
+                    <span className="text-[10px] font-mono text-stone-500">
+                      {phaseItems.length > 0
+                        ? `${phaseItems.length} item${phaseItems.length !== 1 ? 's' : ''}`
+                        : 'Empty'}
+                    </span>
+                  </div>
+
+                  {/* Phase Content */}
+                  {phaseItems.length > 0 ? (
+                    <div className="space-y-0 relative">
+                      {phaseItems.map((item) => {
+                        if (item.type === 'standalone') {
+                          return renderStandaloneRow(item.entry, false, false);
+                        } else if (item.type === 'bracket') {
+                          return renderBracketItem(item.block, item.children);
+                        } else if (item.type === 'now_needle') {
+                          return renderNowNeedle();
+                        }
+                        return null;
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-6 flex flex-col items-center justify-center text-center select-none">
+                      <p className="text-xs font-serif italic text-stone-400 font-medium">
+                        "{phase.emptyText}"
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Habit logs grouped into a sleek horizontal ritual strip */}
+            {(() => {
+              const habitItems = items.filter(
+                (item) => item.type === 'standalone' && item.entry.type === 'habit-log',
+              );
+              if (habitItems.length === 0) return null;
+
+              return (
+                <div className="pt-2.5 pb-1 relative z-10">
+                  {/* Section Header */}
+                  <div className="flex items-center justify-between px-3 mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400/90">
+                        Habits Completed ({habitItems.length})
+                      </span>
+                    </div>
+                    {habitItems.length > 2 && (
+                      <span className="text-[9px] font-mono text-stone-600 hidden sm:inline">
+                        Scroll for more →
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Horizontal Scrollable Rail */}
+                  <div className="flex items-center gap-2 overflow-x-auto px-3 py-1 scrollbar-none">
+                    {habitItems.map((item) => {
+                      const entry = (item as { type: 'standalone'; entry: TimelineEntry }).entry as HabitLog;
+                      const emojiMatch = entry.title?.match(
+                        /^(\p{Extended_Pictographic}|\p{Emoji_Presentation})/u,
+                      );
+                      const emoji = emojiMatch ? emojiMatch[0] : null;
+                      const cleanTitle = emoji
+                        ? entry.title.replace(emoji, '').trim()
+                        : entry.title;
+
+                      return (
+                        <div
+                          key={entry.id}
+                          onClick={() => handleOpenDetail(entry)}
+                          className="group/habit flex items-center gap-2.5 px-3 py-1.5 bg-[#121212] hover:bg-[#181818] border border-emerald-500/20 hover:border-emerald-500/40 rounded-xl transition-all cursor-pointer select-none shrink-0 shadow-sm"
+                          title="Click to view details"
+                        >
+                          {/* Circular Habit Icon */}
+                          <div className="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.2)]">
+                            {emoji ? (
+                              <span className="text-xs leading-none">{emoji}</span>
+                            ) : (
+                              <Repeat2 className="w-3 h-3 text-emerald-400" />
+                            )}
+                          </div>
+
+                          {/* Title & Done Time */}
+                          <div className="flex flex-col min-w-0 pr-1">
+                            <span className="text-xs font-sans font-semibold text-stone-200 group-hover/habit:text-white truncate max-w-[130px]">
+                              {cleanTitle}
+                            </span>
+                            <span className="text-[9px] font-mono text-emerald-400 font-medium leading-tight">
+                              ✔ {formatTime(entry.timestamp)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Sleep row rendered at the end */}
+            {(() => {
+              const sleepItem = enrichedItems.find((item) => item.type === 'sleep');
+              if (sleepItem && sleepItem.type === 'sleep') {
+                return renderSleepRow(sleepItem.timeStr, sleepItem.sortTime);
+              }
+              return null;
+            })()}
+          </div>
+        ) : enrichedItems.length > 0 ? (
           <div className="space-y-0 pt-1">
             {/* Non-habit items render normally */}
             {enrichedItems
@@ -1099,12 +1520,16 @@ export default function DayTimeline({
         <TimeRulerOverlay
           entry={activeRulerState.entry}
           initialDate={activeRulerState.initialDate}
+          initialEndDate={activeRulerState.initialEndDate}
+          mode={activeRulerState.mode}
           originY={activeRulerState.originY}
           originX={activeRulerState.originX}
           formatTime={formatTime}
           onConfirm={(newDate) => {
-            onTimePickerConfirm(activeRulerState.entry, newDate);
-            setActiveRulerState(null);
+            handleConfirmSpanRuler(newDate);
+          }}
+          onConfirmSpan={(newStart, newEnd) => {
+            handleConfirmSpanRuler(newStart, newEnd);
           }}
           onCancel={() => setActiveRulerState(null)}
         />

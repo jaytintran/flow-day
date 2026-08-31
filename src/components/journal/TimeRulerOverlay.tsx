@@ -8,22 +8,28 @@ import { X, Clock } from 'lucide-react';
 import { TimelineEntry } from '../../types';
 
 interface TimeRulerOverlayProps {
-  entry: TimelineEntry;
+  entry: TimelineEntry | any;
   initialDate: Date;
+  initialEndDate?: Date;
+  mode?: 'start' | 'end' | 'span';
   originY: number;
   originX: number;
   formatTime: (date: Date | string) => string;
   onConfirm: (newDate: Date) => void;
+  onConfirmSpan?: (newStart: Date, newEnd?: Date) => void;
   onCancel: () => void;
 }
 
 export default function TimeRulerOverlay({
   entry,
   initialDate,
+  initialEndDate,
+  mode = 'start',
   originY,
   originX,
   formatTime,
   onConfirm,
+  onConfirmSpan,
   onCancel,
 }: TimeRulerOverlayProps) {
   const [currentY, setCurrentY] = useState(originY);
@@ -37,8 +43,15 @@ export default function TimeRulerOverlay({
   const BOTTOM_PADDING = 90;
   const rulerHeight = Math.max(300, window.innerHeight - TOP_PADDING - BOTTOM_PADDING);
 
+  const durationMs = useMemo(() => {
+    if (initialEndDate && initialEndDate.getTime() > initialDate.getTime()) {
+      return initialEndDate.getTime() - initialDate.getTime();
+    }
+    return 0;
+  }, [initialDate, initialEndDate]);
+
   // Map pointer Y to minutes of day (0 to 1439) with 15-minute / 5-minute magnetic snapping
-  const { calculatedDate, formattedTime, diffLabel, isSnapped } = useMemo(() => {
+  const { calculatedDate, calculatedEndDate, formattedTime, diffLabel, isSnapped } = useMemo(() => {
     // Clamp Y within ruler bounds
     const clampedY = Math.max(TOP_PADDING, Math.min(TOP_PADDING + rulerHeight, currentY));
     const ratio = (clampedY - TOP_PADDING) / rulerHeight;
@@ -52,10 +65,20 @@ export default function TimeRulerOverlay({
     const hours = Math.floor(finalMinutes / 60);
     const mins = finalMinutes % 60;
 
-    const newDate = new Date(initialDate);
+    const baseReferenceDate = mode === 'end' && initialEndDate ? initialEndDate : initialDate;
+    const newDate = new Date(baseReferenceDate);
     newDate.setHours(hours, mins, 0, 0);
 
-    const diffMinutes = Math.round((newDate.getTime() - initialDate.getTime()) / 60000);
+    let newEndDate: Date | undefined = undefined;
+    if (mode === 'span' && durationMs > 0) {
+      newEndDate = new Date(newDate.getTime() + durationMs);
+    } else if (mode === 'end') {
+      newEndDate = newDate;
+    } else if (mode === 'start' && initialEndDate) {
+      newEndDate = initialEndDate;
+    }
+
+    const diffMinutes = Math.round((newDate.getTime() - baseReferenceDate.getTime()) / 60000);
     let diffStr = '';
     if (diffMinutes === 0) {
       diffStr = 'Same time';
@@ -71,14 +94,20 @@ export default function TimeRulerOverlay({
       }
     }
 
+    let timeDisplay = formatTime(newDate);
+    if (mode === 'span' && newEndDate) {
+      timeDisplay = `${formatTime(newDate)} – ${formatTime(newEndDate)}`;
+    }
+
     return {
       calculatedDate: newDate,
-      formattedTime: formatTime(newDate),
+      calculatedEndDate: newEndDate,
+      formattedTime: timeDisplay,
       diffLabel: diffStr,
       isSnapped: true,
       finalMinutes,
     };
-  }, [currentY, initialDate, rulerHeight, formatTime]);
+  }, [currentY, initialDate, initialEndDate, mode, durationMs, rulerHeight, formatTime]);
 
   // Haptic feedback when crossing into a new 15-minute slot
   useEffect(() => {
@@ -132,7 +161,11 @@ export default function TimeRulerOverlay({
       if (overCancel) {
         onCancel();
       } else {
-        onConfirm(calculatedDate);
+        if (onConfirmSpan) {
+          onConfirmSpan(calculatedDate, calculatedEndDate);
+        } else {
+          onConfirm(calculatedDate);
+        }
       }
     };
 
@@ -145,10 +178,18 @@ export default function TimeRulerOverlay({
         if (overCancel) {
           onCancel();
         } else {
-          onConfirm(calculatedDate);
+          if (onConfirmSpan) {
+            onConfirmSpan(calculatedDate, calculatedEndDate);
+          } else {
+            onConfirm(calculatedDate);
+          }
         }
       } else {
-        onConfirm(calculatedDate);
+        if (onConfirmSpan) {
+          onConfirmSpan(calculatedDate, calculatedEndDate);
+        } else {
+          onConfirm(calculatedDate);
+        }
       }
     };
 
