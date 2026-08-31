@@ -41,6 +41,17 @@ export interface Task extends BaseEntry {
   sort_order?: number; // display ordering (used by ListsView DnD)
   category_ids?: string[]; // add this
   starred?: boolean;
+  is_accomplishment?: boolean; // marks a completed task as an accomplishment for the Trophy view
+  folder_id?: string; // links to a ListFolder
+}
+
+export interface ListFolder {
+  id: string;
+  name: string;
+  list_id: string; // Category ID, 'all', or 'none'
+  sort_order?: number;
+  color?: string;
+  created_at: Date;
 }
 
 export interface Event extends BaseEntry {

@@ -312,19 +312,43 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
     });
   };
 
-  // Stop timer, save progress, and deactivate the working state
+  const sessionInitTimeRef = useRef<number>(Date.now());
+
+  // Helper: auto-create a timeline log entry for this session
+  const logWorkingSession = async (task: Task, startMs: number, endMs: number) => {
+    if (endMs - startMs < 5000) return; // Skip trivial taps under 5s
+    await db.entries.add({
+      id: crypto.randomUUID(),
+      type: 'log',
+      title: task.title,
+      timestamp: new Date(startMs),
+      end_timestamp: new Date(endMs),
+      category_ids: task.category_ids,
+      created_at: new Date(),
+    } as any);
+  };
+
+  // Stop / Finish working session, save progress, log session to timeline, and deactivate
   const handleStop = async () => {
     if (!activeTaskId) return;
 
+    const now = Date.now();
+    const sessionStart = sessionInitTimeRef.current || now;
+
     let finalTimeSpent = localTimeSpent;
     if (isRunning && sessionStartRef.current !== null) {
-      const delta = Date.now() - sessionStartRef.current;
+      const delta = now - sessionStartRef.current;
       finalTimeSpent = elapsedBeforeRef.current + delta;
     }
 
     await db.entries.update(activeTaskId, {
       time_spent: finalTimeSpent,
     } as any);
+
+    if (activeTask) {
+      await logWorkingSession(activeTask, sessionStart, now);
+    }
+
     // Also accumulate to linked objective
     const stopDelta = finalTimeSpent - (elapsedBeforeRef.current || 0);
     await accumulateLinkedObjective(activeTaskId, stopDelta);
@@ -333,28 +357,9 @@ export default function TimerBar({ activeTaskId, setActiveTaskId }: TimerBarProp
     clearTimerState();
   };
 
-  // Finish task: save time, complete task, and deactivate
+  // Finish session: saves session, logs to timeline, and keeps task status open for manual completion
   const handleFinish = async () => {
-    if (!activeTaskId) return;
-
-    let finalTimeSpent = localTimeSpent;
-    if (isRunning && sessionStartRef.current !== null) {
-      const delta = Date.now() - sessionStartRef.current;
-      finalTimeSpent = elapsedBeforeRef.current + delta;
-    }
-
-    await db.entries.update(activeTaskId, {
-      status: 'done',
-      time_spent: finalTimeSpent,
-      completed_at: new Date(),
-    } as any);
-    // Also accumulate to linked objective
-    const finishDelta = finalTimeSpent - (elapsedBeforeRef.current || 0);
-    await accumulateLinkedObjective(activeTaskId, finishDelta);
-
-    setActiveTaskId(null);
-
-    clearTimerState();
+    await handleStop();
   };
 
   const [isDeletingActiveTask, setIsDeletingActiveTask] = useState(false);

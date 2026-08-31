@@ -4,7 +4,7 @@
  */
 
 import Dexie, { type Table } from 'dexie';
-import { TimelineEntry, Habit, Category, Purpose, Domain } from './types';
+import { TimelineEntry, Habit, Category, Purpose, Domain, ListFolder } from './types';
 
 export class PersonalTimelineDB extends Dexie {
   entries!: Table<TimelineEntry>;
@@ -12,6 +12,7 @@ export class PersonalTimelineDB extends Dexie {
   categories!: Table<Category>;
   purposes!: Table<Purpose>;
   domains!: Table<Domain>;
+  list_folders!: Table<ListFolder>;
 
   constructor() {
     super('PersonalTimelineDB');
@@ -104,6 +105,15 @@ export class PersonalTimelineDB extends Dexie {
       categories: 'id, name, scope, [scope+name]',
       purposes: 'id, sort_order, *domain_ids',
       domains: 'id, sort_order',
+    });
+    this.version(14).stores({
+      entries:
+        'id, type, created_at, status, timestamp, start_at, end_at, title, carried_to, objective_id, goal_id, scheduled_at, habit_id, *category_ids, sort_order, *purpose_ids, *domain_ids, starred, folder_id, is_accomplishment',
+      habits: 'id, status, sort_order, *purpose_ids, *domain_ids',
+      categories: 'id, name, scope, [scope+name]',
+      purposes: 'id, sort_order, *domain_ids',
+      domains: 'id, sort_order',
+      list_folders: 'id, list_id, sort_order, created_at',
     });
   }
 }
