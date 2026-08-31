@@ -955,13 +955,23 @@ export default function Journal({
 						? "overflow-y-auto pt-4 md:pt-6"
 						: viewMode === "lists"
 							? "overflow-y-auto pt-4 md:pt-6"
-							: "overflow-y-auto pt-4 md:pt-6"
+							: viewMode === "timeline"
+								? "overflow-y-auto pt-0"
+								: "overflow-y-auto pt-4 md:pt-6"
 			}`}
 			id="timeline-journal-scrollable"
 			ref={containerRef}
 		>
 			<div
-				className={`w-full md:mx-auto ${viewMode === "hub" ? "h-full md:max-w-9xl flex flex-col" : viewMode === "lists" || viewMode === "records" ? "md:max-w-9xl " : "md:max-w-4xl space-y-8"}`}
+				className={`w-full md:mx-auto ${
+					viewMode === "hub"
+						? "h-full md:max-w-9xl flex flex-col"
+						: viewMode === "lists" || viewMode === "records"
+							? "md:max-w-9xl "
+							: viewMode === "timeline"
+								? "md:max-w-4xl space-y-0"
+								: "md:max-w-4xl space-y-8"
+				}`}
 			>
 				{viewMode === "records" ? (
 					<RecordsView

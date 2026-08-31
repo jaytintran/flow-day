@@ -877,10 +877,10 @@ export default function DayTimeline({
       {isFromTimelineView && (
         <div
           id={`spine-day-${labelString}`}
-          className={`sticky top-[86px] sm:top-[48px] z-20 flex items-center justify-between py-2.5 px-3 border-b transition-all w-full ${
+          className={`sticky top-[102px] sm:top-[60px] z-20 flex items-center justify-between py-2.5 px-0 border-b transition-all w-full ${
             isToday
-              ? 'bg-[#0f0d07] border-amber-500/35 text-amber-300 shadow-[0_4px_16px_rgba(0,0,0,0.6)]'
-              : 'bg-[#0a0a0a] border-stone-850 text-stone-300 shadow-[0_4px_16px_rgba(0,0,0,0.6)]'
+              ? 'bg-[#0a0a0a] border-amber-500/35 text-amber-300 shadow-[0_6px_20px_rgba(0,0,0,0.9)]'
+              : 'bg-[#0a0a0a] border-stone-850 text-stone-300 shadow-[0_6px_20px_rgba(0,0,0,0.9)]'
           }`}
         >
           <div className="flex items-center gap-2 min-w-0 flex-1">
