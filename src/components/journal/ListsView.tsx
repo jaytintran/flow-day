@@ -737,6 +737,8 @@ interface MobileTaskItemProps {
 	taskLists: Category[];
 	selectedListId?: string;
 	availableFolders?: ListFolder[];
+	isSwiped?: boolean;
+	onSetSwiped?: (swiped: boolean) => void;
 	onDeleteEntry: (id: string) => void;
 	onOpenDetail: (entry: TimelineEntry) => void;
 	onToggleTaskStatus: (task: Task) => void;
@@ -756,6 +758,8 @@ function MobileTaskItem({
 	taskLists,
 	selectedListId,
 	availableFolders,
+	isSwiped,
+	onSetSwiped,
 	onDeleteEntry,
 	onOpenDetail,
 	onToggleTaskStatus,
@@ -781,7 +785,16 @@ function MobileTaskItem({
 		.map((id) => taskLists.find((list) => list.id === id))
 		.filter((list): list is Category => !!list && list.id !== selectedListId);
 
-	const [isMobileSwiped, setIsMobileSwiped] = useState(false);
+	const [localSwiped, setLocalSwiped] = useState(false);
+	const isMobileSwiped = isSwiped !== undefined ? isSwiped : localSwiped;
+	const setIsMobileSwiped = (swiped: boolean) => {
+		if (onSetSwiped) {
+			onSetSwiped(swiped);
+		} else {
+			setLocalSwiped(swiped);
+		}
+	};
+
 	const isDraggingSwipe = useRef(false);
 	const isSwipeDisabled = isDone || isDropped;
 	const hasFolders = !!(
@@ -805,9 +818,13 @@ function MobileTaskItem({
 	return (
 		<SortableRow id={task.id}>
 			<div className="relative overflow-hidden rounded-xl">
-				{/* Underlying Mobile Action Tray (Transparent Background, Active Tasks Only) */}
+				{/* Underlying Mobile Action Tray (Hidden until swiped, fade-in transition) */}
 				{!isSwipeDisabled && (
-					<div className="absolute inset-y-0 right-0 flex items-center pr-2 gap-1.5 bg-transparent z-0">
+					<div
+						className={`absolute inset-y-0 right-0 flex items-center pr-2 gap-1.5 bg-transparent z-0 transition-opacity duration-200 ${
+							isMobileSwiped ? "opacity-100" : "opacity-0 pointer-events-none"
+						}`}
+					>
 						{!isDone && !isDropped && !isActive && (
 							<button
 								type="button"
@@ -889,20 +906,24 @@ function MobileTaskItem({
 				{/* Main Mobile Row Card */}
 				<motion.div
 					drag={isSwipeDisabled ? false : "x"}
+					dragDirectionLock={true}
 					dragConstraints={isSwipeDisabled ? { left: 0, right: 0 } : { left: maxSwipeLeft, right: 0 }}
 					dragElastic={0.05}
 					animate={{ x: !isSwipeDisabled && isMobileSwiped ? maxSwipeLeft : 0 }}
 					onDragStart={() => {
-						if (!isSwipeDisabled) isDraggingSwipe.current = true;
+						if (!isSwipeDisabled) {
+							isDraggingSwipe.current = true;
+							setIsMobileSwiped(true);
+						}
 					}}
 					onDragEnd={(_, info) => {
 						if (isSwipeDisabled) return;
 						setTimeout(() => {
 							isDraggingSwipe.current = false;
 						}, 100);
-						if (info.offset.x < -40) {
+						if (info.offset.x < -30) {
 							setIsMobileSwiped(true);
-						} else if (info.offset.x > 20) {
+						} else if (info.offset.x > 15) {
 							setIsMobileSwiped(false);
 						}
 					}}
@@ -914,17 +935,17 @@ function MobileTaskItem({
 							onOpenDetail(task);
 						}
 					}}
-					className={`relative z-10 flex flex-col gap-1 px-3 py-2.5 rounded-xl border transition-colors cursor-pointer select-none touch-manipulation ${
+					className={`relative z-10 flex flex-col gap-1 px-3 py-2.5 rounded-xl border transition-colors cursor-pointer select-none touch-pan-y ${
 						isActive
-							? "bg-amber-500/10 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]"
+							? "bg-[#1c1608] border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]"
 							: isDone
 								? isAccomplishment
 									? "bg-[#161410] border-amber-500/30 hover:border-amber-500/50"
-									: "bg-[#111]/40 border-stone-800/40 opacity-70 hover:opacity-100 hover:border-stone-700"
+									: "bg-[#111111] border-stone-800/40 opacity-70 hover:opacity-100 hover:border-stone-700"
 								: isDropped
-									? "bg-rose-950/10 border-rose-900/30 opacity-60"
+									? "bg-[#181111] border-rose-900/30 opacity-60"
 									: isMaybe
-										? "bg-indigo-950/10 border-indigo-900/30 opacity-80"
+										? "bg-[#141422] border-indigo-900/40 opacity-90 hover:opacity-100"
 										: "bg-[#131313] border-stone-800/80 hover:border-stone-700 hover:bg-[#171717]"
 					}`}
 				>
@@ -1372,6 +1393,8 @@ interface FolderCardProps {
 	taskLists: Category[];
 	selectedListId?: string;
 	availableFolders?: ListFolder[];
+	activeSwipedTaskId?: string | null;
+	onSetSwipedTaskId?: (taskId: string | null) => void;
 	onDeleteEntry: (id: string) => void;
 	onOpenDetail: (entry: TimelineEntry) => void;
 	onToggleTaskStatus: (task: Task) => void;
@@ -1399,6 +1422,8 @@ function FolderCard({
 	taskLists,
 	selectedListId,
 	availableFolders,
+	activeSwipedTaskId,
+	onSetSwipedTaskId,
 	onDeleteEntry,
 	onOpenDetail,
 	onToggleTaskStatus,
@@ -1589,6 +1614,10 @@ function FolderCard({
 										taskLists={taskLists}
 										selectedListId={selectedListId}
 										availableFolders={availableFolders}
+										isSwiped={activeSwipedTaskId === task.id}
+										onSetSwiped={(swiped) =>
+											onSetSwipedTaskId?.(swiped ? task.id : null)
+										}
 										onDeleteEntry={onDeleteEntry}
 										onOpenDetail={onOpenDetail}
 										onToggleTaskStatus={onToggleTaskStatus}
@@ -1985,6 +2014,26 @@ export default function ListsView({
 	const [isMobileViewSheetOpen, setIsMobileViewSheetOpen] = useState(false);
 	const [isMobileStatusSheetOpen, setIsMobileStatusSheetOpen] = useState(false);
 
+	// Single active swiped task row controller (auto-closes others)
+	const [activeSwipedTaskId, setActiveSwipedTaskId] = useState<string | null>(
+		null,
+	);
+
+	useEffect(() => {
+		const handleGlobalClick = () => {
+			if (activeSwipedTaskId) setActiveSwipedTaskId(null);
+		};
+		const handleScroll = () => {
+			if (activeSwipedTaskId) setActiveSwipedTaskId(null);
+		};
+		window.addEventListener("scroll", handleScroll, { passive: true });
+		window.addEventListener("click", handleGlobalClick);
+		return () => {
+			window.removeEventListener("scroll", handleScroll);
+			window.removeEventListener("click", handleGlobalClick);
+		};
+	}, [activeSwipedTaskId]);
+
 	// Modals state
 	const [statusPickerTask, setStatusPickerTask] = useState<Task | null>(null);
 	const [scheduleModalTask, setScheduleModalTask] = useState<Task | null>(null);
@@ -2059,6 +2108,12 @@ export default function ListsView({
 			.filter((f) => f.list_id === selectedView)
 			.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 	}, [allFolders, selectedView]);
+
+	// Available folders to pick when moving a task on mobile/desktop (shows all folders if in 'all' view or list has none)
+	const availableFoldersForPicker = useMemo(() => {
+		if (selectedView === "all") return allFolders;
+		return currentListFolders.length > 0 ? currentListFolders : allFolders;
+	}, [selectedView, allFolders, currentListFolders]);
 
 	// Dateless backlog tasks only for ListsView (excludes scheduled tasks, which belong to Day/Timeline views)
 	const allTasks = useMemo(
@@ -2466,7 +2521,9 @@ export default function ListsView({
 							deletingId={deletingId}
 							taskLists={taskLists}
 							selectedListId={selectedView}
-							availableFolders={currentListFolders}
+							availableFolders={availableFoldersForPicker}
+							activeSwipedTaskId={activeSwipedTaskId}
+							onSetSwipedTaskId={setActiveSwipedTaskId}
 							onDeleteEntry={onDeleteEntry}
 							onOpenDetail={onOpenDetail}
 							onToggleTaskStatus={onToggleTaskStatus}
@@ -2560,7 +2617,7 @@ export default function ListsView({
 																	deletingId={deletingId}
 																	taskLists={taskLists}
 																	selectedListId={selectedView}
-																	availableFolders={currentListFolders}
+																	availableFolders={availableFoldersForPicker}
 																	onDeleteEntry={onDeleteEntry}
 																	onOpenDetail={onOpenDetail}
 																	onToggleTaskStatus={onToggleTaskStatus}
@@ -2588,7 +2645,13 @@ export default function ListsView({
 																	deletingId={deletingId}
 																	taskLists={taskLists}
 																	selectedListId={selectedView}
-																	availableFolders={currentListFolders}
+																	availableFolders={availableFoldersForPicker}
+																	isSwiped={activeSwipedTaskId === task.id}
+																	onSetSwiped={(swiped) =>
+																		setActiveSwipedTaskId(
+																			swiped ? task.id : null,
+																		)
+																	}
 																	onDeleteEntry={onDeleteEntry}
 																	onOpenDetail={onOpenDetail}
 																	onToggleTaskStatus={onToggleTaskStatus}
@@ -2629,7 +2692,7 @@ export default function ListsView({
 												deletingId={deletingId}
 												taskLists={taskLists}
 												selectedListId={selectedView}
-												availableFolders={currentListFolders}
+												availableFolders={availableFoldersForPicker}
 												onDeleteEntry={onDeleteEntry}
 												onOpenDetail={onOpenDetail}
 												onToggleTaskStatus={onToggleTaskStatus}
@@ -2653,7 +2716,13 @@ export default function ListsView({
 												deletingId={deletingId}
 												taskLists={taskLists}
 												selectedListId={selectedView}
-												availableFolders={currentListFolders}
+												availableFolders={availableFoldersForPicker}
+												isSwiped={activeSwipedTaskId === task.id}
+												onSetSwiped={(swiped) =>
+													setActiveSwipedTaskId(
+														swiped ? task.id : null,
+													)
+												}
 												onDeleteEntry={onDeleteEntry}
 												onOpenDetail={onOpenDetail}
 												onToggleTaskStatus={onToggleTaskStatus}
@@ -3137,7 +3206,7 @@ export default function ListsView({
 			{folderPickerTask && (
 				<MoveToFolderModal
 					task={folderPickerTask}
-					folders={currentListFolders}
+					folders={availableFoldersForPicker}
 					onClose={() => setFolderPickerTask(null)}
 					onSelectFolder={handleMoveTaskToFolder}
 				/>
