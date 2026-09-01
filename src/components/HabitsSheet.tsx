@@ -53,6 +53,7 @@ interface HabitsSheetProps {
   isInline?: boolean;
   highlightPurposeIds?: string[] | null;
   highlightDomainId?: string | null;
+  onSwitchToCanvas?: () => void;
 }
 
 // ─── Color palette ────────────────────────────────────────────────────────────
@@ -179,6 +180,7 @@ export default function HabitsSheet({
   isInline = false,
   highlightPurposeIds,
   highlightDomainId,
+  onSwitchToCanvas,
 }: HabitsSheetProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -649,8 +651,35 @@ export default function HabitsSheet({
 
   const content = (
     <div className="flex flex-col h-full bg-[#121212]">
-      {/* Header */}
-      {!isInline && (
+      {/* Top Switcher Bar when rendered inside Hub view */}
+      {onSwitchToCanvas && (
+        <div className="flex items-center justify-between border-b border-stone-850 bg-[#121212]/95 px-4 py-2.5 shrink-0">
+          <div className="flex items-center gap-1 bg-[#161618] border border-stone-800 p-1 rounded-xl shadow-lg">
+            <button
+              type="button"
+              onClick={onSwitchToCanvas}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider text-stone-400 hover:text-stone-200 hover:bg-stone-850/60 transition-all cursor-pointer select-none"
+            >
+              <Compass className="w-3.5 h-3.5" />
+              <span>🌐 System Canvas</span>
+            </button>
+            <button
+              type="button"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-[0_0_12px_rgba(244,63,94,0.25)] select-none cursor-default"
+            >
+              <Repeat2 className="w-3.5 h-3.5" />
+              <span>🔄 Habits Studio</span>
+            </button>
+          </div>
+
+          <span className="text-[10px] font-mono text-stone-500 uppercase tracking-widest hidden sm:inline">
+            Routine Tracking & Streaks
+          </span>
+        </div>
+      )}
+
+      {/* Header for modal mode */}
+      {!isInline && !onSwitchToCanvas && (
         <div className="flex items-center justify-between border-b border-stone-800/60 px-4 py-3.5">
           <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border text-emerald-400 bg-emerald-500/10 border-emerald-500/20 flex items-center gap-1.5">
             <Repeat2 className="w-3 h-3" />

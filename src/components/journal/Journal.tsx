@@ -22,6 +22,8 @@ import ListsView from "./ListsView";
 import GoalsSheet from "../GoalsSheet";
 import ObjectivesSheet from "../ObjectivesSheet";
 import HabitsSheet from "../HabitsSheet";
+import HubCanvas from "./hub/HubCanvas";
+import GenericEntitySheet from "./hub/GenericEntitySheet";
 
 import FocusSheet from "../FocusSheet";
 import { Delete, Trash, Star, Pin, Sparkles, X, Trophy } from "lucide-react";
@@ -33,8 +35,8 @@ interface JournalProps {
 	viewMode: "day" | "timeline" | "records" | "lists" | "hub";
 	activeTaskId: string | null;
 	setActiveTaskId: (id: string | null) => void;
-	activeHubTab?: "goals" | "objectives" | "habits" | "focus";
-	setActiveHubTab?: (tab: "goals" | "objectives" | "habits" | "focus") => void;
+	activeHubTab?: "goals" | "objectives" | "habits" | "focus" | string;
+	setActiveHubTab?: (tab: "goals" | "objectives" | "habits" | "focus" | string) => void;
 }
 
 // ─── EditableChip ───────────────────────────────────────────────────────────
@@ -1021,36 +1023,26 @@ export default function Journal({
 						handleRescheduleAllOverdue={handleRescheduleAllOverdue}
 					/>
 				) : viewMode === "hub" ? (
-					<div className="w-full flex-1 min-h-0 flex flex-col">
-						{/* Desktop 4-column Layout */}
-						<div className="hidden md:grid xl:grid-cols-4 lg:grid-cols-2 gap-6 h-full items-stretch pt-2">
-							<FocusSheet
-								isInline
-								selectedPurposeId={selectedPurposeId}
-								selectedDomainId={selectedDomainId}
-								onSelectPurpose={setSelectedPurposeId}
-								onSelectDomain={setSelectedDomainId}
-							/>
-							<GoalsSheet
-								isInline
-								highlightPurposeIds={highlightPurposeIds}
-								highlightDomainId={highlightDomainId}
-							/>
-							<ObjectivesSheet
-								isInline
-								highlightPurposeIds={highlightPurposeIds}
-								highlightDomainId={highlightDomainId}
-							/>
-							<HabitsSheet
-								isInline
-								activeDate={activeDate}
-								highlightPurposeIds={highlightPurposeIds}
-								highlightDomainId={highlightDomainId}
-							/>
+					<div className="w-full flex-1 min-h-0 flex flex-col pt-2 h-[calc(100vh-140px)]">
+						{/* Desktop: System Canvas & Habits Studio */}
+						<div className="hidden md:flex w-full h-full flex-col">
+							{activeHubTab === "habits" ? (
+								<div className="w-full h-full max-w-4xl mx-auto overflow-y-auto bg-[#121212] border border-stone-850 rounded-2xl shadow-inner">
+									<HabitsSheet
+										isInline
+										activeDate={activeDate}
+										highlightPurposeIds={highlightPurposeIds}
+										highlightDomainId={highlightDomainId}
+										onSwitchToCanvas={() => setActiveHubTab?.("focus")}
+									/>
+								</div>
+							) : (
+								<HubCanvas onSwitchToHabits={() => setActiveHubTab?.("habits")} />
+							)}
 						</div>
 
-						{/* Mobile Single-column Switchable Layout */}
-						<div className="md:hidden h-full flex flex-col pb-2">
+						{/* Mobile: Dynamic Sub-tabs management sheets */}
+						<div className="md:hidden h-full flex flex-col pb-2 overflow-y-auto">
 							{activeHubTab === "focus" && (
 								<FocusSheet
 									isInline
@@ -1082,6 +1074,14 @@ export default function Journal({
 									highlightDomainId={highlightDomainId}
 								/>
 							)}
+							{/* Dynamic Custom Entity Sheet for User-Defined Types */}
+							{activeHubTab &&
+								!["focus", "goals", "objectives", "habits"].includes(activeHubTab) && (
+									<GenericEntitySheet
+										entityTypeId={activeHubTab}
+										isInline
+									/>
+								)}
 						</div>
 					</div>
 				) : (

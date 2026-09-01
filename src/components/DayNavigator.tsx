@@ -101,6 +101,13 @@ export default function DayNavigator({
   // Load entries reactively
   const entries = useLiveQuery(() => db.entries.toArray()) || [];
 
+  // Load custom entity types reactively
+  const allEntityTypes = useLiveQuery(() => db.entity_types.toArray()) || [];
+  const customEntityTypes = React.useMemo(
+    () => allEntityTypes.filter((t) => !t.is_system),
+    [allEntityTypes],
+  );
+
   // Load achievements / starred tasks reactively
   const starredTasks = (useLiveQuery(() => db.entries.where('type').equals('task').toArray()) ||
     []) as Task[];
@@ -868,13 +875,13 @@ export default function DayNavigator({
           />
         )}
 
-        {/* Mobile sub-tab switcher for Hub */}
+        {/* Mobile-only sub-tab switcher for Hub */}
         {viewMode === 'hub' && (
-          <div className="md:hidden flex gap-1 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 w-full">
+          <div className="md:hidden flex gap-1 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 w-full overflow-x-auto scrollbar-none">
             <button
               id="view-mode-hub"
-              onClick={() => setActiveHubTab?.('focus')}
-              className={`flex-1 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all ${
+              onClick={() => setActiveHubTab?.('focus' as any)}
+              className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all whitespace-nowrap shrink-0 ${
                 activeHubTab === 'focus'
                   ? 'bg-indigo-500/10 text-sky-400 border border-sky-500/20'
                   : 'text-stone-500 border border-transparent hover:text-stone-400'
@@ -883,8 +890,8 @@ export default function DayNavigator({
               Focus
             </button>
             <button
-              onClick={() => setActiveHubTab?.('goals')}
-              className={`flex-1 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all ${
+              onClick={() => setActiveHubTab?.('goals' as any)}
+              className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all whitespace-nowrap shrink-0 ${
                 activeHubTab === 'goals'
                   ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
                   : 'text-stone-500 border border-transparent hover:text-stone-400'
@@ -893,8 +900,8 @@ export default function DayNavigator({
               Goals
             </button>
             <button
-              onClick={() => setActiveHubTab?.('objectives')}
-              className={`flex-1 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all ${
+              onClick={() => setActiveHubTab?.('objectives' as any)}
+              className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all whitespace-nowrap shrink-0 ${
                 activeHubTab === 'objectives'
                   ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                   : 'text-stone-500 border border-transparent hover:text-stone-400'
@@ -903,8 +910,8 @@ export default function DayNavigator({
               Objectives
             </button>
             <button
-              onClick={() => setActiveHubTab?.('habits')}
-              className={`flex-1 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all ${
+              onClick={() => setActiveHubTab?.('habits' as any)}
+              className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all whitespace-nowrap shrink-0 ${
                 activeHubTab === 'habits'
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                   : 'text-stone-500 border border-transparent hover:text-stone-400'
@@ -912,6 +919,21 @@ export default function DayNavigator({
             >
               Habits
             </button>
+
+            {/* Render any Custom Entity Types on Mobile */}
+            {customEntityTypes.map((customType) => (
+              <button
+                key={customType.id}
+                onClick={() => setActiveHubTab?.(customType.id as any)}
+                className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all whitespace-nowrap shrink-0 ${
+                  activeHubTab === customType.id
+                    ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                    : 'text-stone-500 border border-transparent hover:text-stone-400'
+                }`}
+              >
+                {customType.name}
+              </button>
+            ))}
           </div>
         )}
       </div>

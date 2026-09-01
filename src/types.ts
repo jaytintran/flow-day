@@ -27,6 +27,7 @@ export interface BaseEntry {
   created_at: Date;
   scheduled_at?: Date;
   starred?: boolean;
+  icon?: string;
   micro_wins?: MicroWin[];
   achievements?: MicroWin[]; // Backwards compatibility for legacy tasks
 }
@@ -126,6 +127,7 @@ export interface Habit {
   created_at: Date;
   status: 'active' | 'archived';
   color?: 'emerald' | 'sky' | 'violet' | 'rose' | 'amber';
+  icon?: string;
   sort_order?: number; // display ordering
   purpose_ids?: string[];
   domain_ids?: string[];
@@ -153,6 +155,7 @@ export interface Category {
 export interface Purpose {
   id: string;
   title: string;
+  icon?: string;
   domain_ids?: string[];
   created_at: Date;
   sort_order?: number;
@@ -161,6 +164,9 @@ export interface Purpose {
 export interface Domain {
   id: string;
   title: string;
+  name?: string;
+  color?: string;
+  icon?: string;
   created_at: Date;
   sort_order?: number;
 }
@@ -171,3 +177,47 @@ export interface TimerState {
   startTime: number | null; // Date.now() when started or resumed
   elapsedAtStart: number; // accumulated time before this run session
 }
+
+// ─── Dynamic Unified Entity Architecture ────────────────────────────────────
+export type EntityColor =
+  | 'indigo'
+  | 'sky'
+  | 'amber'
+  | 'emerald'
+  | 'rose'
+  | 'violet'
+  | 'teal'
+  | 'orange'
+  | 'cyan'
+  | 'fuchsia';
+
+export interface EntityTypeDefinition {
+  id: string; // 'purpose' | 'domain' | 'goal' | 'objective' | 'habit' | 'custom-*'
+  name: string; // 'Goal', 'Project', 'Skill', 'Book'
+  plural_name?: string; // 'Goals', 'Projects'
+  color: EntityColor;
+  icon: string; // Lucide icon name
+  is_system?: boolean; // true for built-in 5 types
+  has_status?: boolean; // supports active/achieved/todo/done
+  has_time_tracking?: boolean; // supports logged focus time
+  is_schedulable?: boolean; // can schedule tasks to today view
+  sort_order?: number;
+}
+
+export interface UnifiedEntity {
+  id: string;
+  entity_type: string; // references EntityTypeDefinition.id
+  title: string;
+  content?: string; // Markdown notes, vision, strategy
+  status?: 'active' | 'todo' | 'done' | 'achieved' | 'archived' | string;
+  icon?: string;
+  color?: EntityColor;
+  time_spent?: number; // accumulated milliseconds
+  parent_ids?: string[]; // generic multi-parent links across any entity type
+  created_at: Date;
+  scheduled_at?: Date;
+  completed_at?: Date;
+  achieved_at?: Date;
+  sort_order?: number;
+}
+
