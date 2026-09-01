@@ -894,29 +894,29 @@ export default function DayTimeline({
                 </button>
               )}
 
-              {isTask && (entry as Task).status === 'done' && (
+              {/* Star highlight button for all entry types (note, log, event, done task) */}
+              {((isTask && (entry as Task).status === 'done') || isNote || isEvent || isLog) && (
                 <button
-                  id={`star-task-btn-${entry.id}`}
+                  id={`star-entry-btn-${entry.id}`}
                   onClick={async (e) => {
                     e.stopPropagation();
-                    const task = entry as Task;
-                    const isStarred = !task.starred;
-                    await db.entries.update(task.id, { starred: isStarred } as any);
+                    const isStarred = !entry.starred;
+                    await db.entries.update(entry.id, { starred: isStarred } as any);
                   }}
                   className={`p-1.5 bg-transparent rounded border border-stone-800 hover:bg-stone-850 transition-colors cursor-pointer ${
-                    (entry as Task).starred || ((entry as Task).achievements && (entry as Task).achievements!.length > 0)
+                    entry.starred || (isTask && (entry as Task).achievements && (entry as Task).achievements!.length > 0)
                       ? 'text-amber-400 hover:text-amber-300'
-                      : 'text-stone-500 hover:text-stone-300'
+                      : 'text-stone-500 hover:text-amber-400'
                   }`}
                   title={
-                    (entry as Task).starred || ((entry as Task).achievements && (entry as Task).achievements!.length > 0)
-                      ? 'Unstar achievement'
-                      : 'Star achievement'
+                    entry.starred || (isTask && (entry as Task).achievements && (entry as Task).achievements!.length > 0)
+                      ? 'Unstar highlight'
+                      : 'Star as Highlight'
                   }
                 >
                   <Star
                     className={`w-3.5 h-3.5 ${
-                      (entry as Task).starred || ((entry as Task).achievements && (entry as Task).achievements!.length > 0)
+                      entry.starred || (isTask && (entry as Task).achievements && (entry as Task).achievements!.length > 0)
                         ? 'fill-current'
                         : ''
                     }`}
@@ -1051,6 +1051,23 @@ export default function DayTimeline({
           </div>
 
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={async (e) => {
+                e.stopPropagation();
+                const isStarred = !block.starred;
+                await db.entries.update(block.id, { starred: isStarred } as any);
+              }}
+              className={`p-1 rounded transition-colors cursor-pointer ${
+                block.starred
+                  ? 'text-amber-400 hover:text-amber-300'
+                  : 'text-stone-500 hover:text-amber-400'
+              }`}
+              title={block.starred ? 'Unstar highlight' : 'Star as Highlight'}
+            >
+              <Star
+                className={`w-3.5 h-3.5 ${block.starred ? 'fill-current' : ''}`}
+              />
+            </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();

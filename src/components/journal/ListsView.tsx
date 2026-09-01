@@ -31,6 +31,7 @@ import {
 	Printer,
 	Sparkles,
 	FileText,
+	Star,
 } from "lucide-react";
 import {
 	DndContext,
@@ -1787,6 +1788,15 @@ function TrophyView({
 											.map((id) => taskLists.find((list) => list.id === id))
 											.filter((list): list is Category => !!list);
 
+										const completedDateObj = task.completed_at
+											? new Date(task.completed_at)
+											: new Date(task.created_at);
+										const completedFormatted = completedDateObj.toLocaleDateString("en-GB", {
+											day: "2-digit",
+											month: "2-digit",
+											year: "2-digit",
+										});
+
 										return (
 											<div
 												key={task.id}
@@ -1812,6 +1822,11 @@ function TrophyView({
 
 												<div className="flex items-center justify-between flex-wrap gap-1 pt-2 border-t border-stone-800/80 mt-auto">
 													<div className="flex items-center flex-wrap gap-1">
+														<span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold tracking-wider bg-stone-900 border border-stone-800 text-stone-400">
+															<Calendar className="w-2.5 h-2.5 text-amber-500/70" />
+															{completedFormatted}
+														</span>
+
 														{taskCategories.map((cat) => {
 															const colorClass =
 																CATEGORY_COLORS[cat.color] ??
@@ -1833,16 +1848,37 @@ function TrophyView({
 														})}
 													</div>
 
-													<button
-														onClick={(e) => {
-															e.stopPropagation();
-															onToggleAccomplishment(task);
-														}}
-														className="text-[9px] font-mono text-stone-500 hover:text-red-400 transition-colors"
-														title="Remove from trophy wall"
-													>
-														Unmark
-													</button>
+													<div className="flex items-center gap-1">
+														<button
+															type="button"
+															onClick={async (e) => {
+																e.stopPropagation();
+																await db.entries.update(task.id, {
+																	starred: !task.starred,
+																} as any);
+															}}
+															className={`p-1 rounded transition-colors ${
+																task.starred
+																	? "text-amber-400 hover:text-amber-300"
+																	: "text-stone-500 hover:text-amber-400"
+															}`}
+															title={task.starred ? "Remove from Day Highlights" : "Add to Day Highlights"}
+														>
+															<Star
+																className={`w-3 h-3 ${task.starred ? "fill-amber-400" : ""}`}
+															/>
+														</button>
+														<button
+															onClick={(e) => {
+																e.stopPropagation();
+																onToggleAccomplishment(task);
+															}}
+															className="text-[9px] font-mono text-stone-500 hover:text-red-400 transition-colors px-1"
+															title="Remove from accomplishments"
+														>
+															Unmark
+														</button>
+													</div>
 												</div>
 											</div>
 										);
@@ -2783,7 +2819,7 @@ export default function ListsView({
 		}
 		if (selectedView === "trophy") {
 			return {
-				name: "Trophy Wall",
+				name: "Accomplishments",
 				icon: <Trophy className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />,
 				count: listTaskCounts["trophy"]?.active ?? 0,
 			};
@@ -2988,7 +3024,7 @@ export default function ListsView({
 							</span>
 						</button>
 
-						{/* Trophy Wall View */}
+						{/* Accomplishments View */}
 						<button
 							onClick={() => handleSelectView("trophy")}
 							className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-all duration-150 cursor-pointer border ${
@@ -2999,7 +3035,7 @@ export default function ListsView({
 						>
 							<Trophy className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
 							<span className="flex-1 min-w-0 text-xs font-mono font-semibold truncate">
-								Trophy Wall
+								Accomplishments
 							</span>
 							<span className="text-[10px] font-mono text-amber-400 font-bold tabular-nums">
 								{listTaskCounts["trophy"]?.active ?? 0}
@@ -3316,7 +3352,7 @@ export default function ListsView({
 										}`}
 									>
 										<Trophy className="w-4 h-4 text-amber-400 fill-amber-400" />
-										<span className="flex-1">Trophy Wall</span>
+										<span className="flex-1">Accomplishments</span>
 										<span className="text-[10px] text-amber-400 font-bold tabular-nums">
 											{listTaskCounts["trophy"]?.active ?? 0}
 										</span>

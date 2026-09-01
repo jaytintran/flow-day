@@ -1279,37 +1279,53 @@ export default function Journal({
 												setSelectedEntry({ ...task, starred: nextStarred });
 											}}
 											className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-mono font-bold uppercase tracking-widest cursor-pointer transition-all active:scale-95 ${
-												(selectedEntry as Task).starred ||
-												(
-													(selectedEntry as Task).achievements &&
-														(selectedEntry as Task).achievements!.length > 0
-												)
+												(selectedEntry as Task).starred
 													? "bg-amber-500/10 border-amber-500/30 text-amber-400"
 													: "bg-[#121212] border-stone-800 text-stone-500 hover:text-stone-300 hover:border-stone-750"
 											}`}
-											title={
-												(selectedEntry as Task).achievements &&
-												(selectedEntry as Task).achievements!.length > 0
-													? "Auto-starred because it has achievements"
-													: "Toggle star achievement status"
-											}
+											title="Toggle Highlight of Days"
 										>
 											<Star
 												className={`w-3 h-3 ${
-													(selectedEntry as Task).starred ||
-													(
-														(selectedEntry as Task).achievements &&
-															(selectedEntry as Task).achievements!.length > 0
-													)
-														? "fill-current"
+													(selectedEntry as Task).starred
+														? "fill-current text-amber-400"
 														: ""
 												}`}
 											/>
-											{(selectedEntry as Task).starred ||
-											((selectedEntry as Task).achievements &&
-												(selectedEntry as Task).achievements!.length > 0)
-												? "Starred Win"
-												: "Star Win"}
+											{(selectedEntry as Task).starred
+												? "Highlight"
+												: "Highlight"}
+										</button>
+
+										<button
+											onClick={async () => {
+												const task = selectedEntry as Task;
+												const nextAccomplishment = !task.is_accomplishment;
+												await db.entries.update(task.id, {
+													is_accomplishment: nextAccomplishment,
+												} as any);
+												setSelectedEntry({
+													...task,
+													is_accomplishment: nextAccomplishment,
+												});
+											}}
+											className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-mono font-bold uppercase tracking-widest cursor-pointer transition-all active:scale-95 ${
+												(selectedEntry as Task).is_accomplishment
+													? "bg-amber-500/20 border-amber-500/40 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.15)]"
+													: "bg-[#121212] border-stone-800 text-stone-500 hover:text-stone-300 hover:border-stone-750"
+											}`}
+											title="Toggle Accomplishments wall"
+										>
+											<Trophy
+												className={`w-3 h-3 ${
+													(selectedEntry as Task).is_accomplishment
+														? "fill-current text-amber-400"
+														: ""
+												}`}
+											/>
+											{(selectedEntry as Task).is_accomplishment
+												? "Accomplishment"
+												: "Accomplishment"}
 										</button>
 									</div>
 								)}
@@ -1449,6 +1465,30 @@ export default function Journal({
 										/>
 										{(selectedEntry as Note).pinned ? "Pinned" : "Pin"}
 									</button>
+									<button
+										type="button"
+										onClick={async () => {
+											const note = selectedEntry as Note;
+											const nextStarred = !note.starred;
+											await db.entries.update(note.id, {
+												starred: nextStarred,
+											} as any);
+											setSelectedEntry({ ...note, starred: nextStarred });
+										}}
+										className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-mono font-bold uppercase tracking-widest cursor-pointer transition-all active:scale-95 ${
+											(selectedEntry as Note).starred
+												? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+												: "bg-[#121212] border-stone-800 text-stone-500 hover:text-stone-300 hover:border-stone-750"
+										}`}
+										title="Toggle Highlight of Days"
+									>
+										<Star
+											className={`w-3 h-3 ${
+												(selectedEntry as Note).starred ? "fill-current" : ""
+											}`}
+										/>
+										{(selectedEntry as Note).starred ? "Highlight" : "Highlight"}
+									</button>
 								</div>
 								{isEditingContent ? (
 									<textarea
@@ -1520,6 +1560,30 @@ export default function Journal({
 										/>
 										{(selectedEntry as Event).pinned ? "Pinned" : "Pin"}
 									</button>
+									<button
+										type="button"
+										onClick={async () => {
+											const evt = selectedEntry as Event;
+											const nextStarred = !evt.starred;
+											await db.entries.update(evt.id, {
+												starred: nextStarred,
+											} as any);
+											setSelectedEntry({ ...evt, starred: nextStarred });
+										}}
+										className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-mono font-bold uppercase tracking-widest cursor-pointer transition-all active:scale-95 ${
+											(selectedEntry as Event).starred
+												? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+												: "bg-[#121212] border-stone-800 text-stone-500 hover:text-stone-300 hover:border-stone-750"
+										}`}
+										title="Toggle Highlight of Days"
+									>
+										<Star
+											className={`w-3 h-3 ${
+												(selectedEntry as Event).starred ? "fill-current" : ""
+											}`}
+										/>
+										{(selectedEntry as Event).starred ? "Highlight" : "Highlight"}
+									</button>
 								</div>
 								{isEditingContent ? (
 									<textarea
@@ -1590,6 +1654,30 @@ export default function Journal({
 										);
 									}}
 								/>
+								<button
+									type="button"
+									onClick={async () => {
+										const tb = selectedEntry as TimeBlock;
+										const nextStarred = !tb.starred;
+										await db.entries.update(tb.id, {
+											starred: nextStarred,
+										} as any);
+										setSelectedEntry({ ...tb, starred: nextStarred });
+									}}
+									className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-mono font-bold uppercase tracking-widest cursor-pointer transition-all active:scale-95 ${
+										(selectedEntry as TimeBlock).starred
+											? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+											: "bg-[#121212] border-stone-800 text-stone-500 hover:text-stone-300 hover:border-stone-750"
+									}`}
+									title="Toggle Highlight of Days"
+								>
+									<Star
+										className={`w-3 h-3 ${
+											(selectedEntry as TimeBlock).starred ? "fill-current" : ""
+										}`}
+									/>
+									{(selectedEntry as TimeBlock).starred ? "Highlight" : "Highlight"}
+								</button>
 							</div>
 						)}
 					</>

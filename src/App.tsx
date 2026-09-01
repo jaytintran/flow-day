@@ -100,6 +100,8 @@ export default function App() {
           setActiveHubTab={setActiveHubTab}
           isScratchpadOpen={isScratchpadOpen}
           toggleScratchpad={toggleScratchpad}
+          isHighlightsOpen={isHighlightsOpen}
+          toggleHighlights={toggleHighlights}
         />
       </header>
 
@@ -139,6 +141,12 @@ export default function App() {
         viewMode={viewMode}
         isOpen={isScratchpadOpen}
         onToggle={toggleScratchpad}
+      />
+
+      {/* GLOBAL PERSISTENT DAY HIGHLIGHTS */}
+      <DayHighlights
+        isOpen={isHighlightsOpen}
+        onToggle={toggleHighlights}
       />
     </div>
   );
