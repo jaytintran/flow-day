@@ -479,6 +479,24 @@ export default function DayHighlights({
                                   {(entry as any).content}
                                 </p>
                               )}
+                              {(() => {
+                                const wins =
+                                  entry.micro_wins || (entry as any).achievements || [];
+                                if (wins.length === 0) return null;
+                                return (
+                                  <div className="flex items-center gap-2 pl-6 pt-1 border-t border-stone-850/60 overflow-hidden">
+                                    {wins.slice(0, 2).map((w: any) => (
+                                      <span
+                                        key={w.id}
+                                        className="text-[10px] font-mono text-stone-400 flex items-center gap-1 truncate"
+                                      >
+                                        <Sparkles className="w-2.5 h-2.5 text-amber-500/70 shrink-0" />
+                                        <span className="truncate">{w.text}</span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           );
                         })}
@@ -697,21 +715,24 @@ export default function DayHighlights({
                               </p>
                             )}
 
-                            {entry.type === 'task' &&
-                              (entry as Task).achievements &&
-                              (entry as Task).achievements!.length > 0 && (
-                                <div className="flex items-center gap-2 pl-5 pt-1 border-t border-stone-850/60 overflow-hidden">
-                                  {(entry as Task).achievements!.slice(0, 2).map((a) => (
+                            {(() => {
+                              const wins =
+                                entry.micro_wins || (entry as any).achievements || [];
+                              if (wins.length === 0) return null;
+                              return (
+                                <div className="flex items-center gap-2 pl-6 pt-1 border-t border-stone-850/60 overflow-hidden">
+                                  {wins.slice(0, 3).map((w: any) => (
                                     <span
-                                      key={a.id}
+                                      key={w.id}
                                       className="text-[10px] font-mono text-stone-400 flex items-center gap-1 truncate"
                                     >
-                                      <span className="text-amber-500">•</span>
-                                      {a.text}
+                                      <Sparkles className="w-2.5 h-2.5 text-amber-500/70 shrink-0" />
+                                      <span className="truncate">{w.text}</span>
                                     </span>
                                   ))}
                                 </div>
-                              )}
+                              );
+                            })()}
                           </div>
                         );
                       })}

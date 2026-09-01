@@ -260,17 +260,17 @@ export default function DayTimeline({
     return (
       <div
         key="live-now-needle"
-        className="group relative flex items-center gap-2.5 py-2 rounded md:px-3 select-none z-10"
+        className="group relative flex items-center gap-2.5 py-2 rounded select-none z-10"
       >
         {/* Left Column 1: Time Gutter */}
-        <div className="w-14 text-right shrink-0 select-none whitespace-nowrap">
+        <div className="w-16 text-right shrink-0 select-none whitespace-nowrap">
           <span className="text-[9px] font-mono font-bold tracking-wider text-amber-400 bg-amber-500/15 border border-amber-500/40 px-1.5 py-0.5 rounded shadow-[0_0_8px_rgba(245,158,11,0.25)]">
             NOW
           </span>
         </div>
 
         {/* Left Column 2: Glowing Beacon Node directly on spine */}
-        <div className="w-5 h-5 flex items-center justify-center relative shrink-0 z-10 bg-[#0a0a0a] rounded-full">
+        <div className="w-6 h-6 flex items-center justify-center relative shrink-0 z-10 bg-[#0a0a0a] rounded-full">
           <div className="w-2.5 h-2.5 rounded-full bg-amber-400 border border-amber-200 shadow-[0_0_8px_rgba(245,158,11,1)] relative z-10" />
           <div className="w-4 h-4 rounded-full bg-amber-400/40 animate-ping absolute" />
         </div>
@@ -621,13 +621,13 @@ export default function DayTimeline({
         key={entry.id}
         id={`entry-${entry.id}`}
         onClick={() => !isHabitLog && entry.type !== 'log' && handleOpenDetail(entry)}
-        className={`group relative flex items-center gap-2.5 py-2.5 rounded md:px-3 transition-colors border-stone-900/50 last:border-b-0 ${
+        className={`group relative flex items-center gap-2.5 py-2.5 rounded transition-colors border-stone-900/50 last:border-b-0 ${
           isHabitLog || entry.type === 'log' ? '' : 'hover:bg-stone-900/40 cursor-pointer'
         }`}
       >
         {/* Left Column 1: Time Gutter */}
         {span.hasSpan ? (
-          <div className="w-14 text-right shrink-0 select-none flex flex-col items-end justify-between self-stretch py-2 whitespace-nowrap min-h-[92px]">
+          <div className="w-14 sm:w-16 text-right shrink-0 select-none flex flex-col items-end justify-between self-stretch py-0.5 whitespace-nowrap min-h-[76px] relative">
             {/* Top: Start Time */}
             <span
               onPointerDown={(e) =>
@@ -638,14 +638,16 @@ export default function DayTimeline({
               onPointerCancel={handleGutterPointerCancel}
               onClick={(e) => e.stopPropagation()}
               title="Drag to adjust Start Time"
-              className="text-[9px] font-mono font-bold text-sky-400 hover:text-amber-300 cursor-ns-resize transition-colors whitespace-nowrap tracking-tight leading-none"
+              className="text-[10px] font-mono font-bold text-sky-400 hover:text-amber-300 cursor-ns-resize transition-colors whitespace-nowrap tracking-tight leading-none relative z-10"
             >
               {formatTime(span.startDate)}
             </span>
 
-            {/* Connecting Vertical Rail & Center Duration Badge */}
-            <div className="w-full flex items-center justify-end my-2 relative pr-1.5 flex-1 min-h-[36px]">
-              <div className="absolute right-0 top-0 bottom-0 w-[1.5px] bg-gradient-to-b from-sky-400/80 via-amber-400/80 to-sky-400/80 rounded-full" />
+            {/* Dotted Vertical Line connecting start to end (behind duration pill) */}
+            <div className="absolute right-[18px] top-3 bottom-3 border-r border-dotted border-sky-500/40 pointer-events-none z-0" />
+
+            {/* Middle: Duration Badge (Opaque background so dotted line sits behind/under it) */}
+            <div className="w-full flex items-center justify-end my-1 relative z-10">
               <button
                 type="button"
                 onPointerDown={(e) =>
@@ -656,7 +658,7 @@ export default function DayTimeline({
                 onPointerCancel={handleGutterPointerCancel}
                 onClick={(e) => e.stopPropagation()}
                 title="Drag to shift entire time span"
-                className="relative z-10 px-1 py-0.5 text-[8px] font-mono font-bold rounded bg-[#161616] border border-amber-500/40 text-amber-400 shadow-md hover:border-amber-400 hover:scale-105 active:scale-95 cursor-grab transition-all"
+                className="px-1.5 py-0.5 text-[8.5px] font-mono font-bold rounded bg-[#0e0e0e] border border-amber-500/40 text-amber-400 hover:border-amber-400 shadow-sm active:scale-95 cursor-grab transition-all"
               >
                 {span.durationLabel}
               </button>
@@ -672,13 +674,13 @@ export default function DayTimeline({
               onPointerCancel={handleGutterPointerCancel}
               onClick={(e) => e.stopPropagation()}
               title="Drag to adjust End Time"
-              className="text-[9px] font-mono font-bold text-sky-400/80 hover:text-amber-300 cursor-ns-resize transition-colors whitespace-nowrap tracking-tight leading-none"
+              className="text-[10px] font-mono font-bold text-sky-400/80 hover:text-amber-300 cursor-ns-resize transition-colors whitespace-nowrap tracking-tight leading-none relative z-10"
             >
               {formatTime(span.endDate)}
             </span>
           </div>
         ) : (
-          <div className="w-14 text-right shrink-0 select-none whitespace-nowrap self-center">
+          <div className="w-14 sm:w-16 text-right shrink-0 select-none whitespace-nowrap self-center">
             <span
               onPointerDown={(e) => handleGutterPointerDown(e, entry, 'start')}
               onPointerMove={handleGutterPointerMove}
@@ -686,12 +688,12 @@ export default function DayTimeline({
               onPointerCancel={handleGutterPointerCancel}
               onClick={(e) => e.stopPropagation()}
               title="Click to edit · Hold & drag for time ruler"
-              className={`text-[10px] font-mono font-medium tracking-tight cursor-pointer hover:text-amber-400 transition-colors touch-none whitespace-nowrap ${
+              className={`text-[10px] font-mono font-semibold tracking-tight cursor-pointer hover:text-amber-400 transition-colors touch-none whitespace-nowrap ${
                 isCompletedTask || isHabitLog
-                  ? 'text-emerald-600 font-semibold'
+                  ? 'text-emerald-500 font-bold'
                   : isScheduledTime
-                    ? 'text-sky-500'
-                    : 'text-stone-500'
+                    ? 'text-sky-400 font-bold'
+                    : 'text-stone-400'
               }`}
             >
               {primaryTime}
@@ -700,7 +702,7 @@ export default function DayTimeline({
         )}
 
         {/* Left Column 2: Icon Dot / Checkbox (Centered vertically) */}
-        <div className="w-5 h-5 flex items-center justify-center relative shrink-0 z-10 self-center">
+        <div className="w-6 h-6 flex items-center justify-center relative shrink-0 z-10 self-center">
           {isTask && (
             <button
               id={`task-status-btn-${entry.id}`}
@@ -719,8 +721,8 @@ export default function DayTimeline({
           )}
 
           {isLog && (
-            <div className="w-6 h-6 flex items-center justify-center select-none">
-              <div className="w-2 h-2 rounded-full bg-stone-500" />
+            <div className="w-6 h-6 flex items-center justify-center select-none bg-transparent">
+              <div className="w-2.5 h-2.5 rounded-full bg-stone-500 border border-stone-400/30 shadow-sm" />
             </div>
           )}
 
@@ -1254,9 +1256,9 @@ export default function DayTimeline({
         </div>
       )}
 
-      {/* Continuous timeline spine line passing through icons */}
+      {/* Continuous timeline spine line passing through exact center of icons */}
       {isFromTimelineView && !isCollapsed && (
-        <div className="absolute top-0 bottom-0 left-[76px] md:left-[88px] w-px pointer-events-none z-0">
+        <div className="absolute top-0 bottom-0 left-[86px] w-px pointer-events-none z-0">
           <div
             className={`w-full h-full ${
               isToday
@@ -1289,10 +1291,10 @@ export default function DayTimeline({
               return (
                 <div
                   key={`phase-block-${phase.id}`}
-                  className={`rounded-2xl border ${phase.borderClasses} ${phase.bgClasses} p-3 sm:p-4 transition-all relative overflow-hidden shadow-sm`}
+                  className={`rounded-2xl border ${phase.borderClasses} ${phase.bgClasses} px-1.5 py-3 sm:p-4 transition-all relative overflow-hidden shadow-sm`}
                 >
                   {/* Phase Header */}
-                  <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-stone-850/60">
+                  <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-stone-850/60 px-1 sm:px-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm leading-none">{phase.icon}</span>
                       <span className="text-xs font-mono font-bold uppercase tracking-wider text-stone-200">

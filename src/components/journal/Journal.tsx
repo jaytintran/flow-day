@@ -24,8 +24,7 @@ import ObjectivesSheet from "../ObjectivesSheet";
 import HabitsSheet from "../HabitsSheet";
 
 import FocusSheet from "../FocusSheet";
-import { Purpose } from "../../types";
-import { Delete, Trash, Star, Pin } from "lucide-react";
+import { Delete, Trash, Star, Pin, Sparkles, X, Trophy } from "lucide-react";
 import MarkdownPreview from "../MarkdownPreview";
 
 interface JournalProps {
@@ -292,28 +291,28 @@ function EditableChip({
 	);
 }
 
-// ─── AchievementRow ─────────────────────────────────────────────────────────
+// ─── MicroWinRow ─────────────────────────────────────────────────────────
 
-interface AchievementRowProps {
-	achievement: TaskAchievement;
+interface MicroWinRowProps {
+	win: MicroWin;
 	formatTime: (d: Date | string) => string;
 	onSave: (text: string) => Promise<void>;
 	onDelete: () => Promise<void>;
 }
 
-function AchievementRow({
-	achievement,
+function MicroWinRow({
+	win,
 	formatTime,
 	onSave,
 	onDelete,
-}: AchievementRowProps) {
+}: MicroWinRowProps) {
 	const [isEditing, setIsEditing] = useState(false);
-	const [draft, setDraft] = useState(achievement.text);
+	const [draft, setDraft] = useState(win.text);
 	const [confirmDelete, setConfirmDelete] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
 
 	const open = () => {
-		setDraft(achievement.text);
+		setDraft(win.text);
 		setIsEditing(true);
 		setTimeout(() => {
 			const el = inputRef.current;
@@ -330,7 +329,7 @@ function AchievementRow({
 			setIsEditing(false);
 			return;
 		}
-		if (text === achievement.text) {
+		if (text === win.text) {
 			setIsEditing(false);
 			return;
 		}
@@ -348,9 +347,10 @@ function AchievementRow({
 	};
 
 	return (
-		<div className="group flex items-start gap-2 text-sm font-mono text-stone-300 bg-stone-900/60 border border-stone-800 rounded-lg px-3 py-2">
-			<div className="flex-1 min-w-0 flex items-center justify-between">
-				<div className="flex-1 min-w-0 mr-3">
+		<div className="group flex items-center gap-2 text-xs font-mono text-stone-300 bg-stone-900/60 border border-stone-850 hover:border-amber-500/20 rounded-lg px-2.5 py-1.5 transition-all">
+			<Sparkles className="w-3 h-3 text-amber-500/70 shrink-0 select-none" />
+			<div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+				<div className="flex-1 min-w-0">
 					{isEditing ? (
 						<input
 							ref={inputRef}
@@ -367,32 +367,34 @@ function AchievementRow({
 								if (e.key === "Escape") setIsEditing(false);
 							}}
 							onBlur={commit}
-							className="w-full bg-[#0a0a0a] border border-amber-500/40 rounded px-2 py-1 text-sm font-mono text-amber-300 focus:outline-none focus:border-amber-500"
+							className="w-full bg-[#0a0a0a] border border-amber-500/40 rounded px-2 py-0.5 text-xs font-mono text-amber-300 focus:outline-none focus:border-amber-500"
 						/>
 					) : (
 						<p
-							className="break-words cursor-text hover:text-amber-300 transition-colors"
+							className="break-words cursor-text hover:text-amber-300 transition-colors line-clamp-2"
 							onClick={open}
 						>
-							{achievement.text}
+							{win.text}
 						</p>
 					)}
-					<p className="text-[9px] text-stone-600 mt-0.5">
-						{formatTime(new Date(achievement.created_at))}
-					</p>
 				</div>
 				{!isEditing && (
-					<button
-						onClick={handleDelete}
-						className={`shrink-0 text-xs font-mono px-1 transition-colors cursor-pointer ${
-							confirmDelete ? "text-red-400" : "text-stone-600"
-						}`}
-						title={
-							confirmDelete ? "Click again to delete" : "Delete achievement"
-						}
-					>
-						{confirmDelete ? "Confirm" : <Trash width={15} height={15} />}
-					</button>
+					<div className="flex items-center gap-1 shrink-0">
+						<span className="text-[9px] text-stone-600 font-mono hidden sm:inline">
+							{formatTime(new Date(win.created_at))}
+						</span>
+						<button
+							onClick={handleDelete}
+							className={`text-xs font-mono px-1 transition-colors cursor-pointer ${
+								confirmDelete ? "text-red-400" : "text-stone-600 hover:text-red-400"
+							}`}
+							title={
+								confirmDelete ? "Click again to delete" : "Delete outcome"
+							}
+						>
+							{confirmDelete ? "Confirm" : <X className="w-3.5 h-3.5" />}
+						</button>
+					</div>
 				)}
 			</div>
 		</div>
@@ -1330,70 +1332,7 @@ export default function Journal({
 									</div>
 								)}
 
-								{/* Achievements */}
-								{(selectedEntry as Task).achievements &&
-									(selectedEntry as Task).achievements!.length > 0 && (
-										<div className="space-y-1.5">
-											{((selectedEntry as Task).achievements ?? []).map((a) => (
-												<AchievementRow
-													key={a.id}
-													achievement={a}
-													formatTime={formatTime}
-													onSave={async (text) => {
-														const task = selectedEntry as Task;
-														const updated = (task.achievements ?? []).map(
-															(x) => (x.id === a.id ? { ...x, text } : x),
-														);
-														await db.entries.update(task.id, {
-															achievements: updated,
-														} as any);
-														setSelectedEntry({
-															...task,
-															achievements: updated,
-														});
-													}}
-													onDelete={async () => {
-														const task = selectedEntry as Task;
-														const updated = (task.achievements ?? []).filter(
-															(x) => x.id !== a.id,
-														);
-														await db.entries.update(task.id, {
-															achievements: updated,
-														} as any);
-														setSelectedEntry({
-															...task,
-															achievements: updated,
-														});
-													}}
-												/>
-											))}
-										</div>
-									)}
-
-								<div className="flex items-center gap-2">
-									<input
-										type="text"
-										placeholder="Add achievement..."
-										className="flex-1 bg-[#0a0a0a] border border-stone-800 rounded-lg px-3 py-2 text-xs text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/30 transition-colors font-mono"
-										onKeyDown={async (e) => {
-											if (e.key !== "Enter" || !e.currentTarget.value.trim())
-												return;
-											const text = e.currentTarget.value.trim();
-											const task = selectedEntry as Task;
-											const entry: TaskAchievement = {
-												id: crypto.randomUUID(),
-												text,
-												created_at: new Date(),
-											};
-											const updated = [...(task.achievements ?? []), entry];
-											await db.entries.update(task.id, {
-												achievements: updated,
-											} as any);
-											setSelectedEntry({ ...task, achievements: updated });
-											e.currentTarget.value = "";
-										}}
-									/>
-								</div>
+								{/* Content */}
 
 								{isEditingContent ? (
 									<textarea
@@ -1678,6 +1617,118 @@ export default function Journal({
 									/>
 									{(selectedEntry as TimeBlock).starred ? "Highlight" : "Highlight"}
 								</button>
+							</div>
+						)}
+						{/* ── UNIVERSAL OUTCOMES & MICRO-WINS ── */}
+						{selectedEntry && (
+							<div className="mt-4 pt-3 border-t border-stone-850/80 space-y-2">
+								<div className="flex items-center justify-between">
+									<div className="flex items-center gap-1.5">
+										<Sparkles className="w-3.5 h-3.5 text-amber-400" />
+										<span className="text-[11px] font-mono font-bold uppercase tracking-wider text-stone-300">
+											Outcomes & Micro-Wins
+										</span>
+									</div>
+									<span className="text-[9px] font-mono text-stone-500">
+										{(
+											selectedEntry.micro_wins ||
+											(selectedEntry as any).achievements ||
+											[]
+										).length}{" "}
+										logged
+									</span>
+								</div>
+
+								{/* List of Micro-Wins */}
+								{(
+									selectedEntry.micro_wins ||
+									(selectedEntry as any).achievements ||
+									[]
+								).length > 0 && (
+									<div className="space-y-1.5">
+										{(
+											selectedEntry.micro_wins ||
+											(selectedEntry as any).achievements ||
+											[]
+										).map((w: MicroWin) => (
+											<MicroWinRow
+												key={w.id}
+												win={w}
+												formatTime={formatTime}
+												onSave={async (text) => {
+													const existingWins: MicroWin[] =
+														selectedEntry.micro_wins ||
+														(selectedEntry as any).achievements ||
+														[];
+													const updated = existingWins.map((x) =>
+														x.id === w.id ? { ...x, text } : x,
+													);
+													await db.entries.update(selectedEntry.id, {
+														micro_wins: updated,
+														achievements: updated,
+													} as any);
+													setSelectedEntry({
+														...selectedEntry,
+														micro_wins: updated,
+														achievements: updated,
+													} as any);
+												}}
+												onDelete={async () => {
+													const existingWins: MicroWin[] =
+														selectedEntry.micro_wins ||
+														(selectedEntry as any).achievements ||
+														[];
+													const updated = existingWins.filter(
+														(x) => x.id !== w.id,
+													);
+													await db.entries.update(selectedEntry.id, {
+														micro_wins: updated,
+														achievements: updated,
+													} as any);
+													setSelectedEntry({
+														...selectedEntry,
+														micro_wins: updated,
+														achievements: updated,
+													} as any);
+												}}
+											/>
+										))}
+									</div>
+								)}
+
+								{/* Add Micro-Win Input */}
+								<div className="flex items-center gap-2 pt-1">
+									<input
+										type="text"
+										placeholder="Add a takeaway, outcome or micro-win..."
+										className="flex-1 bg-[#0a0a0a] border border-stone-850 hover:border-stone-800 rounded-lg px-3 py-1.5 text-xs text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/30 transition-colors font-mono"
+										onKeyDown={async (e) => {
+											if (e.key !== "Enter" || !e.currentTarget.value.trim())
+												return;
+											const text = e.currentTarget.value.trim();
+											const newWin: MicroWin = {
+												id: crypto.randomUUID(),
+												text,
+												created_at: new Date(),
+											};
+											const existingWins: MicroWin[] =
+												selectedEntry.micro_wins ||
+												(selectedEntry as any).achievements ||
+												[];
+											const updated = [...existingWins, newWin];
+											await db.entries.update(selectedEntry.id, {
+												micro_wins: updated,
+												achievements: updated,
+											} as any);
+											setSelectedEntry({
+												...selectedEntry,
+												micro_wins: updated,
+												achievements: updated,
+											} as any);
+											e.currentTarget.value = "";
+										}}
+									/>
+								</div>
 							</div>
 						)}
 					</>

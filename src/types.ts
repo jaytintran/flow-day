@@ -13,18 +13,22 @@ export type EntryType =
   | 'goal'
   | 'habit-log';
 
+export interface MicroWin {
+  id: string;
+  text: string;
+  created_at: Date;
+}
+
+export type TaskAchievement = MicroWin;
+
 export interface BaseEntry {
   id: string;
   type: EntryType;
   created_at: Date;
   scheduled_at?: Date;
   starred?: boolean;
-}
-
-export interface TaskAchievement {
-  id: string;
-  text: string;
-  created_at: Date;
+  micro_wins?: MicroWin[];
+  achievements?: MicroWin[]; // Backwards compatibility for legacy tasks
 }
 
 export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'dropped' | 'maybe';

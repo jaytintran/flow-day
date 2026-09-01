@@ -1817,6 +1817,31 @@ function TrophyView({
 																{task.content}
 															</p>
 														)}
+
+														{(() => {
+															const wins =
+																task.micro_wins || task.achievements || [];
+															if (wins.length === 0) return null;
+															return (
+																<div className="flex flex-col gap-1 mt-2 pt-2 border-t border-stone-850/60">
+																	{wins.slice(0, 2).map((w: any) => (
+																		<span
+																			key={w.id}
+																			className="text-[10px] font-mono text-stone-400 flex items-center gap-1.5 truncate"
+																		>
+																			<Sparkles className="w-2.5 h-2.5 text-amber-500/80 shrink-0" />
+																			<span className="truncate">{w.text}</span>
+																		</span>
+																	))}
+																	{wins.length > 2 && (
+																		<span className="text-[9px] font-mono text-stone-600 pl-4">
+																			+{wins.length - 2} more outcome
+																			{wins.length - 2 > 1 ? "s" : ""}
+																		</span>
+																	)}
+																</div>
+															);
+														})()}
 													</div>
 												</div>
 
