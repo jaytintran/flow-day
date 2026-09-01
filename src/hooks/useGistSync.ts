@@ -154,9 +154,14 @@ export function useGistSync() {
     const purposes = await db.purposes.toArray();
     const domains = await db.domains.toArray();
 
-    // Include Day Scratchpad items in backup
+    // Include Day Scratchpad data in backup (both pads and legacy items)
+    let scratchpadPads = [];
     let scratchpadItems = [];
     try {
+      const rawPads = localStorage.getItem('flowday_scratchpad_pads_v1');
+      if (rawPads) {
+        scratchpadPads = JSON.parse(rawPads);
+      }
       const rawScratch = localStorage.getItem('flowday_day_scratchpad_items_v1');
       if (rawScratch) {
         scratchpadItems = JSON.parse(rawScratch);
@@ -171,6 +176,7 @@ export function useGistSync() {
       categories,
       purposes,
       domains,
+      scratchpad_pads: scratchpadPads,
       scratchpad_items: scratchpadItems,
     };
   };
@@ -185,14 +191,21 @@ export function useGistSync() {
       throw new Error('Invalid Gist backup payload');
     }
 
-    // Restore Day Scratchpad items if present in backup
-    if (Array.isArray(data.scratchpad_items)) {
+    // Restore Day Scratchpad pads/items if present in backup
+    if (Array.isArray(data.scratchpad_pads)) {
+      try {
+        localStorage.setItem(
+          'flowday_scratchpad_pads_v1',
+          JSON.stringify(data.scratchpad_pads),
+        );
+        window.dispatchEvent(new Event('scratchpad_sync_update'));
+      } catch {}
+    } else if (Array.isArray(data.scratchpad_items)) {
       try {
         localStorage.setItem(
           'flowday_day_scratchpad_items_v1',
           JSON.stringify(data.scratchpad_items),
         );
-        // Dispatch storage event so active scratchpad components refresh immediately
         window.dispatchEvent(new Event('scratchpad_sync_update'));
       } catch {}
     }

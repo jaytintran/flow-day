@@ -18,6 +18,7 @@ export interface BaseEntry {
   type: EntryType;
   created_at: Date;
   scheduled_at?: Date;
+  starred?: boolean;
 }
 
 export interface TaskAchievement {

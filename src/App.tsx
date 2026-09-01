@@ -9,6 +9,7 @@ import DayNavigator from './components/DayNavigator';
 import Journal from './components/journal/Journal';
 import InputBar from './components/InputBar';
 import DayScratchpad from './components/journal/DayScratchpad';
+import DayHighlights from './components/journal/DayHighlights';
 
 type ViewMode = 'day' | 'timeline' | 'records' | 'lists' | 'hub';
 const VALID_MODES: ViewMode[] = ['day', 'timeline', 'records', 'lists', 'hub'];
@@ -50,6 +51,24 @@ export default function App() {
       const next = !prev;
       try {
         localStorage.setItem('flowday_day_scratchpad_is_open', String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  const [isHighlightsOpen, setIsHighlightsOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('flowday_day_highlights_is_open') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleHighlights = useCallback(() => {
+    setIsHighlightsOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('flowday_day_highlights_is_open', String(next));
       } catch {}
       return next;
     });
