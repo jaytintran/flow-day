@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import DayTimeline, { RenderItem } from './DayTimeline';
 import { TimelineEntry, Task } from '../../types';
 import { ChevronDown, ChevronRight, Calendar, Trash2, Sparkles, AlertCircle, Play } from 'lucide-react';
+import EntryContextMenu from '../EntryContextMenu';
 
 interface DayViewProps {
   activeDate: Date;
@@ -69,6 +70,12 @@ export default function DayView({
     });
   };
 
+  const [contextMenu, setContextMenu] = useState<{
+    entry: Task;
+    x: number;
+    y: number;
+  } | null>(null);
+
   return (
     <div className="space-y-6">
       {/* Overdue Tasks Section */}
@@ -128,7 +135,15 @@ export default function DayView({
                 return (
                   <div
                     key={task.id}
-                    className="group relative flex items-center justify-between gap-2 px-3 py-2 sm:px-4 sm:py-2.5 hover:bg-stone-900/40 transition-colors"
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setContextMenu({
+                        entry: task,
+                        x: e.clientX,
+                        y: e.clientY,
+                      });
+                    }}
+                    className="group relative flex items-center justify-between gap-2 px-3 py-2 sm:px-4 sm:py-2.5 hover:bg-stone-900/40 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                       {/* Checkbox */}
@@ -240,6 +255,24 @@ export default function DayView({
         formatDateStringLabel={formatDateStringLabel}
         onTimePickerConfirm={onTimePickerConfirm}
       />
+
+      {/* Entry Context Menu (Desktop Right Click) */}
+      {contextMenu && (
+        <EntryContextMenu
+          entry={contextMenu.entry}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          activeTaskId={activeTaskId}
+          onOpenDetail={handleOpenDetail}
+          onDeleteEntry={handleDeleteEntry}
+          onActivateTask={handleActivateTask}
+          onToggleTaskStatus={handleToggleTaskStatus}
+          onReschedule={(targetEntry, targetDate) => {
+            onTimePickerConfirm(targetEntry, targetDate);
+          }}
+        />
+      )}
     </div>
   );
 }

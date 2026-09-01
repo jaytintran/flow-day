@@ -655,9 +655,33 @@ export default function Journal({
 
 		if (nextStatus === "done") playStrikeSound();
 
+		let completionDate: Date | undefined = undefined;
+		if (nextStatus === "done") {
+			const now = new Date();
+			const target = new Date(activeDate);
+			// If activeDate is today, use current real time
+			const isToday =
+				target.getFullYear() === now.getFullYear() &&
+				target.getMonth() === now.getMonth() &&
+				target.getDate() === now.getDate();
+
+			if (isToday) {
+				completionDate = now;
+			} else {
+				// Anchor to activeDate using task's scheduled time or midday/evening
+				completionDate = new Date(target);
+				if (task.scheduled_at) {
+					const sched = new Date(task.scheduled_at);
+					completionDate.setHours(sched.getHours(), sched.getMinutes(), 0, 0);
+				} else {
+					completionDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), 0);
+				}
+			}
+		}
+
 		await db.entries.update(task.id, {
 			status: nextStatus,
-			completed_at: nextStatus === "done" ? new Date() : undefined,
+			completed_at: completionDate,
 		} as any);
 	};
 

@@ -62,6 +62,7 @@ import {
 import { useLiveQuery } from "dexie-react-hooks";
 import TaskListManagerModal from "../TaskListManagerModal";
 import CategoryIcon from "../CategoryIcon";
+import EntryContextMenu from "../EntryContextMenu";
 import { TASK_LIST_SCOPE } from "../../utils";
 
 interface ListsViewProps {
@@ -750,6 +751,7 @@ interface MobileTaskItemProps {
 	onOpenFolderPicker?: (task: Task) => void;
 	onToggleAccomplishment?: (task: Task) => void;
 	showContent?: boolean;
+	onContextMenu?: (task: Task, e: React.MouseEvent) => void;
 }
 
 function MobileTaskItem({
@@ -771,6 +773,7 @@ function MobileTaskItem({
 	onOpenFolderPicker,
 	onToggleAccomplishment,
 	showContent = true,
+	onContextMenu,
 }: MobileTaskItemProps) {
 	const isActive = activeTaskId === task.id;
 	const isDone = task.status === "done";
@@ -935,6 +938,10 @@ function MobileTaskItem({
 						} else {
 							onOpenDetail(task);
 						}
+					}}
+					onContextMenu={(e) => {
+						e.preventDefault();
+						if (onContextMenu) onContextMenu(task, e);
 					}}
 					className={`relative z-10 flex flex-col gap-1 px-3 py-2.5 rounded-xl border transition-colors cursor-pointer select-none touch-pan-y ${
 						isActive
@@ -1114,6 +1121,7 @@ interface DesktopTaskCardProps {
 	onOpenFolderPicker?: (task: Task) => void;
 	onToggleAccomplishment?: (task: Task) => void;
 	showContent?: boolean;
+	onContextMenu?: (task: Task, e: React.MouseEvent) => void;
 }
 
 function DesktopTaskCard({
@@ -1133,6 +1141,7 @@ function DesktopTaskCard({
 	onOpenFolderPicker,
 	onToggleAccomplishment,
 	showContent = true,
+	onContextMenu,
 }: DesktopTaskCardProps) {
 	const isActive = activeTaskId === task.id;
 	const isDone = task.status === "done";
@@ -1152,6 +1161,10 @@ function DesktopTaskCard({
 		<SortableRow id={task.id} hideHandle>
 			<div
 				onClick={() => onOpenDetail(task)}
+				onContextMenu={(e) => {
+					e.preventDefault();
+					if (onContextMenu) onContextMenu(task, e);
+				}}
 				className={`group relative flex flex-col justify-between gap-2.5 p-3 rounded-xl border transition-all cursor-pointer select-none min-h-[90px] ${
 					isActive
 						? "bg-amber-500/10 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]"
@@ -1409,6 +1422,7 @@ interface FolderCardProps {
 	isDesktop?: boolean;
 	gridClass?: string;
 	showContent?: boolean;
+	onContextMenu?: (task: Task, e: React.MouseEvent) => void;
 }
 
 function FolderCard({
@@ -1438,6 +1452,7 @@ function FolderCard({
 	isDesktop = false,
 	gridClass = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5",
 	showContent = true,
+	onContextMenu,
 }: FolderCardProps) {
 	const [isEditingTitle, setIsEditingTitle] = useState(false);
 	const [titleDraft, setTitleDraft] = useState(folder.name);
@@ -1601,6 +1616,7 @@ function FolderCard({
 										onOpenFolderPicker={onOpenFolderPicker}
 										onToggleAccomplishment={onToggleAccomplishment}
 										showContent={showContent}
+										onContextMenu={onContextMenu}
 									/>
 								))}
 							</div>
@@ -1629,6 +1645,7 @@ function FolderCard({
 										onOpenFolderPicker={onOpenFolderPicker}
 										onToggleAccomplishment={onToggleAccomplishment}
 										showContent={showContent}
+										onContextMenu={onContextMenu}
 									/>
 								))}
 							</div>
@@ -1801,6 +1818,14 @@ function TrophyView({
 											<div
 												key={task.id}
 												onClick={() => onOpenDetail(task)}
+												onContextMenu={(e) => {
+													e.preventDefault();
+													setContextMenu({
+														entry: task,
+														x: e.clientX,
+														y: e.clientY,
+													});
+												}}
 												className="bg-[#121212] border border-amber-500/30 hover:border-amber-500/60 rounded-xl p-3 flex flex-col justify-between gap-2.5 transition-all cursor-pointer group shadow-[0_0_12px_rgba(245,158,11,0.06)]"
 											>
 												<div className="flex items-start gap-2.5">
@@ -1924,12 +1949,14 @@ interface PaperListViewProps {
 	tasks: Task[];
 	onToggleTaskStatus: (task: Task) => void;
 	onOpenDetail: (entry: TimelineEntry) => void;
+	onContextMenu?: (task: Task, e: React.MouseEvent) => void;
 }
 
 function PaperListView({
 	tasks,
 	onToggleTaskStatus,
 	onOpenDetail,
+	onContextMenu,
 }: PaperListViewProps) {
 	const activeTasks = tasks.filter((t) => t.status !== "done");
 	const doneTasks = tasks.filter((t) => t.status === "done");
@@ -1978,7 +2005,11 @@ function PaperListView({
 						{activeTasks.map((t) => (
 							<div
 								key={t.id}
-								className="flex items-start gap-3 py-2 border-b border-stone-800/50 group hover:border-stone-700 transition-colors"
+								onContextMenu={(e) => {
+									e.preventDefault();
+									if (onContextMenu) onContextMenu(t, e);
+								}}
+								className="flex items-start gap-3 py-2 border-b border-stone-800/50 group hover:border-stone-700 transition-colors cursor-pointer"
 							>
 								<button
 									onClick={() => onToggleTaskStatus(t)}
@@ -2003,7 +2034,11 @@ function PaperListView({
 						{doneTasks.map((t) => (
 							<div
 								key={t.id}
-								className="flex items-start gap-3 py-1.5 border-b border-stone-900/40 opacity-50 line-through group"
+								onContextMenu={(e) => {
+									e.preventDefault();
+									if (onContextMenu) onContextMenu(t, e);
+								}}
+								className="flex items-start gap-3 py-1.5 border-b border-stone-900/40 opacity-50 line-through group cursor-pointer"
 							>
 								<button
 									onClick={() => onToggleTaskStatus(t)}
@@ -2100,6 +2135,20 @@ export default function ListsView({
 	const [scheduleModalTask, setScheduleModalTask] = useState<Task | null>(null);
 	const [listPickerTaskId, setListPickerTaskId] = useState<string | null>(null);
 	const [folderPickerTask, setFolderPickerTask] = useState<Task | null>(null);
+	const [contextMenu, setContextMenu] = useState<{
+		entry: Task;
+		x: number;
+		y: number;
+	} | null>(null);
+
+	const handleTaskContextMenu = (task: Task, e: React.MouseEvent) => {
+		e.preventDefault();
+		setContextMenu({
+			entry: task,
+			x: e.clientX,
+			y: e.clientY,
+		});
+	};
 
 	// Status groups collapsed state (when statusFilter === 'all')
 	const [collapsedStatusGroups, setCollapsedStatusGroups] = useState<
@@ -2602,6 +2651,7 @@ export default function ListsView({
 							isDesktop={isDesktop}
 							gridClass={gridClass}
 							showContent={showContent}
+							onContextMenu={handleTaskContextMenu}
 						/>
 					);
 				})}
@@ -2693,6 +2743,7 @@ export default function ListsView({
 																		handleToggleAccomplishment
 																	}
 																	showContent={showContent}
+																	onContextMenu={handleTaskContextMenu}
 																/>
 															))}
 														</div>
@@ -2727,6 +2778,7 @@ export default function ListsView({
 																		handleToggleAccomplishment
 																	}
 																	showContent={showContent}
+																	onContextMenu={handleTaskContextMenu}
 																/>
 															))}
 														</div>
@@ -2764,6 +2816,7 @@ export default function ListsView({
 												onOpenFolderPicker={setFolderPickerTask}
 												onToggleAccomplishment={handleToggleAccomplishment}
 												showContent={showContent}
+												onContextMenu={handleTaskContextMenu}
 											/>
 										))}
 									</div>
@@ -2794,6 +2847,7 @@ export default function ListsView({
 												onOpenFolderPicker={setFolderPickerTask}
 												onToggleAccomplishment={handleToggleAccomplishment}
 												showContent={showContent}
+												onContextMenu={handleTaskContextMenu}
 											/>
 										))}
 									</div>
@@ -2978,6 +3032,7 @@ export default function ListsView({
 							tasks={listTasks}
 							onToggleTaskStatus={onToggleTaskStatus}
 							onOpenDetail={onOpenDetail}
+							onContextMenu={handleTaskContextMenu}
 						/>
 					) : (
 						renderTaskContent(false)
@@ -3186,6 +3241,7 @@ export default function ListsView({
 							tasks={listTasks}
 							onToggleTaskStatus={onToggleTaskStatus}
 							onOpenDetail={onOpenDetail}
+							onContextMenu={handleTaskContextMenu}
 						/>
 					) : (
 						<>
@@ -3516,6 +3572,24 @@ export default function ListsView({
 			{/* List Manager Modal */}
 			{isListManagerOpen && (
 				<TaskListManagerModal onClose={() => setIsListManagerOpen(false)} />
+			)}
+
+			{/* Entry Context Menu (Desktop Right Click) */}
+			{contextMenu && (
+				<EntryContextMenu
+					entry={contextMenu.entry}
+					x={contextMenu.x}
+					y={contextMenu.y}
+					onClose={() => setContextMenu(null)}
+					activeTaskId={activeTaskId}
+					onOpenDetail={onOpenDetail}
+					onDeleteEntry={onDeleteEntry}
+					onActivateTask={onActivateTask}
+					onToggleTaskStatus={onToggleTaskStatus}
+					onReschedule={async (targetEntry, targetDate) => {
+						onCarryTask(targetEntry.id, targetDate);
+					}}
+				/>
 			)}
 		</div>
 	);

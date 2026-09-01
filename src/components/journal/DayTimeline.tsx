@@ -27,6 +27,7 @@ import { TimelineEntry, Task, Log, Event, Note, TimeBlock, HabitLog } from '../.
 import { formatDuration, toLocalDateString } from '../../utils';
 import TimePickerSheet from '../TimePickerSheet';
 import TimeRulerOverlay from './TimeRulerOverlay';
+import EntryContextMenu from '../EntryContextMenu';
 import { db } from '../../db';
 
 function truncateText(text?: string, limit = 100): string {
@@ -150,6 +151,11 @@ export default function DayTimeline({
   });
   // Local state for time picker and time ruler
   const [pickerEntry, setPickerEntry] = useState<TimelineEntry | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    entry: TimelineEntry | TimeBlock;
+    x: number;
+    y: number;
+  } | null>(null);
   const [activeRulerState, setActiveRulerState] = useState<{
     entry: TimelineEntry | TimeBlock;
     initialDate: Date;
@@ -366,10 +372,49 @@ export default function DayTimeline({
 
     if (entry.type === 'task') {
       const task = entry as Task;
-      const start = task.scheduled_at || task.created_at;
-      if (task.scheduled_end_at && start) {
-        startDate = new Date(start);
-        endDate = new Date(task.scheduled_end_at);
+      if (task.status === 'done' && task.completed_at) {
+        const completedTime = new Date(task.completed_at).getTime();
+
+        // 1. If task has focus/tracked time >= 15 mins (900,000 ms)
+        if (task.time_spent && task.time_spent >= 15 * 60 * 1000) {
+          endDate = new Date(task.completed_at);
+          startDate = new Date(completedTime - task.time_spent);
+        }
+        // 2. If task had scheduled start and scheduled end time
+        else if (task.scheduled_at && task.scheduled_end_at) {
+          const s = new Date(task.scheduled_at).getTime();
+          const e = new Date(task.scheduled_end_at).getTime();
+          if (e - s >= 15 * 60 * 1000) {
+            startDate = new Date(s);
+            endDate = new Date(e);
+          }
+        }
+        // 3. If task had scheduled_at or same-day created_at
+        else if (task.scheduled_at || task.created_at) {
+          const origin = new Date(task.scheduled_at || task.created_at);
+          const comp = new Date(task.completed_at);
+          // Check if same calendar day
+          const isSameDay =
+            origin.getFullYear() === comp.getFullYear() &&
+            origin.getMonth() === comp.getMonth() &&
+            origin.getDate() === comp.getDate();
+
+          if (isSameDay) {
+            const diff = comp.getTime() - origin.getTime();
+            // Show span only if duration is at least 15 minutes and non-negative
+            if (diff >= 15 * 60 * 1000) {
+              startDate = origin;
+              endDate = comp;
+            }
+          }
+        }
+      } else {
+        // Pending task with scheduled start & end
+        const start = task.scheduled_at || task.created_at;
+        if (task.scheduled_end_at && start) {
+          startDate = new Date(start);
+          endDate = new Date(task.scheduled_end_at);
+        }
       }
     } else if (entry.type === 'log') {
       const log = entry as Log;
@@ -621,6 +666,15 @@ export default function DayTimeline({
         key={entry.id}
         id={`entry-${entry.id}`}
         onClick={() => !isHabitLog && entry.type !== 'log' && handleOpenDetail(entry)}
+        onContextMenu={(e) => {
+          if (isHabitLog) return;
+          e.preventDefault();
+          setContextMenu({
+            entry,
+            x: e.clientX,
+            y: e.clientY,
+          });
+        }}
         className={`group relative flex items-center gap-2.5 py-2.5 rounded transition-colors border-stone-900/50 last:border-b-0 ${
           isHabitLog || entry.type === 'log' ? '' : 'hover:bg-stone-900/40 cursor-pointer'
         }`}
@@ -957,72 +1011,105 @@ export default function DayTimeline({
           {/* Row 2: Custom info triggers */}
           <div className="flex items-center gap-x-1.5 text-xs pb-1">
             {isLog && (
-              <span className="font-mono text-stone-500 flex items-center gap-1.5 flex-wrap">
-                {(entry as Log).end_timestamp ? (
+              <>
+                <span className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                  <Clock className="w-3 h-3 inline-block text-stone-500" />
+                  {formatTime((entry as Log).timestamp)}
+                </span>
+
+                {(entry as Log).end_timestamp && (
                   <>
-                    <span>
-                      Span: {formatTime((entry as Log).timestamp)} – {formatTime((entry as Log).end_timestamp!)}
+                    <span className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                      <Calendar className="w-3 h-3 inline-block text-sky-400" />
+                      {formatTime((entry as Log).timestamp)} – {formatTime((entry as Log).end_timestamp!)}
                     </span>
-                    <span className="text-stone-700">·</span>
-                    <span className="text-stone-400">
-                      Duration: {formatDuration(
+
+                    <span className="flex items-center gap-1 bg-[#121212] border border-amber-800/30 text-amber-400/90 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                      <Hourglass className="w-3 h-3 inline-block text-amber-500" />
+                      {formatDuration(
                         new Date((entry as Log).end_timestamp!).getTime() -
                           new Date((entry as Log).timestamp).getTime(),
                       )}
                     </span>
                   </>
-                ) : (
-                  <span>Logged at: {formatTime((entry as Log).timestamp)}</span>
                 )}
-              </span>
+              </>
             )}
 
             {isTask && (
               <>
-                <span className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 rounded px-2 py-0.5 text-[8px]">
+                <span className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 rounded px-2 py-0.5 text-[8px] font-mono select-none">
                   <Clock className="w-3 h-3 inline-block text-stone-500" />
                   {formatTime(entry.created_at)}
                 </span>
 
+                {(entry as Task).scheduled_at && !(entry as Task).scheduled_end_at && (
+                  <span className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                    <Calendar className="w-3 h-3 inline-block text-sky-400" />
+                    {formatTime((entry as Task).scheduled_at!)}
+                  </span>
+                )}
+
                 {(entry as Task).scheduled_end_at && (
-                  <span className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 rounded px-2 py-0.5 text-[8px]">
+                  <span className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 rounded px-2 py-0.5 text-[8px] font-mono select-none">
                     <Calendar className="w-3 h-3 inline-block text-sky-400" />
                     {formatTime((entry as Task).scheduled_at || (entry as Task).created_at)} – {formatTime((entry as Task).scheduled_end_at!)}
                   </span>
                 )}
 
                 {(entry as Task).completed_at && (
-                  <span className="flex items-center gap-1 bg-[emerald-900] text-emerald-600/90 border border-emerald-600/30 rounded px-2 py-0.5 text-[8px]">
-                    <CheckCircle className="w-3 h-3 inline-block" />
+                  <span className="flex items-center gap-1 bg-emerald-950/30 text-emerald-400 border border-emerald-700/30 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                    <CheckCircle className="w-3 h-3 inline-block text-emerald-400" />
                     {formatTime((entry as Task).completed_at!)}
                   </span>
                 )}
 
-                <span className="flex items-center gap-1 bg-[#121212] border border-blue-800/30 text-blue-400/90 rounded px-2 py-0.5 text-[8px]">
-                  <Hourglass className="w-3 h-3 inline-block" />
-                  {formatDuration((entry as Task).time_spent)}
-                </span>
+                {(entry as Task).time_spent > 0 && (
+                  <span className="flex items-center gap-1 bg-[#121212] border border-amber-800/30 text-amber-400/90 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                    <Hourglass className="w-3 h-3 inline-block text-amber-500" />
+                    {formatDuration((entry as Task).time_spent)}
+                  </span>
+                )}
               </>
             )}
 
             {isEvent && (
-              <span className="font-mono text-stone-500">
-                {(entry as Event).end_timestamp
-                  ? `Happens: ${formatTime((entry as Event).timestamp)} – ${formatTime((entry as Event).end_timestamp!)} (${formatDuration(new Date((entry as Event).end_timestamp!).getTime() - new Date((entry as Event).timestamp).getTime())})`
-                  : `Happens at: ${formatTime((entry as Event).timestamp)}`}
-              </span>
+              <>
+                <span className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                  <Clock className="w-3 h-3 inline-block text-stone-500" />
+                  {formatTime((entry as Event).timestamp)}
+                </span>
+
+                {(entry as Event).end_timestamp && (
+                  <>
+                    <span className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                      <Calendar className="w-3 h-3 inline-block text-sky-400" />
+                      {formatTime((entry as Event).timestamp)} – {formatTime((entry as Event).end_timestamp!)}
+                    </span>
+
+                    <span className="flex items-center gap-1 bg-[#121212] border border-amber-800/30 text-amber-400/90 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                      <Hourglass className="w-3 h-3 inline-block text-amber-500" />
+                      {formatDuration(
+                        new Date((entry as Event).end_timestamp!).getTime() -
+                          new Date((entry as Event).timestamp).getTime(),
+                      )}
+                    </span>
+                  </>
+                )}
+              </>
             )}
 
             {isNote && (
-              <span className="font-mono text-stone-500">
-                Created at: {formatTime((entry as Note).timestamp)}
+              <span className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                <Clock className="w-3 h-3 inline-block text-stone-500" />
+                {formatTime((entry as Note).timestamp)}
               </span>
             )}
 
             {isHabitLog && (
-              <span className="flex items-center gap-1 bg-emerald-950/30 text-emerald-500 border border-emerald-700/30 rounded px-2 py-0.5 text-[10px]">
-                <CheckCircle className="w-3 h-3 inline-block" />
-                At: {formatTime((entry as HabitLog).timestamp)}
+              <span className="flex items-center gap-1 bg-emerald-950/30 text-emerald-400 border border-emerald-700/30 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                <CheckCircle className="w-3 h-3 inline-block text-emerald-400" />
+                {formatTime((entry as HabitLog).timestamp)}
               </span>
             )}
           </div>
@@ -1039,6 +1126,15 @@ export default function DayTimeline({
         <div
           className="flex justify-between items-center bg-[#121212] border border-stone-800 rounded px-4 py-2.5 ml-5 mt-4 cursor-pointer hover:border-stone-700 transition-colors"
           onClick={() => handleOpenDetail(block)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setContextMenu({
+              entry: block,
+              x: e.clientX,
+              y: e.clientY,
+            });
+          }}
         >
           <div className="flex items-center gap-2.5">
             <Clock className="w-4 h-4 text-stone-400 shrink-0" />
@@ -1564,6 +1660,24 @@ export default function DayTimeline({
           setPickerEntry(null);
         }}
       />
+
+      {/* Entry Context Menu (Desktop Right Click) */}
+      {contextMenu && (
+        <EntryContextMenu
+          entry={contextMenu.entry}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          activeTaskId={activeTaskId}
+          onOpenDetail={handleOpenDetail}
+          onDeleteEntry={handleDeleteEntry}
+          onActivateTask={handleActivateTask}
+          onToggleTaskStatus={handleToggleTaskStatus}
+          onReschedule={(targetEntry, targetDate) => {
+            onTimePickerConfirm(targetEntry, targetDate);
+          }}
+        />
+      )}
     </div>
   );
 }
