@@ -100,24 +100,89 @@ const nodeTypes = {
   custom: GenericCanvasNode,
 };
 
-// ─── Dagre Auto Layout Engine ──────────────────────────────────────────────
+// ─── Dagre & Radial Layout Computation ───────────────────────────────────────
 const getLayoutedElements = (
   nodes: Node[],
   edges: Edge[],
-  direction = 'LR',
+  direction: 'LR' | 'TB' | 'RADIAL' = 'LR',
 ) => {
+  if (direction === 'RADIAL') {
+    // Organic Radial Galaxy Layout: Roots in center, children orbit outward
+    const rootNodes = nodes.filter(
+      (n) => !edges.some((e) => e.target === n.id && n.id !== e.source),
+    );
+    const centerNodeIds = rootNodes.length > 0 ? rootNodes.map((n) => n.id) : [nodes[0]?.id];
+    const visited = new Set<string>();
+    const posMap = new Map<string, { x: number; y: number }>();
+
+    // Center root cluster
+    const centerX = 600;
+    const centerY = 400;
+    centerNodeIds.forEach((id, idx) => {
+      const angle = (idx / Math.max(1, centerNodeIds.length)) * 2 * Math.PI;
+      const radius = centerNodeIds.length > 1 ? 120 : 0;
+      posMap.set(id, {
+        x: Math.round(centerX + radius * Math.cos(angle)),
+        y: Math.round(centerY + radius * Math.sin(angle)),
+      });
+      visited.add(id);
+    });
+
+    // Orbit children outward layer by layer
+    let currentLayer = [...centerNodeIds];
+    let layerRadius = 240;
+
+    while (currentLayer.length > 0) {
+      const nextLayer: string[] = [];
+      currentLayer.forEach((parentId) => {
+        const parentPos = posMap.get(parentId) || { x: centerX, y: centerY };
+        const childEdges = edges.filter((e) => e.source === parentId && !visited.has(e.target));
+        const childCount = childEdges.length;
+
+        childEdges.forEach((e, cIdx) => {
+          visited.add(e.target);
+          nextLayer.push(e.target);
+          const spreadAngle = childCount > 1 ? ((cIdx - (childCount - 1) / 2) / childCount) * (Math.PI * 0.9) : 0;
+          const baseAngle = Math.atan2(parentPos.y - centerY, parentPos.x - centerX) || 0;
+          const finalAngle = baseAngle + spreadAngle;
+
+          posMap.set(e.target, {
+            x: Math.round(parentPos.x + layerRadius * Math.cos(finalAngle)),
+            y: Math.round(parentPos.y + layerRadius * Math.sin(finalAngle)),
+          });
+        });
+      });
+      currentLayer = nextLayer;
+      layerRadius += 180;
+    }
+
+    // Place any remaining disconnected nodes
+    nodes.forEach((n, idx) => {
+      if (!posMap.has(n.id)) {
+        posMap.set(n.id, { x: centerX + (idx % 4) * 240 - 360, y: centerY + Math.floor(idx / 4) * 120 + 350 });
+      }
+    });
+
+    const newNodes = nodes.map((node) => ({
+      ...node,
+      position: posMap.get(node.id) || node.position,
+    }));
+    return { nodes: newNodes, edges };
+  }
+
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
   dagreGraph.setGraph({
     rankdir: direction,
-    nodesep: 50,
-    ranksep: 100,
+    nodesep: direction === 'LR' ? 35 : 55,
+    ranksep: direction === 'LR' ? 70 : 80,
   });
 
-  const visibleNodes = nodes.filter((n) => !n.hidden);
-
-  visibleNodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: 240, height: 80 });
+  nodes.forEach((node) => {
+    const tier = (node.data as any)?.tier || 2;
+    const width = tier === 3 ? 160 : tier === 1 ? 280 : 230;
+    const height = tier === 3 ? 45 : tier === 1 ? 95 : 75;
+    dagreGraph.setNode(node.id, { width, height });
   });
 
   edges.forEach((edge) => {
@@ -136,8 +201,8 @@ const getLayoutedElements = (
       ...node,
       position: nodeWithPosition
         ? {
-            x: nodeWithPosition.x - 120,
-            y: nodeWithPosition.y - 40,
+            x: nodeWithPosition.x - (nodeWithPosition.width || 200) / 2,
+            y: nodeWithPosition.y - (nodeWithPosition.height || 70) / 2,
           }
         : node.position,
     };
@@ -539,6 +604,30 @@ function InnerHubCanvas({ onSwitchToHabits }: HubCanvasProps) {
       e.parent_ids?.forEach((pid) => parentChildMap.add(`${pid}`));
     });
 
+    // 1. Calculate dynamic graph depth & tier for each entity
+    const depthMap = new Map<string, number>();
+    const computeDepth = (entityId: string, visited = new Set<string>()): number => {
+      if (visited.has(entityId)) return 0;
+      if (depthMap.has(entityId)) return depthMap.get(entityId)!;
+      visited.add(entityId);
+
+      const entity = entitiesList.find((e) => e.id === entityId);
+      if (!entity || !entity.parent_ids || entity.parent_ids.length === 0) {
+        depthMap.set(entityId, 0);
+        return 0;
+      }
+
+      let maxParentDepth = 0;
+      for (const pid of entity.parent_ids) {
+        maxParentDepth = Math.max(maxParentDepth, computeDepth(pid, new Set(visited)));
+      }
+      const myDepth = maxParentDepth + 1;
+      depthMap.set(entityId, myDepth);
+      return myDepth;
+    };
+
+    entitiesList.forEach((e) => computeDepth(e.id));
+
     entitiesList.forEach((entity, idx) => {
       const typeDef = entityTypeMap.get(entity.entity_type) || {
         id: entity.entity_type,
@@ -549,6 +638,10 @@ function InnerHubCanvas({ onSwitchToHabits }: HubCanvasProps) {
         has_status: true,
         has_time_tracking: true,
       };
+
+      const depth = depthMap.get(entity.id) || 0;
+      // Tier 1 = Root Nucleus (depth 0), Tier 2 = Major Pillar (depth 1), Tier 3 = Satellite/Sub-Skill (depth 2+)
+      const tier: 1 | 2 | 3 = depth === 0 ? 1 : depth === 1 ? 2 : 3;
 
       const id = `${entity.entity_type}-${entity.id}`;
       const savedPos = posCacheRef.current[id] || posCacheRef.current[entity.id];
@@ -590,7 +683,7 @@ function InnerHubCanvas({ onSwitchToHabits }: HubCanvasProps) {
         type: reactFlowNodeNodeType,
         hidden: isParentCollapsed || isHiddenByFilter,
         position: savedPos || {
-          x: typeDef.sort_order !== undefined ? typeDef.sort_order * 260 : 600,
+          x: depth * 280 + (idx % 3) * 40,
           y: idx * 95,
         },
         data: {
@@ -607,6 +700,7 @@ function InnerHubCanvas({ onSwitchToHabits }: HubCanvasProps) {
           hasChildren,
           isCollapsed,
           isDimmed,
+          tier,
           hasStatus: typeDef.has_status,
           hasTimeTracking: typeDef.has_time_tracking,
           onInspect: handleInspect,
@@ -617,7 +711,7 @@ function InnerHubCanvas({ onSwitchToHabits }: HubCanvasProps) {
         },
       });
 
-      // Render parent edges
+      // Render parent edges with organic curved synapse styling
       if (entity.parent_ids && entity.parent_ids.length > 0) {
         entity.parent_ids.forEach((pid) => {
           const parentEntity = entitiesList.find((item) => item.id === pid);
@@ -628,54 +722,38 @@ function InnerHubCanvas({ onSwitchToHabits }: HubCanvasProps) {
           const strokeColor = isCompleted
             ? '#10b98190'
             : typeDef.color === 'amber'
-              ? '#818cf8'
+              ? '#f59e0b'
               : typeDef.color === 'emerald'
                 ? '#34d399'
                 : typeDef.color === 'rose'
                   ? '#fb7185'
-                  : '#a855f7';
+                  : typeDef.color === 'sky'
+                    ? '#38bdf8'
+                    : '#a855f7';
 
           rawEdges.push({
             id: `e-${parentFullId}-${id}`,
             source: parentFullId,
             target: id,
-            animated: !isCompleted,
+            type: 'default', // Smooth curved bezier synapse
+            animated: !isCompleted && !isDimmed,
             style: {
               stroke: strokeColor,
-              strokeWidth: isCompleted ? 1.5 : 2,
-              strokeDasharray: isCompleted ? '5 5' : undefined,
-              opacity: isDimmed ? 0.35 : 1,
+              strokeWidth: tier === 3 ? 1.5 : 2,
+              strokeDasharray: isCompleted ? '4 4' : undefined,
+              opacity: isDimmed ? 0.35 : tier === 3 ? 0.75 : 0.95,
               cursor: 'pointer',
             },
             markerEnd: {
               type: MarkerType.ArrowClosed,
               color: strokeColor,
+              width: 14,
+              height: 14,
             },
           });
         });
       }
     });
-
-    // Load custom persisted edges from localStorage, pruning any orphaned edges
-    const validNodeIdSet = new Set(rawNodes.map((n) => n.id));
-    try {
-      const raw = localStorage.getItem(STORAGE_EDGES_KEY);
-      if (raw) {
-        const customEdges: Edge[] = JSON.parse(raw);
-        const validCustomEdges: Edge[] = [];
-        customEdges.forEach((ce) => {
-          if (validNodeIdSet.has(ce.source) && validNodeIdSet.has(ce.target)) {
-            validCustomEdges.push(ce);
-            if (!rawEdges.some((re) => re.source === ce.source && re.target === ce.target)) {
-              rawEdges.push(ce);
-            }
-          }
-        });
-        if (validCustomEdges.length !== customEdges.length && rawNodes.length > 0) {
-          localStorage.setItem(STORAGE_EDGES_KEY, JSON.stringify(validCustomEdges));
-        }
-      }
-    } catch {}
 
     // Initial Layout calculation if cache is completely empty
     if (Object.keys(posCacheRef.current).length === 0) {
@@ -728,7 +806,7 @@ function InnerHubCanvas({ onSwitchToHabits }: HubCanvasProps) {
     setContextMenu(null);
   }, []);
 
-  // Delete Connection (Wire) and update Dexie DB + localStorage
+  // Delete Connection (Wire) and update Dexie DB
   const handleDeleteEdge = useCallback(
     async (edge: Edge) => {
       const [, sourceId] = edge.source.split('-');
@@ -747,23 +825,13 @@ function InnerHubCanvas({ onSwitchToHabits }: HubCanvasProps) {
         await db.entities.update(sourceId, { parent_ids: nextParents });
       }
 
-      // LocalStorage custom edge cache update
-      try {
-        const raw = localStorage.getItem(STORAGE_EDGES_KEY);
-        if (raw) {
-          const edgeList: Edge[] = JSON.parse(raw);
-          const filtered = edgeList.filter((e) => e.id !== edge.id);
-          localStorage.setItem(STORAGE_EDGES_KEY, JSON.stringify(filtered));
-        }
-      } catch {}
-
       setEdges((eds) => eds.filter((e) => e.id !== edge.id));
       setSelectedEdge(null);
     },
     [entitiesList, setEdges],
   );
 
-  // Handle Drag Wire Connection & Sync DB + localStorage
+  // Handle Drag Wire Connection & Sync Dexie DB
   const onConnect = useCallback(
     async (params: Connection) => {
       if (!params.source || !params.target) return;
@@ -792,16 +860,6 @@ function InnerHubCanvas({ onSwitchToHabits }: HubCanvasProps) {
         style: { stroke: '#f59e0b', strokeWidth: 2, cursor: 'pointer' },
         markerEnd: { type: MarkerType.ArrowClosed, color: '#f59e0b' },
       };
-
-      // Save to localStorage
-      try {
-        const raw = localStorage.getItem(STORAGE_EDGES_KEY);
-        const edgeList: Edge[] = raw ? JSON.parse(raw) : [];
-        if (!edgeList.some((e) => e.source === newEdge.source && e.target === newEdge.target)) {
-          edgeList.push(newEdge);
-          localStorage.setItem(STORAGE_EDGES_KEY, JSON.stringify(edgeList));
-        }
-      } catch {}
 
       setEdges((eds) => addEdge(newEdge, eds));
     },
@@ -1085,19 +1143,7 @@ function InnerHubCanvas({ onSwitchToHabits }: HubCanvasProps) {
         await db.entries.delete(data.id);
       }
 
-      // 2. Clean up custom edges from localStorage
-      try {
-        const raw = localStorage.getItem(STORAGE_EDGES_KEY);
-        if (raw) {
-          const edgeList: Edge[] = JSON.parse(raw);
-          const filtered = edgeList.filter(
-            (e) => e.source !== fullNodeId && e.target !== fullNodeId,
-          );
-          localStorage.setItem(STORAGE_EDGES_KEY, JSON.stringify(filtered));
-        }
-      } catch {}
-
-      // 3. Clean up cached position
+      // 2. Clean up cached position
       if (posCacheRef.current[fullNodeId]) {
         delete posCacheRef.current[fullNodeId];
         localStorage.setItem(STORAGE_POS_KEY, JSON.stringify(posCacheRef.current));
@@ -1220,14 +1266,45 @@ function InnerHubCanvas({ onSwitchToHabits }: HubCanvasProps) {
             </button>
           </div>
 
-          <button
-            onClick={handleAutoLayout}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#121212]/90 backdrop-blur-md hover:bg-[#181818] border border-stone-800 text-stone-300 hover:text-amber-400 rounded-xl text-xs font-mono font-semibold transition-all shadow-lg cursor-pointer active:scale-95"
-            title="Auto-align tree branches into clean columns"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Auto-Tidy Tree</span>
-          </button>
+          {/* Layout Mode Selector (Radial Galaxy | Tree LR | Waterfall TB) */}
+          <div className="flex items-center gap-0.5 bg-[#121212]/95 backdrop-blur-xl border border-stone-800 p-1 rounded-xl shadow-lg">
+            <button
+              onClick={() => {
+                const layouted = getLayoutedElements(nodes, edges, 'RADIAL');
+                setNodes(layouted.nodes);
+                savePositions(layouted.nodes);
+              }}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-mono font-bold text-stone-400 hover:text-amber-300 hover:bg-stone-800 transition-all cursor-pointer"
+              title="Radial Galaxy (Organic brain orbit layout)"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Radial</span>
+            </button>
+            <button
+              onClick={() => {
+                const layouted = getLayoutedElements(nodes, edges, 'LR');
+                setNodes(layouted.nodes);
+                savePositions(layouted.nodes);
+              }}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-mono font-bold text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-all cursor-pointer"
+              title="Horizontal Tree (Left to Right)"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+              <span>Tree LR</span>
+            </button>
+            <button
+              onClick={() => {
+                const layouted = getLayoutedElements(nodes, edges, 'TB');
+                setNodes(layouted.nodes);
+                savePositions(layouted.nodes);
+              }}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-mono font-bold text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-all cursor-pointer"
+              title="Vertical Tree (Top to Bottom Waterfall)"
+            >
+              <ChevronDown className="w-3.5 h-3.5" />
+              <span>Tree TB</span>
+            </button>
+          </div>
         </div>
       </div>
 
