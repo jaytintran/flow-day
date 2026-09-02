@@ -91,11 +91,11 @@ const COLOR_OPTIONS: EntityColor[] = [
 ];
 
 const nodeTypes = {
-  purpose: PurposeNode,
-  domain: DomainNode,
-  goal: GoalNode,
-  objective: ObjectiveNode,
-  habit: HabitNode,
+  purpose: GenericCanvasNode,
+  domain: GenericCanvasNode,
+  goal: GenericCanvasNode,
+  objective: GenericCanvasNode,
+  habit: GenericCanvasNode,
   generic: GenericCanvasNode,
   custom: GenericCanvasNode,
 };
@@ -664,19 +664,8 @@ function InnerHubCanvas({ onSwitchToHabits }: HubCanvasProps) {
       const isHiddenByFilter = completedFilterMode === 'hide' && isCompleted;
       const isDimmed = completedFilterMode === 'dim' && isCompleted;
 
-      // Select node component type: specialized for system types or generic for custom
-      const reactFlowNodeNodeType =
-        entity.entity_type === 'purpose'
-          ? 'purpose'
-          : entity.entity_type === 'domain'
-            ? 'domain'
-            : entity.entity_type === 'goal'
-              ? 'goal'
-              : entity.entity_type === 'objective'
-                ? 'objective'
-                : entity.entity_type === 'habit'
-                  ? 'habit'
-                  : 'generic';
+      // All nodes use the dynamic tiered component
+      const reactFlowNodeNodeType = 'generic';
 
       rawNodes.push({
         id,
@@ -806,11 +795,17 @@ function InnerHubCanvas({ onSwitchToHabits }: HubCanvasProps) {
     setContextMenu(null);
   }, []);
 
+  // Helper to extract clean entity ID from full node ID (e.g. "goal-123e4567-e89b..." -> "123e4567-e89b...")
+  const getRawEntityId = useCallback((fullNodeId: string) => {
+    const firstDash = fullNodeId.indexOf('-');
+    return firstDash === -1 ? fullNodeId : fullNodeId.slice(firstDash + 1);
+  }, []);
+
   // Delete Connection (Wire) and update Dexie DB
   const handleDeleteEdge = useCallback(
     async (edge: Edge) => {
-      const [, sourceId] = edge.source.split('-');
-      const [, targetId] = edge.target.split('-');
+      const sourceId = getRawEntityId(edge.source);
+      const targetId = getRawEntityId(edge.target);
 
       // Update parent_ids on unified entities table
       const targetEntity = entitiesList.find((e) => e.id === targetId);
@@ -828,7 +823,7 @@ function InnerHubCanvas({ onSwitchToHabits }: HubCanvasProps) {
       setEdges((eds) => eds.filter((e) => e.id !== edge.id));
       setSelectedEdge(null);
     },
-    [entitiesList, setEdges],
+    [entitiesList, getRawEntityId, setEdges],
   );
 
   // Handle Drag Wire Connection & Sync Dexie DB
@@ -836,8 +831,8 @@ function InnerHubCanvas({ onSwitchToHabits }: HubCanvasProps) {
     async (params: Connection) => {
       if (!params.source || !params.target) return;
 
-      const [, sourceId] = params.source.split('-');
-      const [, targetId] = params.target.split('-');
+      const sourceId = getRawEntityId(params.source);
+      const targetId = getRawEntityId(params.target);
 
       // Link target to source parent in db.entities
       const targetEntity = entitiesList.find((e) => e.id === targetId);
@@ -856,14 +851,15 @@ function InnerHubCanvas({ onSwitchToHabits }: HubCanvasProps) {
         target: params.target,
         sourceHandle: params.sourceHandle,
         targetHandle: params.targetHandle,
+        type: 'default',
         animated: true,
         style: { stroke: '#f59e0b', strokeWidth: 2, cursor: 'pointer' },
-        markerEnd: { type: MarkerType.ArrowClosed, color: '#f59e0b' },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#f59e0b', width: 14, height: 14 },
       };
 
       setEdges((eds) => addEdge(newEdge, eds));
     },
-    [entitiesList, setEdges],
+    [entitiesList, getRawEntityId, setEdges],
   );
 
   // Auto-Tidy Layout
