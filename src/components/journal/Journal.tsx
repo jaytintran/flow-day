@@ -595,10 +595,10 @@ export default function Journal({
 
 	// Group and sort logic for Day View and Timeline View
 	const getEntrySortTime = (e: TimelineEntry): number => {
-		// For tasks: first available of completed_at → scheduled_at → created_at
+		// For tasks: if scheduled_at is set, anchor to scheduled_at; otherwise use completed_at → created_at
 		if (e.type === "task") {
-			if (e.completed_at) return new Date(e.completed_at).getTime();
 			if (e.scheduled_at) return new Date(e.scheduled_at).getTime();
+			if (e.completed_at) return new Date(e.completed_at).getTime();
 			return new Date(e.created_at).getTime();
 		}
 		// For non-tasks: carried_to → natural timestamp (events/notes: timestamp, time-blocks: start_at)

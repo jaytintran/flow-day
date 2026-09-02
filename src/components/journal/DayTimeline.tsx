@@ -357,8 +357,9 @@ export default function DayTimeline({
   const getPickerInitialDate = (entry: TimelineEntry): Date => {
     if (entry.type === 'task') {
       const task = entry as Task;
+      if (task.scheduled_at) return new Date(task.scheduled_at);
       if (task.status === 'done' && task.completed_at) return new Date(task.completed_at);
-      return new Date(task.scheduled_at || task.created_at);
+      return new Date(task.created_at);
     }
     if (entry.type === 'log') return new Date((entry as Log).timestamp);
     if (entry.type === 'event') return new Date((entry as Event).timestamp);
@@ -373,49 +374,25 @@ export default function DayTimeline({
 
     if (entry.type === 'task') {
       const task = entry as Task;
-      if (task.status === 'done' && task.completed_at) {
+      // 1. If task had scheduled start and scheduled end time, always preserve the planned span!
+      if (task.scheduled_at && task.scheduled_end_at) {
+        const s = new Date(task.scheduled_at).getTime();
+        const e = new Date(task.scheduled_end_at).getTime();
+        if (e - s >= 15 * 60 * 1000) {
+          startDate = new Date(s);
+          endDate = new Date(e);
+        }
+      }
+      // 2. If task has focus/tracked time >= 15 mins (900,000 ms) and is done
+      else if (task.status === 'done' && task.completed_at && task.time_spent && task.time_spent >= 15 * 60 * 1000) {
         const completedTime = new Date(task.completed_at).getTime();
-
-        // 1. If task has focus/tracked time >= 15 mins (900,000 ms)
-        if (task.time_spent && task.time_spent >= 15 * 60 * 1000) {
-          endDate = new Date(task.completed_at);
-          startDate = new Date(completedTime - task.time_spent);
-        }
-        // 2. If task had scheduled start and scheduled end time
-        else if (task.scheduled_at && task.scheduled_end_at) {
-          const s = new Date(task.scheduled_at).getTime();
-          const e = new Date(task.scheduled_end_at).getTime();
-          if (e - s >= 15 * 60 * 1000) {
-            startDate = new Date(s);
-            endDate = new Date(e);
-          }
-        }
-        // 3. If task had scheduled_at or same-day created_at
-        else if (task.scheduled_at || task.created_at) {
-          const origin = new Date(task.scheduled_at || task.created_at);
-          const comp = new Date(task.completed_at);
-          // Check if same calendar day
-          const isSameDay =
-            origin.getFullYear() === comp.getFullYear() &&
-            origin.getMonth() === comp.getMonth() &&
-            origin.getDate() === comp.getDate();
-
-          if (isSameDay) {
-            const diff = comp.getTime() - origin.getTime();
-            // Show span only if duration is at least 15 minutes and non-negative
-            if (diff >= 15 * 60 * 1000) {
-              startDate = origin;
-              endDate = comp;
-            }
-          }
-        }
-      } else {
-        // Pending task with scheduled start & end
-        const start = task.scheduled_at || task.created_at;
-        if (task.scheduled_end_at && start) {
-          startDate = new Date(start);
-          endDate = new Date(task.scheduled_end_at);
-        }
+        endDate = new Date(task.completed_at);
+        startDate = new Date(completedTime - task.time_spent);
+      }
+      // 3. For pending task with scheduled start & end
+      else if (task.scheduled_at && task.scheduled_end_at) {
+        startDate = new Date(task.scheduled_at);
+        endDate = new Date(task.scheduled_end_at);
       }
     } else if (entry.type === 'log') {
       const log = entry as Log;
@@ -454,7 +431,7 @@ export default function DayTimeline({
   const handleGutterPointerDown = (
     e: React.PointerEvent,
     entry: TimelineEntry | TimeBlock,
-    mode: 'start' | 'end' | 'span' = 'start',
+    mode: 'start' | 'end' | 'span' | 'completed' = 'start',
     customStartDate?: Date,
     customEndDate?: Date,
   ) => {
@@ -472,7 +449,9 @@ export default function DayTimeline({
 
     const initStartDate =
       customStartDate ||
-      ('start_at' in entry
+      (mode === 'completed' && (entry as Task).completed_at
+        ? new Date((entry as Task).completed_at!)
+        : 'start_at' in entry
         ? new Date(entry.start_at)
         : getPickerInitialDate(entry as TimelineEntry));
 
@@ -581,7 +560,9 @@ export default function DayTimeline({
     const timelineEntry = entry as TimelineEntry;
     if (timelineEntry.type === 'task') {
       const task = timelineEntry as Task;
-      if (mode === 'start') {
+      if (mode === 'completed') {
+        await db.entries.update(task.id, { completed_at: newStart } as any);
+      } else if (mode === 'start') {
         await db.entries.update(task.id, { scheduled_at: newStart } as any);
       } else if (mode === 'end' && newEnd) {
         await db.entries.update(task.id, { scheduled_end_at: newEnd } as any);
@@ -1102,13 +1083,26 @@ export default function DayTimeline({
                 )}
 
                 {(entry as Task).completed_at && (
-                  <span
-                    title={`Completed at ${formatTime((entry as Task).completed_at!)}`}
-                    className="flex items-center gap-1 bg-emerald-950/30 text-emerald-400 border border-emerald-700/30 hover:border-emerald-600/50 hover:text-emerald-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                  <button
+                    type="button"
+                    onPointerDown={(e) =>
+                      handleGutterPointerDown(
+                        e,
+                        entry,
+                        'completed',
+                        new Date((entry as Task).completed_at!),
+                      )
+                    }
+                    onPointerMove={handleGutterPointerMove}
+                    onPointerUp={(e) => handleGutterPointerUp(e, entry)}
+                    onPointerCancel={handleGutterPointerCancel}
+                    onClick={(e) => e.stopPropagation()}
+                    title={`Completed at ${formatTime((entry as Task).completed_at!)} · Hold & drag vertically to readjust completion time`}
+                    className="flex items-center gap-1 bg-emerald-950/30 text-emerald-400 border border-emerald-700/30 hover:border-emerald-500/60 hover:text-emerald-300 hover:bg-emerald-900/30 active:scale-95 transition-all rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-ns-resize shadow-sm"
                   >
                     <CheckCircle className="w-3 h-3 inline-block text-emerald-400" />
-                    {formatTime((entry as Task).completed_at!)}
-                  </span>
+                    <span>{formatTime((entry as Task).completed_at!)}</span>
+                  </button>
                 )}
 
                 {(entry as Task).time_spent > 0 && (

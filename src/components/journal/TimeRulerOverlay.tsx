@@ -11,7 +11,7 @@ interface TimeRulerOverlayProps {
   entry: TimelineEntry | any;
   initialDate: Date;
   initialEndDate?: Date;
-  mode?: 'start' | 'end' | 'span';
+  mode?: 'start' | 'end' | 'span' | 'completed';
   originY: number;
   originX: number;
   formatTime: (date: Date | string) => string;
@@ -238,8 +238,12 @@ export default function TimeRulerOverlay({
     >
       {/* 1. Header guide prompt */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-1.5 rounded-full bg-stone-900/90 border border-stone-800 text-stone-300 text-xs font-mono shadow-2xl pointer-events-none">
-        <Clock className="w-3.5 h-3.5 text-amber-400" />
-        <span>Drag vertically to adjust time · Drop onto (X) to cancel</span>
+        <Clock className={`w-3.5 h-3.5 ${mode === 'completed' ? 'text-emerald-400' : 'text-amber-400'}`} />
+        <span>
+          {mode === 'completed'
+            ? 'Drag vertically to adjust completion time · Drop onto (X) to cancel'
+            : 'Drag vertically to adjust time · Drop onto (X) to cancel'}
+        </span>
       </div>
 
       {/* 2. Vertical Time Ruler Track */}
@@ -283,10 +287,20 @@ export default function TimeRulerOverlay({
 
         {/* Active time indicator line on the ruler */}
         <div
-          className="absolute -right-2 left-0 h-[2px] bg-amber-400 shadow-[0_0_10px_#f59e0b] -translate-y-1/2 flex items-center justify-end"
+          className={`absolute -right-2 left-0 h-[2px] -translate-y-1/2 flex items-center justify-end ${
+            mode === 'completed'
+              ? 'bg-emerald-400 shadow-[0_0_10px_#10b981]'
+              : 'bg-amber-400 shadow-[0_0_10px_#f59e0b]'
+          }`}
           style={{ top: `${indicatorPct}%` }}
         >
-          <div className="w-2.5 h-2.5 rounded-full bg-amber-400 ring-4 ring-amber-400/20 -mr-1" />
+          <div
+            className={`w-2.5 h-2.5 rounded-full ring-4 ${
+              mode === 'completed'
+                ? 'bg-emerald-400 ring-emerald-400/20'
+                : 'bg-amber-400 ring-amber-400/20'
+            } -mr-1`}
+          />
         </div>
       </div>
 
@@ -301,11 +315,30 @@ export default function TimeRulerOverlay({
         }}
       >
         {/* Horizontal connector guide line */}
-        <div className="w-6 md:w-8 h-[1.5px] bg-amber-400/80 shadow-[0_0_8px_#f59e0b]" />
+        <div
+          className={`w-6 md:w-8 h-[1.5px] ${
+            mode === 'completed'
+              ? 'bg-emerald-400/80 shadow-[0_0_8px_#10b981]'
+              : 'bg-amber-400/80 shadow-[0_0_8px_#f59e0b]'
+          }`}
+        />
 
         {/* Floating Time Pill */}
-        <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#121212] border border-amber-500/50 text-stone-100 shadow-[0_8px_30px_rgba(0,0,0,0.85)] backdrop-blur-md">
-          <span className="text-base md:text-lg font-mono font-bold text-amber-400 tracking-tight">
+        <div
+          className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#121212] border text-stone-100 shadow-[0_8px_30px_rgba(0,0,0,0.85)] backdrop-blur-md ${
+            mode === 'completed' ? 'border-emerald-500/50' : 'border-amber-500/50'
+          }`}
+        >
+          {mode === 'completed' && (
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+              Completed
+            </span>
+          )}
+          <span
+            className={`text-base md:text-lg font-mono font-bold tracking-tight ${
+              mode === 'completed' ? 'text-emerald-400' : 'text-amber-400'
+            }`}
+          >
             {formattedTime}
           </span>
           <span
