@@ -431,7 +431,7 @@ export default function DayTimeline({
   const handleGutterPointerDown = (
     e: React.PointerEvent,
     entry: TimelineEntry | TimeBlock,
-    mode: 'start' | 'end' | 'span' | 'completed' = 'start',
+    mode: 'start' | 'end' | 'span' | 'completed' | 'created' = 'start',
     customStartDate?: Date,
     customEndDate?: Date,
   ) => {
@@ -560,7 +560,9 @@ export default function DayTimeline({
     const timelineEntry = entry as TimelineEntry;
     if (timelineEntry.type === 'task') {
       const task = timelineEntry as Task;
-      if (mode === 'completed') {
+      if (mode === 'created') {
+        await db.entries.update(task.id, { created_at: newStart } as any);
+      } else if (mode === 'completed') {
         await db.entries.update(task.id, { completed_at: newStart } as any);
       } else if (mode === 'start') {
         await db.entries.update(task.id, { scheduled_at: newStart } as any);
@@ -1016,37 +1018,78 @@ export default function DayTimeline({
           <div className="flex items-center gap-x-1.5 text-xs pb-1">
             {isLog && (
               <>
-                <span
-                  title={`Logged at ${formatTime((entry as Log).timestamp)}`}
-                  className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 hover:border-stone-700 hover:text-stone-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                <button
+                  type="button"
+                  onPointerDown={(e) =>
+                    handleGutterPointerDown(
+                      e,
+                      entry,
+                      'start',
+                      new Date((entry as Log).timestamp),
+                    )
+                  }
+                  onPointerMove={handleGutterPointerMove}
+                  onPointerUp={(e) => handleGutterPointerUp(e, entry)}
+                  onPointerCancel={handleGutterPointerCancel}
+                  onClick={(e) => e.stopPropagation()}
+                  title={`Logged at ${formatTime((entry as Log).timestamp)} · Hold & drag vertically to readjust log time`}
+                  className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 hover:border-amber-500/50 hover:text-amber-300 hover:bg-stone-900 active:scale-95 transition-all rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-ns-resize shadow-sm"
                 >
                   <Clock className="w-3 h-3 inline-block text-stone-500" />
-                  {formatTime((entry as Log).timestamp)}
-                </span>
+                  <span>{formatTime((entry as Log).timestamp)}</span>
+                </button>
 
                 {(entry as Log).end_timestamp && (
                   <>
-                    <span
-                      title={`Time Span: ${formatTime((entry as Log).timestamp)} to ${formatTime((entry as Log).end_timestamp!)}`}
-                      className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 hover:border-sky-700/50 hover:text-sky-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                    <button
+                      type="button"
+                      onPointerDown={(e) =>
+                        handleGutterPointerDown(
+                          e,
+                          entry,
+                          'span',
+                          new Date((entry as Log).timestamp),
+                          new Date((entry as Log).end_timestamp!),
+                        )
+                      }
+                      onPointerMove={handleGutterPointerMove}
+                      onPointerUp={(e) => handleGutterPointerUp(e, entry)}
+                      onPointerCancel={handleGutterPointerCancel}
+                      onClick={(e) => e.stopPropagation()}
+                      title={`Time Span: ${formatTime((entry as Log).timestamp)} to ${formatTime((entry as Log).end_timestamp!)} · Hold & drag to shift span`}
+                      className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 hover:border-sky-500/60 hover:text-sky-300 hover:bg-sky-950/20 active:scale-95 transition-all rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-ns-resize shadow-sm"
                     >
                       <Calendar className="w-3 h-3 inline-block text-sky-400" />
-                      {formatTime((entry as Log).timestamp)} – {formatTime((entry as Log).end_timestamp!)}
-                    </span>
+                      <span>{formatTime((entry as Log).timestamp)} – {formatTime((entry as Log).end_timestamp!)}</span>
+                    </button>
 
-                    <span
+                    <button
+                      type="button"
+                      onPointerDown={(e) =>
+                        handleGutterPointerDown(
+                          e,
+                          entry,
+                          'end',
+                          new Date((entry as Log).timestamp),
+                          new Date((entry as Log).end_timestamp!),
+                        )
+                      }
+                      onPointerMove={handleGutterPointerMove}
+                      onPointerUp={(e) => handleGutterPointerUp(e, entry)}
+                      onPointerCancel={handleGutterPointerCancel}
+                      onClick={(e) => e.stopPropagation()}
                       title={`Total Duration: ${formatDuration(
                         new Date((entry as Log).end_timestamp!).getTime() -
                           new Date((entry as Log).timestamp).getTime(),
-                      )}`}
-                      className="flex items-center gap-1 bg-[#121212] border border-amber-800/30 text-amber-400/90 hover:border-amber-700/50 hover:text-amber-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                      )} · Hold & drag to adjust end time`}
+                      className="flex items-center gap-1 bg-[#121212] border border-amber-800/30 text-amber-400/90 hover:border-amber-500/60 hover:text-amber-300 hover:bg-amber-950/20 active:scale-95 transition-all rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-ns-resize shadow-sm"
                     >
                       <Hourglass className="w-3 h-3 inline-block text-amber-500" />
-                      {formatDuration(
+                      <span>{formatDuration(
                         new Date((entry as Log).end_timestamp!).getTime() -
                           new Date((entry as Log).timestamp).getTime(),
-                      )}
-                    </span>
+                      )}</span>
+                    </button>
                   </>
                 )}
               </>
@@ -1054,32 +1097,72 @@ export default function DayTimeline({
 
             {isTask && (
               <>
-                <span
-                  title={`Created at ${formatTime(entry.created_at)}`}
-                  className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 hover:border-stone-700 hover:text-stone-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                <button
+                  type="button"
+                  onPointerDown={(e) =>
+                    handleGutterPointerDown(
+                      e,
+                      entry,
+                      'created',
+                      new Date(entry.created_at),
+                    )
+                  }
+                  onPointerMove={handleGutterPointerMove}
+                  onPointerUp={(e) => handleGutterPointerUp(e, entry)}
+                  onPointerCancel={handleGutterPointerCancel}
+                  onClick={(e) => e.stopPropagation()}
+                  title={`Created at ${formatTime(entry.created_at)} · Hold & drag vertically to readjust creation time`}
+                  className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 hover:border-amber-500/50 hover:text-amber-300 hover:bg-stone-900 active:scale-95 transition-all rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-ns-resize shadow-sm"
                 >
                   <Clock className="w-3 h-3 inline-block text-stone-500" />
-                  {formatTime(entry.created_at)}
-                </span>
+                  <span>{formatTime(entry.created_at)}</span>
+                </button>
 
                 {(entry as Task).scheduled_at && !(entry as Task).scheduled_end_at && (
-                  <span
-                    title={`Scheduled for ${formatTime((entry as Task).scheduled_at!)}`}
-                    className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 hover:border-sky-700/50 hover:text-sky-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                  <button
+                    type="button"
+                    onPointerDown={(e) =>
+                      handleGutterPointerDown(
+                        e,
+                        entry,
+                        'start',
+                        new Date((entry as Task).scheduled_at!),
+                      )
+                    }
+                    onPointerMove={handleGutterPointerMove}
+                    onPointerUp={(e) => handleGutterPointerUp(e, entry)}
+                    onPointerCancel={handleGutterPointerCancel}
+                    onClick={(e) => e.stopPropagation()}
+                    title={`Scheduled for ${formatTime((entry as Task).scheduled_at!)} · Hold & drag to adjust scheduled time`}
+                    className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 hover:border-sky-500/60 hover:text-sky-300 hover:bg-sky-950/20 active:scale-95 transition-all rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-ns-resize shadow-sm"
                   >
                     <Calendar className="w-3 h-3 inline-block text-sky-400" />
-                    {formatTime((entry as Task).scheduled_at!)}
-                  </span>
+                    <span>{formatTime((entry as Task).scheduled_at!)}</span>
+                  </button>
                 )}
 
                 {(entry as Task).scheduled_end_at && (
-                  <span
-                    title={`Scheduled Time Span: ${formatTime((entry as Task).scheduled_at || (entry as Task).created_at)} to ${formatTime((entry as Task).scheduled_end_at!)}`}
-                    className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 hover:border-sky-700/50 hover:text-sky-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                  <button
+                    type="button"
+                    onPointerDown={(e) =>
+                      handleGutterPointerDown(
+                        e,
+                        entry,
+                        'span',
+                        new Date((entry as Task).scheduled_at || (entry as Task).created_at),
+                        new Date((entry as Task).scheduled_end_at!),
+                      )
+                    }
+                    onPointerMove={handleGutterPointerMove}
+                    onPointerUp={(e) => handleGutterPointerUp(e, entry)}
+                    onPointerCancel={handleGutterPointerCancel}
+                    onClick={(e) => e.stopPropagation()}
+                    title={`Scheduled Time Span: ${formatTime((entry as Task).scheduled_at || (entry as Task).created_at)} to ${formatTime((entry as Task).scheduled_end_at!)} · Hold & drag to shift span`}
+                    className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 hover:border-sky-500/60 hover:text-sky-300 hover:bg-sky-950/20 active:scale-95 transition-all rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-ns-resize shadow-sm"
                   >
                     <Calendar className="w-3 h-3 inline-block text-sky-400" />
-                    {formatTime((entry as Task).scheduled_at || (entry as Task).created_at)} – {formatTime((entry as Task).scheduled_end_at!)}
-                  </span>
+                    <span>{formatTime((entry as Task).scheduled_at || (entry as Task).created_at)} – {formatTime((entry as Task).scheduled_end_at!)}</span>
+                  </button>
                 )}
 
                 {(entry as Task).completed_at && (
@@ -1119,60 +1202,127 @@ export default function DayTimeline({
 
             {isEvent && (
               <>
-                <span
-                  title={`Event Time: ${formatTime((entry as Event).timestamp)}`}
-                  className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 hover:border-stone-700 hover:text-stone-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                <button
+                  type="button"
+                  onPointerDown={(e) =>
+                    handleGutterPointerDown(
+                      e,
+                      entry,
+                      'start',
+                      new Date((entry as Event).timestamp),
+                    )
+                  }
+                  onPointerMove={handleGutterPointerMove}
+                  onPointerUp={(e) => handleGutterPointerUp(e, entry)}
+                  onPointerCancel={handleGutterPointerCancel}
+                  onClick={(e) => e.stopPropagation()}
+                  title={`Event Time: ${formatTime((entry as Event).timestamp)} · Hold & drag to adjust start time`}
+                  className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 hover:border-indigo-500/50 hover:text-indigo-300 hover:bg-stone-900 active:scale-95 transition-all rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-ns-resize shadow-sm"
                 >
                   <Clock className="w-3 h-3 inline-block text-stone-500" />
-                  {formatTime((entry as Event).timestamp)}
-                </span>
+                  <span>{formatTime((entry as Event).timestamp)}</span>
+                </button>
 
                 {(entry as Event).end_timestamp && (
                   <>
-                    <span
-                      title={`Event Duration Span: ${formatTime((entry as Event).timestamp)} to ${formatTime((entry as Event).end_timestamp!)}`}
-                      className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 hover:border-sky-700/50 hover:text-sky-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                    <button
+                      type="button"
+                      onPointerDown={(e) =>
+                        handleGutterPointerDown(
+                          e,
+                          entry,
+                          'span',
+                          new Date((entry as Event).timestamp),
+                          new Date((entry as Event).end_timestamp!),
+                        )
+                      }
+                      onPointerMove={handleGutterPointerMove}
+                      onPointerUp={(e) => handleGutterPointerUp(e, entry)}
+                      onPointerCancel={handleGutterPointerCancel}
+                      onClick={(e) => e.stopPropagation()}
+                      title={`Event Duration Span: ${formatTime((entry as Event).timestamp)} to ${formatTime((entry as Event).end_timestamp!)} · Hold & drag to shift span`}
+                      className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 hover:border-sky-500/60 hover:text-sky-300 hover:bg-sky-950/20 active:scale-95 transition-all rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-ns-resize shadow-sm"
                     >
                       <Calendar className="w-3 h-3 inline-block text-sky-400" />
-                      {formatTime((entry as Event).timestamp)} – {formatTime((entry as Event).end_timestamp!)}
-                    </span>
+                      <span>{formatTime((entry as Event).timestamp)} – {formatTime((entry as Event).end_timestamp!)}</span>
+                    </button>
 
-                    <span
+                    <button
+                      type="button"
+                      onPointerDown={(e) =>
+                        handleGutterPointerDown(
+                          e,
+                          entry,
+                          'end',
+                          new Date((entry as Event).timestamp),
+                          new Date((entry as Event).end_timestamp!),
+                        )
+                      }
+                      onPointerMove={handleGutterPointerMove}
+                      onPointerUp={(e) => handleGutterPointerUp(e, entry)}
+                      onPointerCancel={handleGutterPointerCancel}
+                      onClick={(e) => e.stopPropagation()}
                       title={`Total Event Duration: ${formatDuration(
                         new Date((entry as Event).end_timestamp!).getTime() -
                           new Date((entry as Event).timestamp).getTime(),
-                      )}`}
-                      className="flex items-center gap-1 bg-[#121212] border border-amber-800/30 text-amber-400/90 hover:border-amber-700/50 hover:text-amber-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                      )} · Hold & drag to adjust end time`}
+                      className="flex items-center gap-1 bg-[#121212] border border-amber-800/30 text-amber-400/90 hover:border-amber-500/60 hover:text-amber-300 hover:bg-amber-950/20 active:scale-95 transition-all rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-ns-resize shadow-sm"
                     >
                       <Hourglass className="w-3 h-3 inline-block text-amber-500" />
-                      {formatDuration(
+                      <span>{formatDuration(
                         new Date((entry as Event).end_timestamp!).getTime() -
                           new Date((entry as Event).timestamp).getTime(),
-                      )}
-                    </span>
+                      )}</span>
+                    </button>
                   </>
                 )}
               </>
             )}
 
             {isNote && (
-              <span
-                title={`Created at ${formatTime((entry as Note).timestamp)}`}
-                className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 hover:border-stone-700 hover:text-stone-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+              <button
+                type="button"
+                onPointerDown={(e) =>
+                  handleGutterPointerDown(
+                    e,
+                    entry,
+                    'start',
+                    new Date((entry as Note).timestamp),
+                  )
+                }
+                onPointerMove={handleGutterPointerMove}
+                onPointerUp={(e) => handleGutterPointerUp(e, entry)}
+                onPointerCancel={handleGutterPointerCancel}
+                onClick={(e) => e.stopPropagation()}
+                title={`Created at ${formatTime((entry as Note).timestamp)} · Hold & drag to readjust note timestamp`}
+                className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 hover:border-blue-500/50 hover:text-blue-300 hover:bg-stone-900 active:scale-95 transition-all rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-ns-resize shadow-sm"
               >
                 <Clock className="w-3 h-3 inline-block text-stone-500" />
-                {formatTime((entry as Note).timestamp)}
-              </span>
+                <span>{formatTime((entry as Note).timestamp)}</span>
+              </button>
             )}
 
             {isHabitLog && (
-              <span
-                title={`Ritual Completed at ${formatTime((entry as HabitLog).timestamp)}`}
-                className="flex items-center gap-1 bg-emerald-950/30 text-emerald-400 border border-emerald-700/30 hover:border-emerald-600/50 hover:text-emerald-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+              <button
+                type="button"
+                onPointerDown={(e) =>
+                  handleGutterPointerDown(
+                    e,
+                    entry,
+                    'start',
+                    new Date((entry as HabitLog).timestamp),
+                  )
+                }
+                onPointerMove={handleGutterPointerMove}
+                onPointerUp={(e) => handleGutterPointerUp(e, entry)}
+                onPointerCancel={handleGutterPointerCancel}
+                onClick={(e) => e.stopPropagation()}
+                title={`Ritual Completed at ${formatTime((entry as HabitLog).timestamp)} · Hold & drag to readjust ritual time`}
+                className="flex items-center gap-1 bg-emerald-950/30 text-emerald-400 border border-emerald-700/30 hover:border-emerald-500/60 hover:text-emerald-300 hover:bg-emerald-900/30 active:scale-95 transition-all rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-ns-resize shadow-sm"
               >
                 <CheckCircle className="w-3 h-3 inline-block text-emerald-400" />
-                {formatTime((entry as HabitLog).timestamp)}
-              </span>
+                <span>{formatTime((entry as HabitLog).timestamp)}</span>
+              </button>
             )}
           </div>
         </div>
