@@ -107,65 +107,12 @@ export interface CanvasNodeData {
   isDimmed?: boolean;
   hasStatus?: boolean;
   hasTimeTracking?: boolean;
-  tier?: 1 | 2 | 3; // Dynamic graph depth tier: 1 = Nucleus (0 parents), 2 = Pillar (1 parent), 3 = Satellite (2+ depth)
-  masteryXp?: number; // Accumulated focus minutes / XP
-  masteryLevel?: number; // 1 to 5 level
   onInspect?: (data: CanvasNodeData) => void;
   onToggleCollapse?: (id: string, e: React.MouseEvent) => void;
   onQuickRename?: (id: string, newTitle: string) => Promise<void>;
   onChangeIcon?: (id: string, newIcon: string) => Promise<void>;
   onQuickUpdateDescription?: (newDescription: string) => Promise<void>;
 }
-
-// ─── 🔮 MASTERY XP RING HELPER ───────────────────────────────────────────────
-export const MasteryRing = ({
-  level = 1,
-  progress = 0,
-  size = 36,
-  strokeWidth = 2.5,
-  colorClass = '#f59e0b',
-}: {
-  level?: number;
-  progress?: number; // 0 to 100
-  size?: number;
-  strokeWidth?: number;
-  colorClass?: string;
-}) => {
-  const radius = (size - strokeWidth * 2) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (Math.min(100, Math.max(0, progress)) / 100) * circumference;
-
-  return (
-    <svg
-      width={size}
-      height={size}
-      className="absolute -top-0 -left-0 pointer-events-none -rotate-90"
-    >
-      {/* Background Track */}
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        stroke="rgba(255, 255, 255, 0.08)"
-        strokeWidth={strokeWidth}
-        fill="none"
-      />
-      {/* Active Animated XP Track */}
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        stroke={colorClass}
-        strokeWidth={strokeWidth}
-        strokeDasharray={circumference}
-        strokeDashoffset={strokeDashoffset}
-        strokeLinecap="round"
-        fill="none"
-        className="transition-all duration-700 ease-out"
-      />
-    </svg>
-  );
-};
 
 export const COLOR_THEMES: Record<
   string,
@@ -444,7 +391,7 @@ const NodeMarkdownSection = ({
   );
 };
 
-// ─── 🌐 DYNAMIC GENERIC CANVAS NODE (TIER 1 NUCLEUS | TIER 2 PILLAR | TIER 3 SATELLITE) ───
+// ─── 🌐 DYNAMIC GENERIC CANVAS NODE ─────────────────────────────────────────
 export const GenericCanvasNode = memo(({ data }: NodeProps<any>) => {
   const isCompleted =
     data.status === 'done' || data.status === 'achieved' || data.status === 'completed';
@@ -466,96 +413,16 @@ export const GenericCanvasNode = memo(({ data }: NodeProps<any>) => {
 
   const colorKey = data.color || 'indigo';
   const theme = COLOR_THEMES[colorKey] || COLOR_THEMES.indigo;
-  const tier: 1 | 2 | 3 = data.tier || 2; // Default to Tier 2 if unset
-
-  // Calculate dynamic Mastery Progress (0-100%) and Level
-  const totalMinutes = data.time_spent ? Math.round(data.time_spent / 60) : 0;
-  const masteryLevel = Math.min(5, Math.max(1, Math.floor(totalMinutes / 120) + 1));
-  const masteryProgress = Math.min(100, (totalMinutes % 120) * (100 / 120));
-
-  // ─── TIER 3: SATELLITE / PEBBLE ORB (Compact Leaf Sub-Skill / Concept) ─────
-  if (tier === 3) {
-    return (
-      <div
-        onClick={() => data.onInspect?.(data)}
-        className={`group relative px-3 py-1.5 rounded-full border transition-all cursor-pointer flex items-center gap-2 select-none shadow-sm ${
-          isArchived
-            ? 'bg-[#141416] border-stone-800 text-stone-500 opacity-60'
-            : isCompleted
-              ? 'bg-[#0d1a13] border-emerald-500/50 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
-              : 'bg-[#111114] border-stone-800 hover:border-amber-500/60 text-stone-200 hover:text-white'
-        } ${data.isDimmed ? 'opacity-30' : 'opacity-100'}`}
-      >
-        <ConnectionHandles
-          colorClass={isArchived ? '!bg-stone-600' : isCompleted ? '!bg-emerald-400' : theme.handleBg}
-        />
-
-        <div
-          className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] ${
-            isCompleted
-              ? 'bg-emerald-500/20 text-emerald-400'
-              : `${theme.iconBg} ${theme.iconText}`
-          }`}
-        >
-          {renderLucideIcon(data.icon, 'Target', 'w-3 h-3')}
-        </div>
-
-        {isEditing ? (
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commitTitle();
-              if (e.key === 'Escape') setIsEditing(false);
-            }}
-            onBlur={commitTitle}
-            onClick={(e) => e.stopPropagation()}
-            autoFocus
-            className="bg-[#0a0a0a] border border-amber-500/50 rounded px-1.5 py-0.5 text-xs text-stone-100 focus:outline-none"
-          />
-        ) : (
-          <span
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              setIsEditing(true);
-            }}
-            className={`text-[11px] font-mono font-medium truncate max-w-[140px] ${
-              isCompleted ? 'line-through text-stone-400' : 'text-stone-200'
-            }`}
-            title="Double click to rename"
-          >
-            {data.title || data.typeName || 'Sub-Item'}
-          </span>
-        )}
-
-        {totalMinutes > 0 && (
-          <span className="text-[9px] font-mono font-bold text-amber-400/80 bg-amber-500/10 px-1.5 py-0.2 rounded-full">
-            {formatDuration(data.time_spent!)}
-          </span>
-        )}
-      </div>
-    );
-  }
-
-  // ─── TIER 1 & TIER 2: NUCLEUS & PILLAR CARDS ──────────────────────────────
-  const isTier1 = tier === 1;
 
   return (
     <div
       onClick={() => data.onInspect?.(data)}
-      className={`group relative rounded-2xl bg-gradient-to-br border-2 transition-all cursor-pointer select-none ${
-        isTier1
-          ? 'p-4 min-w-[240px] max-w-[360px] shadow-[0_0_30px_rgba(245,158,11,0.25)] hover:shadow-[0_0_40px_rgba(245,158,11,0.4)]'
-          : 'p-3.5 min-w-[200px] max-w-[320px] shadow-[0_0_15px_rgba(0,0,0,0.5)]'
-      } ${
+      className={`group relative px-4 py-3 rounded-2xl bg-gradient-to-br border-2 transition-all cursor-pointer min-w-[220px] max-w-[340px] ${
         isArchived
           ? 'from-[#141416] to-[#0c0c0e] border-stone-700/60 opacity-60 hover:opacity-100 shadow-none'
           : isCompleted
             ? 'from-[#0c1a14]/90 to-[#08120e]/90 border-emerald-500/60 shadow-[0_0_20px_rgba(16,185,129,0.2)]'
-            : isTier1
-              ? `${theme.bgGradient} ${theme.border} ${theme.glow}`
-              : `${theme.bgGradient} border-stone-800 hover:${theme.border}`
+            : `${theme.bgGradient} ${theme.border} ${theme.glow}`
       } ${data.isDimmed ? 'opacity-35 hover:opacity-100' : 'opacity-100'}`}
     >
       <ConnectionHandles
@@ -563,51 +430,36 @@ export const GenericCanvasNode = memo(({ data }: NodeProps<any>) => {
       />
 
       <div className="flex items-start gap-3">
-        {/* Node Icon with Optional Mastery XP Ring */}
-        <div className="relative shrink-0 mt-0.5">
-          {totalMinutes > 0 && (
-            <MasteryRing
-              level={masteryLevel}
-              progress={masteryProgress}
-              size={isTier1 ? 40 : 34}
-              colorClass={isCompleted ? '#10b981' : isTier1 ? '#f59e0b' : '#818cf8'}
-            />
-          )}
-          <div
-            className={`rounded-xl border flex items-center justify-center shrink-0 shadow-sm ${
-              isTier1 ? 'w-10 h-10' : 'w-8 h-8'
-            } ${
-              isArchived
-                ? 'bg-stone-800/60 border-stone-700 text-stone-400'
-                : isCompleted
-                  ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
-                  : `${theme.iconBg} ${theme.iconBorder} ${theme.iconText}`
-            }`}
-          >
-            {renderLucideIcon(data.icon, 'Target', isTier1 ? 'w-5 h-5' : 'w-4 h-4')}
-          </div>
+        <div
+          className={`w-8 h-8 rounded-xl border flex items-center justify-center shrink-0 shadow-sm mt-0.5 ${
+            isArchived
+              ? 'bg-stone-800/60 border-stone-700 text-stone-400'
+              : isCompleted
+                ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+                : `${theme.iconBg} ${theme.iconBorder} ${theme.iconText}`
+          }`}
+        >
+          {renderLucideIcon(data.icon, 'Target', 'w-4 h-4')}
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-1 mb-1">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span
-                className={`font-mono uppercase tracking-widest font-bold leading-tight ${
-                  isTier1 ? 'text-[10px]' : 'text-[8.5px]'
-                } ${
+                className={`text-[9px] font-mono uppercase tracking-widest font-bold leading-tight ${
                   isArchived ? 'text-stone-400' : isCompleted ? 'text-emerald-400' : theme.badgeText
                 }`}
               >
                 {data.typeName || data.type}
               </span>
-              {isTier1 && (
-                <span className="text-[7.5px] font-mono uppercase px-1 py-0.2 rounded font-bold bg-amber-500/20 border border-amber-500/30 text-amber-300">
-                  Core
-                </span>
-              )}
               {isCompleted && (
                 <span className="text-[7px] font-mono font-bold uppercase text-emerald-300 bg-emerald-500/20 px-1 py-0.2 rounded border border-emerald-500/40">
                   ✓ Done
+                </span>
+              )}
+              {isArchived && (
+                <span className="text-[7px] font-mono font-bold uppercase text-stone-400 bg-stone-800 px-1 py-0.2 rounded border border-stone-700">
+                  Archived
                 </span>
               )}
             </div>
@@ -623,7 +475,7 @@ export const GenericCanvasNode = memo(({ data }: NodeProps<any>) => {
                         : `${theme.badgeText} ${theme.badgeBg} ${theme.badgeBorder}`
                   }`}
                 >
-                  ⚡ {timeSpentStr}
+                  ⏳ {timeSpentStr}
                 </span>
               )}
             </div>
@@ -654,14 +506,12 @@ export const GenericCanvasNode = memo(({ data }: NodeProps<any>) => {
                 e.stopPropagation();
                 setIsEditing(true);
               }}
-              className={`font-bold block leading-relaxed break-words whitespace-normal ${
-                isTier1 ? 'text-sm font-sans text-stone-100' : 'text-xs text-stone-200'
-              } ${
+              className={`text-xs font-bold block leading-relaxed break-words whitespace-normal ${
                 isArchived
                   ? 'text-stone-400 italic group-hover:text-stone-300'
                   : isCompleted
                     ? 'text-stone-300 line-through group-hover:text-emerald-200'
-                    : 'group-hover:text-amber-200'
+                    : 'text-stone-100 group-hover:text-stone-200'
               }`}
               title="Double click to edit title"
             >
