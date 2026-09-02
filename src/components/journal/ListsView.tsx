@@ -2234,14 +2234,13 @@ export default function ListsView({
 		[entries],
 	);
 
-	// All completed accomplishment tasks across the entire database (strictly is_accomplishment === true)
+	// All completed accomplishment tasks & logs across the entire database (strictly is_accomplishment === true)
 	const accomplishmentTasks = useMemo(
 		() =>
 			entries.filter(
 				(e): e is Task =>
-					e.type === "task" &&
-					e.status === "done" &&
-					e.is_accomplishment === true,
+					(e.type === "task" && e.status === "done" && e.is_accomplishment === true) ||
+					(e.type === "log" && (e as any).is_accomplishment === true),
 			),
 		[entries],
 	);
@@ -2260,7 +2259,7 @@ export default function ListsView({
 
 	// ─── Filter Tasks for the Selected View ──────────────────────────────────
 	const listTasks = useMemo(() => {
-		let tasks = allTasks;
+		let tasks = selectedView === "trophy" ? accomplishmentTasks : allTasks;
 
 		// Filter by list / view
 		if (selectedView === "unassigned") {

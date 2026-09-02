@@ -13,6 +13,8 @@ export type EntryType =
   | 'goal'
   | 'habit-log';
 
+export type DayRange = '1D' | '3D' | '4D' | '1W';
+
 export interface MicroWin {
   id: string;
   text: string;
@@ -84,6 +86,7 @@ export interface Log extends BaseEntry {
   title: string;
   timestamp: Date;
   end_timestamp?: Date;
+  is_accomplishment?: boolean;
 }
 
 export interface TimeBlock extends BaseEntry {

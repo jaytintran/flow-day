@@ -22,6 +22,7 @@ import {
   Hourglass,
   Star,
   Sparkles,
+  Trophy,
 } from 'lucide-react';
 import { TimelineEntry, Task, Log, Event, Note, TimeBlock, HabitLog } from '../../types';
 import { formatDuration, toLocalDateString } from '../../utils';
@@ -837,24 +838,20 @@ export default function DayTimeline({
                           setEditingLogId(entry.id);
                           setEditingLogTitle((entry as Log).title);
                         }}
-                        className="text-xs font-sans font-semibold text-stone-200 break-words line-clamp-1 hover:text-stone-300 transition-colors"
+                        className={`text-xs font-sans font-semibold break-words line-clamp-1 hover:text-stone-300 transition-colors ${
+                          (entry as Log).is_accomplishment || (entry as Log).starred
+                            ? 'text-amber-400'
+                            : 'text-stone-200'
+                        }`}
                       >
+                        {(entry as Log).is_accomplishment && (
+                          <span className="mr-1.5 not-italic text-amber-400" title="Accomplishment">🏆</span>
+                        )}
+                        {(entry as Log).starred && (
+                          <span className="mr-1.5 not-italic text-amber-400" title="Starred Highlight">⭐</span>
+                        )}
                         {(entry as Log).title}
                       </p>
-                      {(entry as Log).end_timestamp && (
-                        <span
-                          className="inline-flex items-center gap-1 bg-stone-900 border border-stone-800 text-stone-400 rounded-md px-1.5 py-0.5 text-[9px] font-mono shrink-0 select-none"
-                          title={`Logged span: ${formatTime((entry as Log).timestamp)} – ${formatTime((entry as Log).end_timestamp!)}`}
-                        >
-                          <Clock className="w-2.5 h-2.5 text-stone-500" />
-                          <span>
-                            {formatDuration(
-                              new Date((entry as Log).end_timestamp!).getTime() -
-                                new Date((entry as Log).timestamp).getTime(),
-                            )}
-                          </span>
-                        </span>
-                      )}
                     </>
                   )}
                 </div>
@@ -866,7 +863,7 @@ export default function DayTimeline({
                     id={`task-title-${entry.id}`}
                     className={`text-xs font-sans break-words line-clamp-1 ${
                       (entry as Task).status === 'done'
-                        ? ((entry as Task).starred || (entry as Task).achievements?.length)
+                        ? ((entry as Task).starred || (entry as Task).is_accomplishment || (entry as Task).achievements?.length)
                           ? 'text-amber-400/80 line-through font-semibold'
                           : 'text-stone-600 line-through font-semibold'
                         : 'text-stone-200 font-semibold'
@@ -874,8 +871,8 @@ export default function DayTimeline({
                   >
                     {(entry as Task).status === 'done' && (
                       <>
-                        {(entry as Task).achievements?.length ? (
-                          <span className="mr-1.5 not-italic" title="Logged Achievements">🏆</span>
+                        {((entry as Task).is_accomplishment || (entry as Task).achievements?.length) ? (
+                          <span className="mr-1.5 not-italic text-amber-400" title="Accomplishment">🏆</span>
                         ) : null}
                         {((entry as Task).starred || ((entry as Task).achievements && (entry as Task).achievements!.length > 0)) ? (
                           <span className="mr-1.5 not-italic text-amber-400" title="Starred Win">⭐</span>
@@ -934,7 +931,7 @@ export default function DayTimeline({
               )}
             </div>
 
-            {/* Right-aligned actions: Delete Entry Tool */}
+            {/* Right-aligned actions: Star (Highlight), Trophy (Accomplishment), Play, Delete */}
             <div className="flex items-center gap-1 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
               {isTask && (entry as Task).status === 'todo' && (
                 <button
@@ -950,7 +947,7 @@ export default function DayTimeline({
                 </button>
               )}
 
-              {/* Star highlight button for all entry types (note, log, event, done task) */}
+              {/* Star highlight button (Days Highlights) */}
               {((isTask && (entry as Task).status === 'done') || isNote || isEvent || isLog) && (
                 <button
                   id={`star-entry-btn-${entry.id}`}
@@ -960,21 +957,47 @@ export default function DayTimeline({
                     await db.entries.update(entry.id, { starred: isStarred } as any);
                   }}
                   className={`p-1.5 bg-transparent rounded border border-stone-800 hover:bg-stone-850 transition-colors cursor-pointer ${
-                    entry.starred || (isTask && (entry as Task).achievements && (entry as Task).achievements!.length > 0)
+                    entry.starred
                       ? 'text-amber-400 hover:text-amber-300'
                       : 'text-stone-500 hover:text-amber-400'
                   }`}
                   title={
-                    entry.starred || (isTask && (entry as Task).achievements && (entry as Task).achievements!.length > 0)
-                      ? 'Unstar highlight'
-                      : 'Star as Highlight'
+                    entry.starred
+                      ? 'Remove from Highlights'
+                      : 'Star to Day’s Highlights'
                   }
                 >
                   <Star
                     className={`w-3.5 h-3.5 ${
-                      entry.starred || (isTask && (entry as Task).achievements && (entry as Task).achievements!.length > 0)
-                        ? 'fill-current'
-                        : ''
+                      entry.starred ? 'fill-current' : ''
+                    }`}
+                  />
+                </button>
+              )}
+
+              {/* Trophy accomplishment button (Accomplishments in Lists view) */}
+              {(isLog || (isTask && (entry as Task).status === 'done')) && (
+                <button
+                  id={`trophy-entry-btn-${entry.id}`}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const isAccomplished = !(entry as Log | Task).is_accomplishment;
+                    await db.entries.update(entry.id, { is_accomplishment: isAccomplished } as any);
+                  }}
+                  className={`p-1.5 bg-transparent rounded border border-stone-800 hover:bg-stone-850 transition-colors cursor-pointer ${
+                    (entry as Log | Task).is_accomplishment
+                      ? 'text-amber-400 hover:text-amber-300'
+                      : 'text-stone-500 hover:text-amber-400'
+                  }`}
+                  title={
+                    (entry as Log | Task).is_accomplishment
+                      ? 'Remove from Accomplishments'
+                      : 'Add to Accomplishments in Lists view'
+                  }
+                >
+                  <Trophy
+                    className={`w-3.5 h-3.5 ${
+                      (entry as Log | Task).is_accomplishment ? 'fill-current' : ''
                     }`}
                   />
                 </button>
@@ -1012,19 +1035,31 @@ export default function DayTimeline({
           <div className="flex items-center gap-x-1.5 text-xs pb-1">
             {isLog && (
               <>
-                <span className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                <span
+                  title={`Logged at ${formatTime((entry as Log).timestamp)}`}
+                  className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 hover:border-stone-700 hover:text-stone-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                >
                   <Clock className="w-3 h-3 inline-block text-stone-500" />
                   {formatTime((entry as Log).timestamp)}
                 </span>
 
                 {(entry as Log).end_timestamp && (
                   <>
-                    <span className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                    <span
+                      title={`Time Span: ${formatTime((entry as Log).timestamp)} to ${formatTime((entry as Log).end_timestamp!)}`}
+                      className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 hover:border-sky-700/50 hover:text-sky-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                    >
                       <Calendar className="w-3 h-3 inline-block text-sky-400" />
                       {formatTime((entry as Log).timestamp)} – {formatTime((entry as Log).end_timestamp!)}
                     </span>
 
-                    <span className="flex items-center gap-1 bg-[#121212] border border-amber-800/30 text-amber-400/90 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                    <span
+                      title={`Total Duration: ${formatDuration(
+                        new Date((entry as Log).end_timestamp!).getTime() -
+                          new Date((entry as Log).timestamp).getTime(),
+                      )}`}
+                      className="flex items-center gap-1 bg-[#121212] border border-amber-800/30 text-amber-400/90 hover:border-amber-700/50 hover:text-amber-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                    >
                       <Hourglass className="w-3 h-3 inline-block text-amber-500" />
                       {formatDuration(
                         new Date((entry as Log).end_timestamp!).getTime() -
@@ -1038,34 +1073,49 @@ export default function DayTimeline({
 
             {isTask && (
               <>
-                <span className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                <span
+                  title={`Created at ${formatTime(entry.created_at)}`}
+                  className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 hover:border-stone-700 hover:text-stone-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                >
                   <Clock className="w-3 h-3 inline-block text-stone-500" />
                   {formatTime(entry.created_at)}
                 </span>
 
                 {(entry as Task).scheduled_at && !(entry as Task).scheduled_end_at && (
-                  <span className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                  <span
+                    title={`Scheduled for ${formatTime((entry as Task).scheduled_at!)}`}
+                    className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 hover:border-sky-700/50 hover:text-sky-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                  >
                     <Calendar className="w-3 h-3 inline-block text-sky-400" />
                     {formatTime((entry as Task).scheduled_at!)}
                   </span>
                 )}
 
                 {(entry as Task).scheduled_end_at && (
-                  <span className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                  <span
+                    title={`Scheduled Time Span: ${formatTime((entry as Task).scheduled_at || (entry as Task).created_at)} to ${formatTime((entry as Task).scheduled_end_at!)}`}
+                    className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 hover:border-sky-700/50 hover:text-sky-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                  >
                     <Calendar className="w-3 h-3 inline-block text-sky-400" />
                     {formatTime((entry as Task).scheduled_at || (entry as Task).created_at)} – {formatTime((entry as Task).scheduled_end_at!)}
                   </span>
                 )}
 
                 {(entry as Task).completed_at && (
-                  <span className="flex items-center gap-1 bg-emerald-950/30 text-emerald-400 border border-emerald-700/30 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                  <span
+                    title={`Completed at ${formatTime((entry as Task).completed_at!)}`}
+                    className="flex items-center gap-1 bg-emerald-950/30 text-emerald-400 border border-emerald-700/30 hover:border-emerald-600/50 hover:text-emerald-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                  >
                     <CheckCircle className="w-3 h-3 inline-block text-emerald-400" />
                     {formatTime((entry as Task).completed_at!)}
                   </span>
                 )}
 
                 {(entry as Task).time_spent > 0 && (
-                  <span className="flex items-center gap-1 bg-[#121212] border border-amber-800/30 text-amber-400/90 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                  <span
+                    title={`Total Focus Time Logged: ${formatDuration((entry as Task).time_spent)}`}
+                    className="flex items-center gap-1 bg-[#121212] border border-amber-800/30 text-amber-400/90 hover:border-amber-700/50 hover:text-amber-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                  >
                     <Hourglass className="w-3 h-3 inline-block text-amber-500" />
                     {formatDuration((entry as Task).time_spent)}
                   </span>
@@ -1075,19 +1125,31 @@ export default function DayTimeline({
 
             {isEvent && (
               <>
-                <span className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                <span
+                  title={`Event Time: ${formatTime((entry as Event).timestamp)}`}
+                  className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 hover:border-stone-700 hover:text-stone-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                >
                   <Clock className="w-3 h-3 inline-block text-stone-500" />
                   {formatTime((entry as Event).timestamp)}
                 </span>
 
                 {(entry as Event).end_timestamp && (
                   <>
-                    <span className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                    <span
+                      title={`Event Duration Span: ${formatTime((entry as Event).timestamp)} to ${formatTime((entry as Event).end_timestamp!)}`}
+                      className="flex items-center gap-1 bg-[#121212] border border-sky-800/30 text-sky-400/90 hover:border-sky-700/50 hover:text-sky-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                    >
                       <Calendar className="w-3 h-3 inline-block text-sky-400" />
                       {formatTime((entry as Event).timestamp)} – {formatTime((entry as Event).end_timestamp!)}
                     </span>
 
-                    <span className="flex items-center gap-1 bg-[#121212] border border-amber-800/30 text-amber-400/90 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+                    <span
+                      title={`Total Event Duration: ${formatDuration(
+                        new Date((entry as Event).end_timestamp!).getTime() -
+                          new Date((entry as Event).timestamp).getTime(),
+                      )}`}
+                      className="flex items-center gap-1 bg-[#121212] border border-amber-800/30 text-amber-400/90 hover:border-amber-700/50 hover:text-amber-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+                    >
                       <Hourglass className="w-3 h-3 inline-block text-amber-500" />
                       {formatDuration(
                         new Date((entry as Event).end_timestamp!).getTime() -
@@ -1100,14 +1162,20 @@ export default function DayTimeline({
             )}
 
             {isNote && (
-              <span className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+              <span
+                title={`Created at ${formatTime((entry as Note).timestamp)}`}
+                className="flex items-center gap-1 bg-[#121212] border border-stone-800 text-stone-400 hover:border-stone-700 hover:text-stone-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+              >
                 <Clock className="w-3 h-3 inline-block text-stone-500" />
                 {formatTime((entry as Note).timestamp)}
               </span>
             )}
 
             {isHabitLog && (
-              <span className="flex items-center gap-1 bg-emerald-950/30 text-emerald-400 border border-emerald-700/30 rounded px-2 py-0.5 text-[8px] font-mono select-none">
+              <span
+                title={`Ritual Completed at ${formatTime((entry as HabitLog).timestamp)}`}
+                className="flex items-center gap-1 bg-emerald-950/30 text-emerald-400 border border-emerald-700/30 hover:border-emerald-600/50 hover:text-emerald-300 transition-colors rounded px-2 py-0.5 text-[8px] font-mono select-none cursor-help"
+              >
                 <CheckCircle className="w-3 h-3 inline-block text-emerald-400" />
                 {formatTime((entry as HabitLog).timestamp)}
               </span>

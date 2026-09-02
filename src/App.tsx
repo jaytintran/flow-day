@@ -11,6 +11,8 @@ import InputBar from './components/InputBar';
 import DayScratchpad from './components/journal/DayScratchpad';
 import DayHighlights from './components/journal/DayHighlights';
 
+import { DayRange } from './types';
+
 type ViewMode = 'day' | 'timeline' | 'records' | 'lists' | 'hub';
 const VALID_MODES: ViewMode[] = ['day', 'timeline', 'records', 'lists', 'hub'];
 
@@ -23,9 +25,18 @@ function getInitialViewMode(): ViewMode {
   return 'day';
 }
 
+function getInitialDayRange(): DayRange {
+  try {
+    const stored = localStorage.getItem('flowday-dayview-range');
+    if (stored === '1D' || stored === '3D' || stored === '4D' || stored === '1W') return stored;
+  } catch {}
+  return '1D';
+}
+
 export default function App() {
   const [activeDate, setActiveDate] = useState<Date>(new Date());
   const [viewMode, setViewModeRaw] = useState<ViewMode>(getInitialViewMode);
+  const [dayRange, setDayRangeRaw] = useState<DayRange>(getInitialDayRange);
 
   const setViewMode = useCallback((mode: ViewMode) => {
     setViewModeRaw(mode);
@@ -33,6 +44,14 @@ export default function App() {
       localStorage.setItem('flowday-view-mode', mode);
     } catch {}
   }, []);
+
+  const setDayRange = useCallback((range: DayRange) => {
+    setDayRangeRaw(range);
+    try {
+      localStorage.setItem('flowday-dayview-range', range);
+    } catch {}
+  }, []);
+
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [activeHubTab, setActiveHubTab] = useState<'focus' | 'goals' | 'objectives' | 'habits'>(
     'goals',
@@ -96,6 +115,8 @@ export default function App() {
           setActiveDate={setActiveDate}
           viewMode={viewMode}
           setViewMode={setViewMode}
+          dayRange={dayRange}
+          setDayRange={setDayRange}
           activeHubTab={activeHubTab}
           setActiveHubTab={setActiveHubTab}
           isScratchpadOpen={isScratchpadOpen}
@@ -117,6 +138,8 @@ export default function App() {
           activeDate={activeDate}
           setActiveDate={setActiveDate}
           viewMode={viewMode}
+          dayRange={dayRange}
+          setDayRange={setDayRange}
           activeTaskId={activeTaskId}
           setActiveTaskId={setActiveTaskId}
           activeHubTab={activeHubTab}

@@ -30,7 +30,7 @@ import HabitConsistencyModal from './HabitConsistencyModal';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../db';
-import { Task, Habit, HabitLog, TaskAchievement } from '../types';
+import { Task, Habit, HabitLog, TaskAchievement, DayRange } from '../types';
 import { formatDateLabel, isSameDay, toLocalDateString } from '../utils';
 
 interface DayNavigatorProps {
@@ -38,6 +38,8 @@ interface DayNavigatorProps {
   setActiveDate: (date: Date) => void;
   viewMode: 'lists' | 'day' | 'timeline' | 'records' | 'hub';
   setViewMode: (mode: 'day' | 'timeline' | 'records' | 'lists' | 'hub') => void;
+  dayRange?: DayRange;
+  setDayRange?: (range: DayRange) => void;
   activeHubTab?: 'goals' | 'objectives' | 'habits' | 'focus';
   setActiveHubTab?: (tab: 'goals' | 'objectives' | 'habits' | 'focus') => void;
   isScratchpadOpen?: boolean;
@@ -51,6 +53,8 @@ export default function DayNavigator({
   setActiveDate,
   viewMode,
   setViewMode,
+  dayRange = '1D',
+  setDayRange,
   activeHubTab,
   setActiveHubTab,
   isScratchpadOpen,
@@ -84,19 +88,25 @@ export default function DayNavigator({
   const [isMobileViewMenuOpen, setIsMobileViewMenuOpen] = useState(false);
   const mobileViewMenuRef = useRef<HTMLDivElement>(null);
 
+  const [isDayRangeDropdownOpen, setIsDayRangeDropdownOpen] = useState(false);
+  const dayRangeDropdownRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (mobileViewMenuRef.current && !mobileViewMenuRef.current.contains(e.target as Node)) {
         setIsMobileViewMenuOpen(false);
       }
+      if (dayRangeDropdownRef.current && !dayRangeDropdownRef.current.contains(e.target as Node)) {
+        setIsDayRangeDropdownOpen(false);
+      }
     };
-    if (isMobileViewMenuOpen) {
+    if (isMobileViewMenuOpen || isDayRangeDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isMobileViewMenuOpen]);
+  }, [isMobileViewMenuOpen, isDayRangeDropdownOpen]);
 
   // Load entries reactively
   const entries = useLiveQuery(() => db.entries.toArray()) || [];
@@ -645,6 +655,67 @@ export default function DayNavigator({
 
               {/* 2. Icon button group: Calendar only */}
               {iconButtonGroup}
+
+              {/* 2.5 Day Range Dropdown Selector for Day View (Desktop only) */}
+              {viewMode === 'day' && setDayRange && (
+                <div className="hidden lg:block relative" ref={dayRangeDropdownRef}>
+                  <div className="flex items-center bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 h-9 shrink-0 shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => setIsDayRangeDropdownOpen(!isDayRangeDropdownOpen)}
+                      className={`h-full px-2.5 rounded-md active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer font-mono font-bold text-xs ${
+                        isDayRangeDropdownOpen || dayRange !== '1D'
+                          ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                          : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/50'
+                      }`}
+                      title="Choose Day View range (1D, 3D, 4D, 1W)"
+                    >
+                      <span className="tracking-wider">{dayRange}</span>
+                      <ChevronDown
+                        className={`w-3.5 h-3.5 text-stone-500 transition-transform duration-200 ${
+                          isDayRangeDropdownOpen ? 'rotate-180 text-amber-400' : ''
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Dropdown Menu */}
+                  {isDayRangeDropdownOpen && (
+                    <div className="absolute left-0 mt-1.5 w-36 bg-[#121212] border border-stone-800 rounded-xl shadow-2xl py-1 z-50 animate-in fade-in zoom-in-95 duration-150">
+                      {(
+                        [
+                          { id: '1D', label: '1 Day', desc: 'Single day focus' },
+                          { id: '3D', label: '3 Days', desc: 'Past, Today, Future' },
+                          { id: '4D', label: '4 Days', desc: 'Next 4 days' },
+                          { id: '1W', label: '1 Week', desc: 'Mon – Sun full week' },
+                        ] as { id: DayRange; label: string; desc: string }[]
+                      ).map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setDayRange(item.id);
+                            setIsDayRangeDropdownOpen(false);
+                          }}
+                          className={`w-full px-3 py-2 text-left flex items-center justify-between transition-colors cursor-pointer text-xs ${
+                            dayRange === item.id
+                              ? 'bg-amber-500/10 text-amber-300'
+                              : 'text-stone-400 hover:text-stone-100 hover:bg-stone-850'
+                          }`}
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-mono font-bold">{item.label}</span>
+                            <span className="text-[10px] text-stone-500">{item.desc}</span>
+                          </div>
+                          {dayRange === item.id && (
+                            <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

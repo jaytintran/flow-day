@@ -8,6 +8,7 @@ import {
 	Note,
 	TimeBlock,
 	TaskAchievement,
+	DayRange,
 } from "../../types";
 import {
 	formatDuration,
@@ -33,6 +34,8 @@ interface JournalProps {
 	activeDate: Date;
 	setActiveDate: (date: Date) => void;
 	viewMode: "day" | "timeline" | "records" | "lists" | "hub";
+	dayRange?: DayRange;
+	setDayRange?: (range: DayRange) => void;
 	activeTaskId: string | null;
 	setActiveTaskId: (id: string | null) => void;
 	activeHubTab?: "goals" | "objectives" | "habits" | "focus" | string;
@@ -407,6 +410,8 @@ export default function Journal({
 	activeDate,
 	setActiveDate,
 	viewMode,
+	dayRange = "1D",
+	setDayRange,
 	activeTaskId,
 	setActiveTaskId,
 	activeHubTab,
@@ -998,7 +1003,9 @@ export default function Journal({
 							? "md:max-w-9xl "
 							: viewMode === "timeline"
 								? "md:max-w-4xl space-y-0"
-								: "md:max-w-4xl space-y-8"
+								: dayRange !== "1D"
+									? "w-full px-4 sm:px-6 md:px-8 space-y-8"
+									: "md:max-w-4xl space-y-8"
 				}`}
 			>
 				{viewMode === "records" ? (
@@ -1045,6 +1052,9 @@ export default function Journal({
 						overdueTasks={overdueTasks}
 						handleImportAllOverdue={handleImportAllOverdue}
 						handleRescheduleAllOverdue={handleRescheduleAllOverdue}
+						dayRange={dayRange}
+						entries={entries}
+						getDayRenderItems={getDayRenderItems}
 					/>
 				) : viewMode === "hub" ? (
 					<div className="w-full flex-1 min-h-0 flex flex-col pt-2 h-[calc(100vh-140px)]">

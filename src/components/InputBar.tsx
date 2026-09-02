@@ -15,10 +15,20 @@ import {
   HelpCircle,
   X,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CircleDot,
+  Sparkles,
+  Info,
+  Layers,
+  ArrowRight,
 } from 'lucide-react';
-import { toLocalDateString } from '../utils';
+import { toLocalDateString, formatDuration } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
+
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+}
 
 interface InputBarProps {
   activeDate: Date;
@@ -87,21 +97,28 @@ function parseSmartDate(
 
 // Helper regex tokens for time parsing
 const TIME_TOKEN_PATTERN =
-  '(?:\\d{1,2}:\\d{2}\\s*(?:am|pm)?|\\d{1,2}\\s*(?:am|pm)\\s*\\d{1,2}|\\d{1,2}\\s*(?:am|pm)|\\d{1,2}\\s*h\\s*\\d{1,2}|\\d{1,2})';
+  '(?:now|\\d{1,2}:\\d{2}\\s*(?:am|pm)?|\\d{1,2}\\s*(?:am|pm)\\s*\\d{1,2}|\\d{1,2}\\s*(?:am|pm)|\\d{1,2}\\s*h\\s*\\d{1,2}|\\d{1,2})';
 const fromToRegex = new RegExp(
   '(?:\\s+|^)from\\s*(' + TIME_TOKEN_PATTERN + ')\\s*to\\s*(' + TIME_TOKEN_PATTERN + ')(?=\\s|$)',
   'i',
 );
 const atRegex = new RegExp('(?:\\s+|^)at\\s*(' + TIME_TOKEN_PATTERN + ')(?=\\s|$)', 'i');
+const nowStandaloneRegex = /(?:\s+|^)\bnow\b(?=\s|$)/i;
 const durationRegex = /(?:\s+|^)(\d+)\s*h\s*(\d+)?\s*(?:m|min)?(?=\s|$)/i;
 const durationOnlyMinutesRegex = /(?:\s+|^)(\d+)\s*(?:m|min)(?=\s|$)/i;
 
-// Parse a single time token like "3pm40", "3:45pm", "3pm", "15:30", "3h20", "3"
+// Parse a single time token like "now", "3pm40", "3:45pm", "3pm", "15:30", "3h20", "3"
 function parseSingleTimeToken(
   tokenStr: string,
-): { hour: number; minute: number; ampm: string | null } | null {
+): { hour: number; minute: number; ampm: string | null; isNow?: boolean } | null {
   if (!tokenStr) return null;
   const s = tokenStr.trim().toLowerCase();
+
+  // Keyword: now
+  if (s === 'now') {
+    const now = new Date();
+    return { hour: now.getHours(), minute: now.getMinutes(), ampm: null, isNow: true };
+  }
 
   // Format: 3:45pm, 3:45 am, 3:45, 15:45
   const colonMatch = s.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/);
@@ -181,23 +198,25 @@ function parseSmartTimeSpan(
   let hasSpan = false;
   let hasTime = false;
 
-  // 1. Try to match "from <time> to <time>" (e.g. from 3pm to 4pm, from3pmto4pm, from 3pm40 to 5pm50, from3pm30to5pm30)
+  // 1. Try to match "from <time> to <time>" (e.g. from now to 3pm, from 10am to now, from 3pm to 4pm, from3pmto4pm, from 3pm40 to 5pm50)
   const fromToMatch = cleanText.match(fromToRegex);
   if (fromToMatch) {
     const t1 = parseSingleTimeToken(fromToMatch[1]);
     const t2 = parseSingleTimeToken(fromToMatch[2]);
 
     if (t1 && t2) {
-      // Inherit am/pm if one is missing but the other exists
-      if (!t1.ampm && t2.ampm && t1.hour < 12) {
-        t1.ampm = t2.ampm;
-      }
-      if (!t2.ampm && t1.ampm && t2.hour < 12) {
-        t2.ampm = t1.ampm;
+      // Inherit am/pm if one is missing but the other exists (and neither is 'now')
+      if (!t1.isNow && !t2.isNow) {
+        if (!t1.ampm && t2.ampm && t1.hour < 12) {
+          t1.ampm = t2.ampm;
+        }
+        if (!t2.ampm && t1.ampm && t2.hour < 12) {
+          t2.ampm = t1.ampm;
+        }
       }
 
-      const startH = resolveHour(t1.hour, t1.ampm);
-      const endH = resolveHour(t2.hour, t2.ampm);
+      const startH = t1.isNow ? t1.hour : resolveHour(t1.hour, t1.ampm);
+      const endH = t2.isNow ? t2.hour : resolveHour(t2.hour, t2.ampm);
 
       if (startH >= 0 && startH < 24 && t1.minute >= 0 && t1.minute < 60) {
         startAt.setHours(startH, t1.minute, 0, 0);
@@ -217,13 +236,13 @@ function parseSmartTimeSpan(
     }
   }
 
-  // 2. If no from...to span, try "at <time>" (e.g. at 3:45pm, at3pm20, at 3pm20, at 20:15)
+  // 2. If no from...to span, try "at <time>" (e.g. at now, at 3:45pm, at3pm20, at 3pm20, at 20:15)
   if (!hasTime) {
     const atMatch = cleanText.match(atRegex);
     if (atMatch) {
       const t = parseSingleTimeToken(atMatch[1]);
       if (t) {
-        const targetHour = resolveHour(t.hour, t.ampm);
+        const targetHour = t.isNow ? t.hour : resolveHour(t.hour, t.ampm);
         if (targetHour >= 0 && targetHour < 24 && t.minute >= 0 && t.minute < 60) {
           startAt.setHours(targetHour, t.minute, 0, 0);
           hasTime = true;
@@ -233,7 +252,18 @@ function parseSmartTimeSpan(
     }
   }
 
-  // 3. Check for trailing duration (e.g. 1h30, 45m)
+  // 3. If still no time, check for standalone "now" (e.g. "now 45m" or "Working on ticket now")
+  if (!hasTime) {
+    const nowMatch = cleanText.match(nowStandaloneRegex);
+    if (nowMatch) {
+      const now = new Date();
+      startAt.setHours(now.getHours(), now.getMinutes(), 0, 0);
+      hasTime = true;
+      cleanText = cleanText.replace(nowStandaloneRegex, ' ').trim().replace(/\s+/g, ' ');
+    }
+  }
+
+  // 4. Check for trailing duration (e.g. 1h30, 45m)
   const durMatch = cleanText.match(durationRegex);
   if (durMatch) {
     const h = parseInt(durMatch[1], 10);
@@ -335,15 +365,54 @@ const formatHumanTimeOnly = (dtStr: string) => {
       minute: '2-digit',
       hour12: true,
     });
-  } catch {
+} catch {
     return dtStr;
   }
+};
+
+// Ordered list of types for Tab cycling
+const ENTRY_TYPES: EntryType[] = ['task', 'log', 'event', 'note', 'time-block'];
+
+// Contextual rotating placeholders covering all existing NLP syntax
+const PLACEHOLDERS: Record<EntryType, string[]> = {
+  task: [
+    'Capture task (e.g. Code database schema at 4:30pm tomorrow)...',
+    'Try: "Review PR from now to 3pm" (Span starting right now)',
+    'Try: "Quick bug fix now 45m" (Span: now + 45m)',
+    'Try: "Team sync today from 2pm to 3:30pm" (From/To range)',
+    'Try: "Workout in 2 days at 6pm" (Relative offset)',
+  ],
+  log: [
+    'Describe what you are doing (e.g. Walking to the train station)...',
+    'Try: "Debugging auth from 10am to now" (Ended just now)',
+    'Try: "Deep debugging session from now to 1h30" or "at 3pm 1h30"',
+    'Try: "Coffee break with design team now 15m"',
+  ],
+  event: [
+    'Event title (e.g. Project briefing presentation tomorrow at 10am)...',
+    'Try: "Emergency team huddle from now to 2pm"',
+    'Try: "Product launch keynote on 25/11 from 9am to 11:30am"',
+    'Try: "Dentist appointment tomorrow at 3pm45"',
+  ],
+  note: [
+    'Note title (e.g. Brainstorming session today at 2pm)...',
+    'Try: "Reflections logged now" (Exact current time)',
+    'Try: "Architecture decisions on 12/9 at 11am"',
+    'Click the pencil icon on the left to write detailed markdown body',
+  ],
+  'time-block': [
+    'Focus time block (e.g. Deep Work block from 3pm to 5pm)...',
+    'Try: "Deep Work block from now to 5pm" (Current time to 5:00 PM)',
+    'Try: "Coding Sprint now 2h" (Starts right now for 2 hours)',
+    'Try: "Design Review tomorrow from 10am to 12pm"',
+  ],
 };
 
 export default function InputBar({ activeDate, viewMode }: InputBarProps) {
   const [activeType, setActiveType] = useState<EntryType>('task');
   const [showHelp, setShowHelp] = useState(false);
   const [showTimePopup, setShowTimePopup] = useState(false);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
 
   // Field values
   const [title, setTitle] = useState('');
@@ -359,6 +428,354 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
   const [startAtStr, setStartAtStr] = useState('');
   const [endAtStr, setEndAtStr] = useState('');
   const [timeManuallySet, setTimeManuallySet] = useState(false);
+  const [calendarViewDate, setCalendarViewDate] = useState<Date>(new Date(activeDate));
+
+  // Sync calendarViewDate with activeDate
+  useEffect(() => {
+    setCalendarViewDate(new Date(activeDate));
+  }, [activeDate]);
+
+  // Debounced live parsed state
+  const [debouncedInput, setDebouncedInput] = useState('');
+
+  // Rotate placeholders every 6 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setPlaceholderIndex((prev) => (prev + 1) % 5);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Debounce user input by 200ms for live chips preview
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedInput(title);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [title]);
+
+  // Helper to change selected day in calendar
+  const handleSelectCalendarDay = (day: number) => {
+    const target = new Date(calendarViewDate);
+    target.setDate(day);
+
+    const pad = (n: number) => n.toString().padStart(2, '0');
+
+    if (activeType === 'time-block') {
+      const currentStart = startAtStr ? new Date(startAtStr) : new Date();
+      currentStart.setFullYear(target.getFullYear(), target.getMonth(), target.getDate());
+      setStartAtStr(`${currentStart.getFullYear()}-${pad(currentStart.getMonth() + 1)}-${pad(currentStart.getDate())}T${pad(currentStart.getHours())}:${pad(currentStart.getMinutes())}`);
+
+      const currentEnd = endAtStr ? new Date(endAtStr) : new Date();
+      currentEnd.setFullYear(target.getFullYear(), target.getMonth(), target.getDate());
+      setEndAtStr(`${currentEnd.getFullYear()}-${pad(currentEnd.getMonth() + 1)}-${pad(currentEnd.getDate())}T${pad(currentEnd.getHours())}:${pad(currentEnd.getMinutes())}`);
+    } else {
+      const current = timestampStr ? new Date(timestampStr) : new Date();
+      current.setFullYear(target.getFullYear(), target.getMonth(), target.getDate());
+      setTimestampStr(`${current.getFullYear()}-${pad(current.getMonth() + 1)}-${pad(current.getDate())}T${pad(current.getHours())}:${pad(current.getMinutes())}`);
+    }
+    setTimeManuallySet(true);
+  };
+
+  // Month navigation
+  const handlePrevMonth = () => {
+    setCalendarViewDate((prev) => {
+      const d = new Date(prev);
+      d.setMonth(d.getMonth() - 1);
+      return d;
+    });
+  };
+
+  const handleNextMonth = () => {
+    setCalendarViewDate((prev) => {
+      const d = new Date(prev);
+      d.setMonth(d.getMonth() + 1);
+      return d;
+    });
+  };
+
+  // Render 1-Month Mini Calendar & Time Configuration Popup
+  const renderCalendarTimePopup = () => {
+    if (!showTimePopup) return null;
+
+    const year = calendarViewDate.getFullYear();
+    const month = calendarViewDate.getMonth();
+    const monthName = calendarViewDate.toLocaleDateString([], { month: 'long', year: 'numeric' });
+
+    // Days in current view month
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    // Selected date check
+    const currentSelectedDate = activeType === 'time-block'
+      ? (startAtStr ? new Date(startAtStr) : activeDate)
+      : (timestampStr ? new Date(timestampStr) : activeDate);
+
+    const isCurrentSelected = (day: number) => {
+      return (
+        currentSelectedDate.getFullYear() === year &&
+        currentSelectedDate.getMonth() === month &&
+        currentSelectedDate.getDate() === day
+      );
+    };
+
+    const isToday = (day: number) => {
+      const now = new Date();
+      return now.getFullYear() === year && now.getMonth() === month && now.getDate() === day;
+    };
+
+    return (
+      <AnimatePresence>
+        <motion.div
+          initial={{ opacity: 0, y: 8, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 8, scale: 0.96 }}
+          transition={{ duration: 0.12, ease: 'easeOut' }}
+          className="absolute bottom-full mb-3 left-0 bg-[#161616] border border-stone-800 rounded-2xl p-4 shadow-2xl z-[999] w-[310px] backdrop-blur-xl"
+          id="calendar-time-popup"
+        >
+          {/* Calendar Header with Month Cycling Strip */}
+          <div className="flex items-center justify-between border-b border-stone-800/80 pb-2.5 mb-3">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handlePrevMonth}
+                className="p-1 hover:bg-stone-800 text-stone-400 hover:text-stone-200 rounded-lg transition-colors cursor-pointer"
+                title="Previous Month"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <span className="text-xs font-mono font-bold text-stone-200 min-w-[120px] text-center select-none">
+                {monthName}
+              </span>
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                className="p-1 hover:bg-stone-800 text-stone-400 hover:text-stone-200 rounded-lg transition-colors cursor-pointer"
+                title="Next Month"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowTimePopup(false)}
+              className="p-1 hover:bg-stone-800 rounded-lg text-stone-500 hover:text-stone-300 transition-colors cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Mini Calendar Grid */}
+          <div className="mb-3.5">
+            {/* Weekday headers */}
+            <div className="grid grid-cols-7 gap-1 text-center font-mono text-[9px] text-stone-500 uppercase font-bold mb-1">
+              <span>Su</span>
+              <span>Mo</span>
+              <span>Tu</span>
+              <span>We</span>
+              <span>Th</span>
+              <span>Fr</span>
+              <span>Sa</span>
+            </div>
+
+            {/* Days grid */}
+            <div className="grid grid-cols-7 gap-1 text-center">
+              {Array.from({ length: firstDayIndex }).map((_, i) => (
+                <div key={`empty-${i}`} className="h-7 w-7" />
+              ))}
+              {Array.from({ length: daysInMonth }).map((_, i) => {
+                const day = i + 1;
+                const selected = isCurrentSelected(day);
+                const today = isToday(day);
+
+                return (
+                  <button
+                    key={`day-${day}`}
+                    type="button"
+                    onClick={() => handleSelectCalendarDay(day)}
+                    className={`h-7 w-7 rounded-lg text-xs font-mono font-semibold flex items-center justify-center transition-all cursor-pointer ${
+                      selected
+                        ? activeType === 'task'
+                          ? 'bg-emerald-500 text-stone-950 font-bold shadow-md'
+                          : activeType === 'log'
+                            ? 'bg-stone-200 text-stone-950 font-bold shadow-md'
+                            : activeType === 'event'
+                              ? 'bg-amber-500 text-stone-950 font-bold shadow-md'
+                              : activeType === 'note'
+                                ? 'bg-blue-500 text-stone-950 font-bold shadow-md'
+                                : 'bg-indigo-500 text-stone-950 font-bold shadow-md'
+                        : today
+                          ? 'border border-amber-500/60 text-amber-400 bg-amber-500/10 hover:bg-amber-500/20'
+                          : 'text-stone-300 hover:bg-stone-800 hover:text-white'
+                    }`}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Time and Duration Inputs */}
+          <div className="border-t border-stone-800/80 pt-3 space-y-2.5">
+            {activeType === 'time-block' ? (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <span className="text-[9px] font-mono text-stone-500 uppercase tracking-wider font-bold">Start Frame</span>
+                  <input
+                    type="datetime-local"
+                    value={startAtStr}
+                    onChange={(e) => setStartAtStr(e.target.value)}
+                    className="w-full bg-[#0b0b0b] hover:bg-stone-900 text-stone-200 border border-stone-800 rounded-lg px-2 py-1.5 text-[11px] font-mono focus:outline-none focus:border-indigo-500/40 cursor-pointer"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[9px] font-mono text-stone-500 uppercase tracking-wider font-bold">End Frame</span>
+                  <input
+                    type="datetime-local"
+                    value={endAtStr}
+                    onChange={(e) => setEndAtStr(e.target.value)}
+                    className="w-full bg-[#0b0b0b] hover:bg-stone-900 text-stone-200 border border-stone-800 rounded-lg px-2 py-1.5 text-[11px] font-mono focus:outline-none focus:border-indigo-500/40 cursor-pointer"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <span className="text-[9px] font-mono text-stone-500 uppercase tracking-wider font-bold">
+                  {activeType === 'task' ? 'Scheduled Target Date & Time' : 'Entry Date & Timestamp'}
+                </span>
+                <input
+                  type="datetime-local"
+                  value={timestampStr}
+                  onChange={(e) => {
+                    setTimestampStr(e.target.value);
+                    setTimeManuallySet(true);
+                  }}
+                  className="w-full bg-[#0b0b0b] hover:bg-stone-900 text-stone-200 border border-stone-800 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:border-amber-500/40 cursor-pointer"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Popup Footer */}
+          <div className="border-t border-stone-800/80 mt-3 pt-2.5 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date();
+                setCalendarViewDate(new Date(now));
+                handleSelectCalendarDay(now.getDate());
+              }}
+              className="text-[10px] font-mono text-amber-400 hover:text-amber-300 font-semibold cursor-pointer"
+            >
+              Jump to Today
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowTimePopup(false)}
+              className="px-3 py-1 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              Done
+            </button>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    );
+  };
+
+  // Slash commands instant switcher
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    const lower = val.toLowerCase().trim();
+
+    // Check for slash command triggers
+    if (lower === '/task' || lower === '/t') {
+      setActiveType('task');
+      setTitle('');
+      return;
+    }
+    if (lower === '/log' || lower === '/l') {
+      setActiveType('log');
+      setTitle('');
+      return;
+    }
+    if (lower === '/event' || lower === '/e') {
+      setActiveType('event');
+      setTitle('');
+      return;
+    }
+    if (lower === '/note' || lower === '/n') {
+      setActiveType('note');
+      setTitle('');
+      return;
+    }
+    if (lower === '/block' || lower === '/tb' || lower === '/timeblock' || lower === '/time-block' || lower === '/b') {
+      setActiveType('time-block');
+      setTitle('');
+      return;
+    }
+
+    // Prefix commands like "/task Write docs" or "t: Write docs"
+    const prefixMap: { prefix: RegExp; type: EntryType }[] = [
+      { prefix: /^\/(?:task|t)\s+/i, type: 'task' },
+      { prefix: /^\/(?:log|l)\s+/i, type: 'log' },
+      { prefix: /^\/(?:event|e)\s+/i, type: 'event' },
+      { prefix: /^\/(?:note|n)\s+/i, type: 'note' },
+      { prefix: /^\/(?:block|timeblock|time-block|tb|b)\s+/i, type: 'time-block' },
+    ];
+
+    for (const { prefix, type } of prefixMap) {
+      if (prefix.test(val)) {
+        setActiveType(type);
+        setTitle(val.replace(prefix, ''));
+        return;
+      }
+    }
+
+    setTitle(val);
+  };
+
+  // Live parsed metadata extraction
+  const liveParsedPreview = React.useMemo(() => {
+    const clean = debouncedInput.trim();
+    if (!clean) return null;
+
+    let base = new Date(activeDate);
+    const now = new Date();
+    base.setHours(now.getHours(), now.getMinutes(), 0, 0);
+
+    const { parsedDate: dateBase, textAfterDateRemoval } = parseSmartDate(clean, base);
+    const hasDetectedDate = dateBase.toDateString() !== base.toDateString();
+
+    if (activeType === 'time-block') {
+      const block = parseTimeBlock(clean, base);
+      const isDateDiff = block.startAt.toDateString() !== base.toDateString();
+      const hasTimeToken = fromToRegex.test(clean) || atRegex.test(clean) || durationRegex.test(clean) || durationOnlyMinutesRegex.test(clean);
+      if (!hasTimeToken && !isDateDiff) return null;
+
+      const durMs = block.endAt.getTime() - block.startAt.getTime();
+      return {
+        title: block.title || clean,
+        dateStr: isDateDiff ? block.startAt.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) : null,
+        spanStr: `${formatTime(block.startAt)} – ${formatTime(block.endAt)}`,
+        durationStr: formatDuration(durMs),
+      };
+    }
+
+    const { parsedStart, parsedEnd, hasSpan, hasTime, textAfterTimeRemoval } = parseSmartTimeSpan(textAfterDateRemoval, dateBase);
+    if (!hasDetectedDate && !hasTime && !hasSpan) return null;
+
+    const durMs = hasSpan && parsedEnd ? parsedEnd.getTime() - parsedStart.getTime() : null;
+
+    return {
+      title: textAfterTimeRemoval || clean,
+      dateStr: hasDetectedDate ? dateBase.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) : null,
+      spanStr: hasSpan && parsedEnd ? `${formatTime(parsedStart)} – ${formatTime(parsedEnd)}` : hasTime ? formatTime(parsedStart) : null,
+      durationStr: durMs ? formatDuration(durMs) : null,
+    };
+  }, [debouncedInput, activeDate, activeType]);
 
   // Close time manual popup if activeType changes
   useEffect(() => {
@@ -408,7 +825,8 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
 
     if (activeType === 'task') {
       let cleanTitle = title.trim();
-      let defaultBaseDate = getBaseCompletedDate();
+      let defaultBaseDate =
+        timeManuallySet && timestampStr ? new Date(timestampStr) : getBaseCompletedDate();
 
       const { parsedDate: dateBase, textAfterDateRemoval } = parseSmartDate(
         cleanTitle,
@@ -441,9 +859,9 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
         status: 'todo',
         time_spent: 0,
         created_at: getBaseCompletedDate(),
-        // In 'lists' mode, tasks are dateless (no scheduled_at) unless the user explicitly typed a date/time keyword
+        // In 'lists' mode, tasks are dateless (no scheduled_at) unless user sets a time/date
         ...(autoListIds.length > 0 ? { category_ids: autoListIds } : {}),
-        ...(viewMode === 'lists' && !hasTime ? {} : { scheduled_at: parsedStart }),
+        ...(hasTime || hasSpan || timeManuallySet ? { scheduled_at: parsedStart } : {}),
         ...(hasSpan && parsedEnd ? { scheduled_end_at: parsedEnd } : {}),
       };
     } else if (activeType === 'log') {
@@ -473,8 +891,9 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
         type: 'log',
         title: finalTitle,
         timestamp: parsedStart,
-        ...(hasSpan && parsedEnd ? { end_timestamp: parsedEnd } : {}),
         created_at: getBaseCompletedDate(),
+        scheduled_at: parsedStart,
+        ...(hasSpan && parsedEnd ? { end_timestamp: parsedEnd } : {}),
       };
     } else if (activeType === 'event') {
       let cleanTitle = title.trim();
@@ -568,6 +987,17 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
+    // Tab cycles effortlessly through the 5 entry types
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const currentIndex = ENTRY_TYPES.indexOf(activeType);
+      const nextIndex = e.shiftKey
+        ? (currentIndex - 1 + ENTRY_TYPES.length) % ENTRY_TYPES.length
+        : (currentIndex + 1) % ENTRY_TYPES.length;
+      setActiveType(ENTRY_TYPES[nextIndex]);
+      return;
+    }
+
     // Submit on Enter
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -613,329 +1043,100 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                 </button>
               </div>
 
-              {/* Help Content */}
-              <div className="space-y-3.5 font-sans text-xs">
-                {activeType === 'task' && (
-                  <>
-                    <p className="text-stone-400 leading-relaxed">
-                      Our task input scans your words dynamically for dates, exact times, or time spans,
-                      schedules the timeline entry correctly, and cleans the residual title.
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                      <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
-                        <div className="font-mono text-[9px] text-stone-500 uppercase tracking-widest mb-1.5 font-bold">
-                          Time & Span Recognition
-                        </div>
-                        <p className="text-stone-300 leading-relaxed">
-                          Type{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
-                            at 3:45pm
-                          </code>
-                          ,{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
-                            at3pm20
-                          </code>
-                          ,{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
-                            from 3pm to 4pm
-                          </code>
-                          , or{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
-                            from3pm30to5pm30
-                          </code>
-                          .
-                        </p>
-                      </div>
-                      <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
-                        <div className="font-mono text-[9px] text-stone-500 uppercase tracking-widest mb-1.5 font-bold">
-                          Date Recognition
-                        </div>
-                        <p className="text-stone-300 leading-relaxed">
-                          Type{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
-                            today
-                          </code>
-                          ,{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
-                            tomorrow
-                          </code>
-                          ,{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
-                            in 3 days
-                          </code>
-                          , or specific date{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-emerald-400">
-                            24/6
-                          </code>
-                          .
-                        </p>
-                      </div>
+              {/* Comprehensive Help Content */}
+              <div className="space-y-4 font-sans text-xs">
+                {/* 1. Universal Time & Span Parsing Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="bg-[#0b0b0b]/80 border border-stone-900 rounded-xl p-3 space-y-1.5">
+                    <div className="font-mono text-[9px] text-amber-400 uppercase tracking-widest font-bold flex items-center gap-1">
+                      <span>🕒 Exact & Point Times</span>
                     </div>
-                    <div className="bg-emerald-950/15 border border-emerald-900/30 rounded-lg p-3 mt-2">
-                      <span className="font-mono font-bold text-[9px] text-emerald-400 uppercase tracking-wider block mb-1">
-                        Interactive Example:
-                      </span>
-                      <span className="font-sans text-stone-200 text-sm leading-relaxed block font-medium">
-                        "Review engineering specs tomorrow from 3pm40 to 5pm50"
-                      </span>
-                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-mono text-stone-400 border-t border-emerald-900/20 pt-1.5">
-                        <span>
-                          ✓ Clean Title:{' '}
-                          <strong className="text-emerald-400">"Review engineering specs"</strong>
-                        </span>
-                        <span>
-                          ✓ Scheduled Span:{' '}
-                          <strong className="text-emerald-400">Tomorrow @ 3:40 PM – 5:50 PM</strong>
-                        </span>
-                      </div>
-                    </div>
-                  </>
-                )}
+                    <ul className="text-stone-300 space-y-1 text-[11px] font-mono leading-relaxed">
+                      <li>• <code className="text-emerald-400">at 3:45pm</code> / <code className="text-emerald-400">at 15:45</code></li>
+                      <li>• <code className="text-emerald-400">at 3pm20</code> / <code className="text-emerald-400">at 3pm</code></li>
+                      <li>• <code className="text-emerald-400">at 14h30</code> / <code className="text-emerald-400">at 14h</code></li>
+                      <li>• <code className="text-emerald-400">at now</code> / <code className="text-emerald-400">now</code></li>
+                    </ul>
+                  </div>
 
-                {activeType === 'log' && (
-                  <>
-                    <p className="text-stone-400 leading-relaxed">
-                      Log quick activities with instant time stamping or duration spans. It parses exact times
-                      and <span className="text-stone-200 font-mono">from...to...</span> duration spans automatically.
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                      <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
-                        <div className="font-mono text-[9px] text-stone-500 uppercase tracking-widest mb-1.5 font-bold">
-                          Time & Span Recognition
-                        </div>
-                        <p className="text-stone-300 leading-relaxed">
-                          Type{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
-                            at3pm20
-                          </code>
-                          ,{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
-                            from 3pm to 4pm
-                          </code>
-                          , or{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
-                            from3pm30to5pm30
-                          </code>
-                          .
-                        </p>
-                      </div>
-                      <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
-                        <div className="font-mono text-[9px] text-stone-500 uppercase tracking-widest mb-1.5 font-bold">
-                          Date & Shorthands
-                        </div>
-                        <p className="text-stone-300 leading-relaxed">
-                          Use{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
-                            3pm40
-                          </code>
-                          ,{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
-                            today
-                          </code>
-                          ,{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
-                            tomorrow
-                          </code>
-                          , or{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-stone-400">
-                            24/6
-                          </code>
-                          .
-                        </p>
-                      </div>
+                  <div className="bg-[#0b0b0b]/80 border border-stone-900 rounded-xl p-3 space-y-1.5">
+                    <div className="font-mono text-[9px] text-sky-400 uppercase tracking-widest font-bold flex items-center gap-1">
+                      <span>↔️ "from X to Y" Spans</span>
                     </div>
-                    <div className="bg-stone-950/15 border border-stone-900/30 rounded-lg p-3 mt-2">
-                      <span className="font-mono font-bold text-[9px] text-stone-400 uppercase tracking-wider block mb-1">
-                        Interactive Example:
-                      </span>
-                      <span className="font-sans text-stone-200 text-sm leading-relaxed block font-medium">
-                        "Walking dog from 3pm40 to 5pm50 today"
-                      </span>
-                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-mono text-stone-400 border-t border-stone-900/20 pt-1.5">
-                        <span>
-                          ✓ Clean Title:{' '}
-                          <strong className="text-stone-300">"Walking dog"</strong>
-                        </span>
-                        <span>
-                          ✓ Calculated Log Span:{' '}
-                          <strong className="text-stone-300">Today @ 3:40 PM – 5:50 PM (2h 10m duration)</strong>
-                        </span>
-                      </div>
-                    </div>
-                  </>
-                )}
+                    <ul className="text-stone-300 space-y-1 text-[11px] font-mono leading-relaxed">
+                      <li>• <code className="text-sky-400">from 1pm to 3:30pm</code></li>
+                      <li>• <code className="text-sky-400">from 9 to 11am</code> <span className="text-stone-500">(inherits am)</span></li>
+                      <li>• <code className="text-sky-400">from 3pm40 to 5pm50</code></li>
+                      <li>• <code className="text-sky-400">from now to 4pm</code> / <code className="text-sky-400">from 10am to now</code></li>
+                    </ul>
+                  </div>
 
-                {activeType === 'event' && (
-                  <>
-                    <p className="text-stone-400 leading-relaxed">
-                      Events map visual milestones or specific schedule goals. Type natural
-                      dates, start times, or duration spans in the input to configure automatically.
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                      <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
-                        <div className="font-mono text-[9px] text-stone-500 uppercase tracking-widest mb-1.5 font-bold">
-                          Time & Span Alignment
-                        </div>
-                        <p className="text-stone-300 leading-relaxed">
-                          Add phrases like{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-amber-400">
-                            at3pm20
-                          </code>
-                          ,{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-amber-400">
-                            from 2pm to 3:30pm
-                          </code>
-                          , or{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-amber-400">
-                            from3pmto4pm
-                          </code>
-                          .
-                        </p>
-                      </div>
-                      <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
-                        <div className="font-mono text-[9px] text-stone-500 uppercase tracking-widest mb-1.5 font-bold">
-                          Relative Dates
-                        </div>
-                        <p className="text-stone-300 leading-relaxed">
-                          Words like{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-amber-400">
-                            today
-                          </code>
-                          ,{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-amber-400">
-                            tomorrow
-                          </code>
-                          , or{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-amber-400">
-                            in 3 days
-                          </code>{' '}
-                          map instantly.
-                        </p>
-                      </div>
+                  <div className="bg-[#0b0b0b]/80 border border-stone-900 rounded-xl p-3 space-y-1.5">
+                    <div className="font-mono text-[9px] text-indigo-400 uppercase tracking-widest font-bold flex items-center gap-1">
+                      <span>⏳ Durations & Dates</span>
                     </div>
-                    <div className="bg-amber-950/15 border border-amber-900/30 rounded-lg p-3 mt-2">
-                      <span className="font-mono font-bold text-[9px] text-amber-400 uppercase tracking-wider block mb-1">
-                        Interactive Example:
-                      </span>
-                      <span className="font-sans text-stone-200 text-sm leading-relaxed block font-medium">
-                        "Sprint planning demonstration tomorrow from 3pm to 4pm"
-                      </span>
-                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-mono text-stone-400 border-t border-amber-900/20 pt-1.5">
-                        <span>
-                          ✓ Saved Title:{' '}
-                          <strong className="text-amber-400">
-                            "Sprint planning demonstration"
-                          </strong>
-                        </span>
-                        <span>
-                          ✓ Date Set: <strong className="text-amber-400">Tomorrow @ 3:00 PM – 4:00 PM</strong>
-                        </span>
-                      </div>
-                    </div>
-                  </>
-                )}
+                    <ul className="text-stone-300 space-y-1 text-[11px] font-mono leading-relaxed">
+                      <li>• <code className="text-indigo-400">at 10am 2h30</code> / <code className="text-indigo-400">now 45m</code></li>
+                      <li>• <code className="text-indigo-400">today</code> / <code className="text-indigo-400">tomorrow</code></li>
+                      <li>• <code className="text-indigo-400">in 3 days</code> / <code className="text-indigo-400">in 1 day</code></li>
+                      <li>• <code className="text-indigo-400">25/11/2026</code> or <code className="text-indigo-400">25/11</code></li>
+                    </ul>
+                  </div>
+                </div>
 
-                {activeType === 'note' && (
-                  <>
-                    <p className="text-stone-400 leading-relaxed">
-                      Record quick text blocks, diary logs, or reflections. You can inject timestamps
-                      inline via plain-text parsing or use the manual custom override below!
+                {/* 2. Specific Type Behaviors */}
+                <div className="bg-[#0a0a0a] border border-stone-850 rounded-xl p-3.5 space-y-2">
+                  <div className="font-mono text-[10px] text-stone-400 uppercase tracking-wider font-bold">
+                    Target Type Behavior: <span className="text-amber-400 uppercase font-extrabold">{activeType}</span>
+                  </div>
+                  {activeType === 'task' && (
+                    <p className="text-stone-300 leading-relaxed text-xs">
+                      Tasks are scheduled when a time/date token is typed (e.g. <span className="text-emerald-400 font-mono">"Review PR from now to 3pm"</span>). Completing tasks taking &ge; 15 min automatically displays a timeline span.
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                      <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
-                        <div className="font-mono text-[9px] text-stone-500 uppercase tracking-widest mb-1.5 font-bold">
-                          Chronology Override
-                        </div>
-                        <p className="text-stone-300 leading-relaxed">
-                          Insert{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-blue-400">
-                            at 10pm
-                          </code>
-                          ,{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-blue-400">
-                            at3pm20
-                          </code>
-                          , or{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-blue-400">
-                            at 12:45
-                          </code>
-                          .
-                        </p>
-                      </div>
-                      <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
-                        <div className="font-mono text-[9px] text-stone-500 uppercase tracking-widest mb-1.5 font-bold">
-                          Custom Dates
-                        </div>
-                        <p className="text-stone-300 leading-relaxed">
-                          Words like{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-blue-400">
-                            tomorrow
-                          </code>
-                          ,{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-blue-400">
-                            today
-                          </code>
-                          , or exact dates like{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-blue-400">
-                            5/6
-                          </code>{' '}
-                          can be parsed.
-                        </p>
-                      </div>
-                    </div>
-                  </>
-                )}
+                  )}
+                  {activeType === 'log' && (
+                    <p className="text-stone-300 leading-relaxed text-xs">
+                      Logs capture real-time reflections or past completed work (e.g. <span className="text-stone-300 font-mono">"Debugged database from 10am to now"</span>). Easily starred <span className="text-amber-400 font-mono">⭐</span> to Highlights or marked as Accomplishment <span className="text-amber-400 font-mono">🏆</span>.
+                    </p>
+                  )}
+                  {activeType === 'event' && (
+                    <p className="text-stone-300 leading-relaxed text-xs">
+                      Events schedule calendar appointments and key milestones (e.g. <span className="text-amber-400 font-mono">"Keynote demo tomorrow from 2pm to 3:30pm"</span>). Use the pencil button on the left to write detailed notes.
+                    </p>
+                  )}
+                  {activeType === 'note' && (
+                    <p className="text-stone-300 leading-relaxed text-xs">
+                      Notes capture unstructured thoughts or meeting notes anchored to a timestamp (e.g. <span className="text-blue-400 font-mono">"Architecture reflections today at 4pm"</span>). Click the pencil button for rich markdown editing.
+                    </p>
+                  )}
+                  {activeType === 'time-block' && (
+                    <p className="text-stone-300 leading-relaxed text-xs">
+                      Time Blocks visually reserve deep-focus segments on the day timeline (e.g. <span className="text-indigo-400 font-mono">"Deep coding block from now to 5pm"</span> or <span className="text-indigo-400 font-mono">"at 9am 2h30"</span>).
+                    </p>
+                  )}
+                </div>
 
-                {activeType === 'time-block' && (
-                  <>
-                    <p className="text-stone-400 leading-relaxed">
-                      Establish rich duration spans on your productivity timeline with simple
-                      expressions.
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                      <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
-                        <div className="font-mono text-[9px] text-stone-500 uppercase tracking-widest mb-1.5 font-bold">
-                          Span Range Keyword
-                        </div>
-                        <p className="text-stone-300 leading-relaxed">
-                          Type{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-indigo-400">
-                            from 1pm to 3:30pm
-                          </code>
-                          ,{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-indigo-400">
-                            from3pmto4pm
-                          </code>
-                          , or{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-indigo-400">
-                            from 3pm40 to 5pm50
-                          </code>
-                          .
-                        </p>
-                      </div>
-                      <div className="bg-[#0b0b0b]/60 border border-stone-900 rounded-lg p-3">
-                        <div className="font-mono text-[9px] text-stone-500 uppercase tracking-widest mb-1.5 font-bold">
-                          Duration Keywords
-                        </div>
-                        <p className="text-stone-300 leading-relaxed">
-                          Type starting time and duration:{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-indigo-400">
-                            at 10am 2h30
-                          </code>
-                          ,{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-indigo-400">
-                            at3pm20 45m
-                          </code>
-                          , or{' '}
-                          <code className="bg-stone-900 border border-stone-800 px-1 py-0.5 rounded font-mono text-indigo-400">
-                            at 5pm 45m
-                          </code>
-                          .
-                        </p>
-                      </div>
-                    </div>
-                  </>
-                )}
+                {/* 3. Global Shortcuts & Slash Commands */}
+                <div className="border-t border-stone-800/80 pt-3 flex flex-wrap items-center justify-between gap-3 text-[10px] font-mono text-stone-400">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-amber-400 font-bold uppercase tracking-wider">Slash Shortcuts:</span>
+                    <span className="bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded text-stone-300 font-bold">/t, /task</span>
+                    <span className="bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded text-stone-300 font-bold">/l, /log</span>
+                    <span className="bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded text-stone-300 font-bold">/e, /event</span>
+                    <span className="bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded text-stone-300 font-bold">/n, /note</span>
+                    <span className="bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded text-stone-300 font-bold">/b, /tb, /block</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1">
+                      <span className="text-emerald-400 font-bold bg-emerald-950/40 border border-emerald-800/60 px-1.5 py-0.5 rounded">[TAB]</span>
+                      <span>Cycle types</span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="text-stone-300 font-bold bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded">[ENTER]</span>
+                      <span>Save entry</span>
+                    </span>
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}
@@ -1044,240 +1245,66 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                   <Clock className="w-3.5 h-3.5" />
                   <span>Block</span>
                 </button>
-              </div>
 
-              {/* Combined Trigger Button Next to tab selector */}
-              {activeType !== 'task' && (
-                <div
-                  className="max-sm:hidden relative inline-block z-40"
-                  id="manual-time-popup-trigger-container"
+                {/* Divider */}
+                <div className="w-[1px] bg-stone-800 my-1 mx-0.5 hidden lg:block" />
+
+                {/* SYNTAX GUIDE - Sitting right next to the Type Switcher */}
+                <button
+                  type="button"
+                  id="chip-syntax-guide"
+                  onClick={() => setShowHelp(!showHelp)}
+                  className={`flex-1 lg:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                    showHelp
+                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-md font-extrabold'
+                      : 'text-stone-400 hover:text-amber-300 hover:bg-stone-900/50 border border-transparent'
+                  }`}
+                  title="Open comprehensive Smart Syntax & Shortcut Guide"
                 >
-                  <button
-                    type="button"
-                    onClick={() => setShowTimePopup(!showTimePopup)}
-                    className={`flex items-center justify-center p-2 bg-[#0e0e0e] border rounded-xl text-xs font-mono font-medium transition-all duration-200 cursor-pointer ${
-                      showTimePopup
-                        ? 'text-white border-stone-700 bg-stone-900 shadow-md ring-1 ring-stone-800'
-                        : 'text-stone-300 border-stone-850 hover:text-white hover:bg-stone-900/40'
-                    }`}
-                    style={{
-                      borderColor: showTimePopup
-                        ? activeType === 'log'
-                          ? '#a8a29e'
-                          : activeType === 'event'
-                            ? '#f59e0b'
-                            : activeType === 'note'
-                              ? '#3b82f6'
-                              : '#6366f1'
-                        : undefined,
-                    }}
-                    title={`Configure ${activeType} time settings manually`}
-                  >
-                    <Clock
-                      className={`w-4 h-4 ${
-                        activeType === 'log'
-                          ? 'text-stone-400'
-                          : activeType === 'event'
-                            ? 'text-amber-400'
-                            : activeType === 'note'
-                              ? 'text-blue-400'
-                              : 'text-indigo-400'
-                      }`}
-                    />
-                  </button>
-
-                  <AnimatePresence>
-                    {showTimePopup && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                        transition={{ duration: 0.12, ease: 'easeOut' }}
-                        className="absolute bottom-full mb-3 left-0 bg-[#161616] border border-stone-800 rounded-xl p-4 shadow-2xl z-[999] w-72 backdrop-blur-md"
-                        id="time-setting-popup"
-                      >
-                        {/* Header */}
-                        <div className="flex items-center justify-between border-b border-stone-800 pb-2 mb-3">
-                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-stone-400">
-                            Adjust Time Configuration
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setShowTimePopup(false)}
-                            className="p-1 hover:bg-stone-800 rounded text-stone-500 hover:text-stone-300 transition-colors cursor-pointer"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-
-                        {/* Config fields */}
-                        <div className="space-y-3">
-                          {activeType === 'log' && (
-                            <div className="space-y-1.5">
-                              <div className="flex items-center gap-1.5">
-                                <CircleDot className="w-3.5 h-3.5 text-stone-400" />
-                                <span className="text-[10px] font-mono text-stone-500 uppercase tracking-widest font-bold">
-                                  Log Time Details
-                                </span>
-                              </div>
-                              <input
-                                id="input-log-time"
-                                type="datetime-local"
-                                required
-                                value={timestampStr}
-                                onChange={(e) => {
-                                  setTimestampStr(e.target.value);
-                                  setTimeManuallySet(true);
-                                }}
-                              />
-                            </div>
-                          )}
-
-                          {activeType === 'event' && (
-                            <div className="space-y-1.5">
-                              <div className="flex items-center gap-1.5">
-                                <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                                <span className="text-[10px] font-mono text-stone-500 uppercase tracking-widest font-bold">
-                                  Event Details
-                                </span>
-                              </div>
-                              <input
-                                id="input-event-time"
-                                type="datetime-local"
-                                required
-                                value={timestampStr}
-                                onChange={(e) => {
-                                  setTimestampStr(e.target.value);
-                                  setTimeManuallySet(true);
-                                }}
-                              />
-                            </div>
-                          )}
-
-                          {activeType === 'note' && (
-                            <div className="space-y-1.5">
-                              <div className="flex items-center gap-1.5">
-                                <FileText className="w-3.5 h-3.5 text-blue-400" />
-                                <span className="text-[10px] font-mono text-stone-500 uppercase tracking-widest font-bold">
-                                  Timestamp Details
-                                </span>
-                              </div>
-                              <input
-                                id="input-note-time"
-                                type="datetime-local"
-                                required
-                                value={timestampStr}
-                                onChange={(e) => {
-                                  setTimestampStr(e.target.value);
-                                  setTimeManuallySet(true);
-                                }}
-                              />
-                            </div>
-                          )}
-
-                          {activeType === 'time-block' && (
-                            <div className="space-y-3">
-                              {/* Start Time with green icon */}
-                              <div className="space-y-1.5">
-                                <div className="flex items-center gap-1.5">
-                                  <Clock className="w-3.5 h-3.5 text-emerald-400" />
-                                  <span className="text-[10px] font-mono text-stone-500 uppercase tracking-widest font-bold">
-                                    Start Frame
-                                  </span>
-                                </div>
-                                <input
-                                  id="input-timeblock-start"
-                                  type="datetime-local"
-                                  required
-                                  value={startAtStr}
-                                  onChange={(e) => setStartAtStr(e.target.value)}
-                                  className="w-full bg-[#0b0b0b] hover:bg-stone-900 text-stone-200 border border-stone-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-indigo-500/40 font-mono cursor-pointer transition-colors"
-                                />
-                              </div>
-
-                              {/* End Time with indigo icon */}
-                              <div className="space-y-1.5">
-                                <div className="flex items-center gap-1.5">
-                                  <Clock className="w-3.5 h-3.5 text-indigo-400" />
-                                  <span className="text-[10px] font-mono text-stone-500 uppercase tracking-widest font-bold">
-                                    End Frame
-                                  </span>
-                                </div>
-                                <input
-                                  id="input-timeblock-end"
-                                  type="datetime-local"
-                                  required
-                                  value={endAtStr}
-                                  onChange={(e) => setEndAtStr(e.target.value)}
-                                  className="w-full bg-[#0b0b0b] hover:bg-stone-900 text-stone-200 border border-stone-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-indigo-500/40 font-mono cursor-pointer transition-colors"
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Done Action Button inside Popup */}
-                        <div className="border-t border-stone-800 mt-3 pt-2.5 flex justify-end">
-                          <button
-                            type="button"
-                            onClick={() => setShowTimePopup(false)}
-                            className="px-3 py-1 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
-                          >
-                            Done
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )}
-            </div>
-
-            {/* Smart Hints / Config Panel Tips */}
-            <div className="max-sm:hidden flex items-center justify-between lg:justify-end gap-3 self-stretch lg:self-auto">
-              <div className="flex items-center gap-2">
-                {activeType === 'task' && (
-                  <span className="text-[10px] font-mono font-semibold text-emerald-400 bg-emerald-950/15 border border-emerald-950 px-2 py-0.5 rounded-md">
-                    Parser Enabled
-                  </span>
-                )}
-                {activeType === 'log' && (
-                  <span className="text-[10px] font-mono font-semibold text-stone-400 bg-stone-950/15 border border-stone-950 px-2 py-0.5 rounded-md">
-                    Parser Enabled
-                  </span>
-                )}
-                {activeType === 'event' && (
-                  <span className="text-[10px] font-mono font-semibold text-amber-400 bg-amber-950/15 border border-amber-950 px-2 py-0.5 rounded-md">
-                    Implicit Schedule Active
-                  </span>
-                )}
-                {activeType === 'note' && (
-                  <span className="text-[10px] font-mono font-semibold text-blue-400 bg-blue-950/15 border border-blue-950 px-2 py-0.5 rounded-md">
-                    Time Override Active
-                  </span>
-                )}
-                {activeType === 'time-block' && (
-                  <span className="text-[10px] font-mono font-semibold text-indigo-400 bg-indigo-950/15 border border-indigo-950 px-2 py-0.5 rounded-md">
-                    Duration Span Active
-                  </span>
-                )}
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Syntax Guide</span>
+                </button>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setShowHelp(!showHelp)}
-                className={`py-1 px-2.5 rounded-lg text-xs font-mono transition-all cursor-pointer flex items-center gap-1.5 ${
-                  showHelp
-                    ? 'bg-stone-800 text-stone-200 border border-stone-700'
-                    : 'text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-transparent'
-                }`}
-                title="Review parser syntax hints"
-              >
-                <HelpCircle className="w-3.5 h-3.5" />
-                <span>Format Tips</span>
-              </button>
             </div>
           </div>
+
+          {/* Live Parsing Preview Chips (Debounced 200ms) */}
+          <AnimatePresence>
+            {liveParsedPreview && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, y: -4 }}
+                animate={{ opacity: 1, height: 'auto', y: 0 }}
+                exit={{ opacity: 0, height: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+                className="mb-2.5 overflow-hidden flex items-center gap-2 flex-wrap text-xs font-mono select-none"
+              >
+                <span className="text-[10px] text-stone-500 uppercase tracking-wider font-bold flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-amber-400 animate-pulse" />
+                  Detected:
+                </span>
+                {liveParsedPreview.dateStr && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-950/40 border border-sky-800/60 text-sky-400 text-[11px]">
+                    <Calendar className="w-3 h-3" />
+                    <span>{liveParsedPreview.dateStr}</span>
+                  </span>
+                )}
+                {liveParsedPreview.spanStr && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-950/40 border border-indigo-800/60 text-indigo-300 text-[11px]">
+                    <Clock className="w-3 h-3" />
+                    <span>{liveParsedPreview.spanStr}</span>
+                  </span>
+                )}
+                {liveParsedPreview.durationStr && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-950/40 border border-amber-800/60 text-amber-400 text-[11px]">
+                    <span>⏳ {liveParsedPreview.durationStr}</span>
+                  </span>
+                )}
+                <span className="text-stone-500 text-[10px] truncate max-w-[200px]">
+                  → "{liveParsedPreview.title}"
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Form Interactive Layout with STABLE Static Area Height */}
           <form onSubmit={handleSubmit} className="w-full h-[46px]" id="timeline-input-form">
@@ -1285,28 +1312,40 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
             <div className="w-full h-full">
               {/* TASK INJECT */}
               {activeType === 'task' && (
-                <div className="relative w-full flex gap-3.5 items-stretch h-full">
+                <div className="relative w-full flex gap-2.5 items-stretch h-full">
+                  {/* Clock Manual Time & Calendar button */}
+                  <div className="relative inline-block">
+                    <button
+                      type="button"
+                      onClick={() => setShowTimePopup(!showTimePopup)}
+                      className={`h-full px-3.5 flex items-center justify-center bg-stone-950 border border-stone-850 hover:border-stone-750 text-emerald-400 hover:text-emerald-300 rounded-xl transition-all hover:bg-stone-900 cursor-pointer ${
+                        showTimePopup ? 'border-emerald-500/50 bg-stone-900 ring-1 ring-emerald-500/30' : ''
+                      }`}
+                      title="Set task date & scheduled time"
+                    >
+                      <Clock className="w-4 h-4" />
+                    </button>
+                    {renderCalendarTimePopup()}
+                  </div>
+
                   <div className="relative flex-1">
                     <input
                       id="input-task-title"
                       type="text"
                       required
                       maxLength={100}
-                      placeholder="Capture real-time task (e.g. Code database schema at 4:30pm tomorrow)..."
+                      placeholder={PLACEHOLDERS.task[placeholderIndex % PLACEHOLDERS.task.length]}
                       value={title}
-                      onChange={(e) => setTitle(e.target.value)}
+                      onChange={handleInputChange}
                       onKeyDown={handleKeyPress}
                       className="w-full h-full bg-[#0a0a0a] text-stone-100 hover:bg-[#080808]/50 border border-stone-850 rounded-xl px-4 py-3 text-sm placeholder-stone-600 focus:outline-none focus:border-emerald-500/50 focus:bg-stone-950 transition-all shadow-inner"
                     />
-                    <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none select-none text-[10px] font-mono text-stone-600 tracking-wider hidden md:block">
-                      [ENTER] TO SAVE
-                    </div>
                   </div>
                   <button
                     type="submit"
-                    className="max-sm:hidden px-6 bg-emerald-500 text-[#070e0a] hover:bg-emerald-400 border border-emerald-400 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all duration-250 active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer"
+                    className="max-sm:hidden px-5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/50 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer shadow-sm"
                   >
-                    <span>Save Entry</span>
+                    <span>Save</span>
                     <Send className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -1314,23 +1353,40 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
 
               {/* LOG INJECT */}
               {activeType === 'log' && (
-                <div className="relative w-full flex gap-3.5 items-stretch h-full">
-                  <input
-                    id="input-log-title"
-                    type="text"
-                    required
-                    maxLength={100}
-                    placeholder="Describe what you are doing at the moment (e.g. Walking to the train station)..."
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    onKeyDown={handleKeyPress}
-                    className="flex-1 bg-[#0a0a0a] text-stone-100 hover:bg-[#080808]/50 border border-stone-850 rounded-xl px-4 py-3 text-sm placeholder-stone-600 focus:outline-none focus:border-stone-500/50 focus:bg-stone-950 transition-all shadow-inner"
-                  />
+                <div className="relative w-full flex gap-2.5 items-stretch h-full">
+                  {/* Clock Manual Time & Calendar button */}
+                  <div className="relative inline-block">
+                    <button
+                      type="button"
+                      onClick={() => setShowTimePopup(!showTimePopup)}
+                      className={`h-full px-3.5 flex items-center justify-center bg-stone-950 border border-stone-850 hover:border-stone-750 text-stone-400 hover:text-stone-200 rounded-xl transition-all hover:bg-stone-900 cursor-pointer ${
+                        showTimePopup ? 'border-stone-600 bg-stone-900 ring-1 ring-stone-700' : ''
+                      }`}
+                      title="Set log date & timestamp"
+                    >
+                      <Clock className="w-4 h-4" />
+                    </button>
+                    {renderCalendarTimePopup()}
+                  </div>
+
+                  <div className="relative flex-1">
+                    <input
+                      id="input-log-title"
+                      type="text"
+                      required
+                      maxLength={100}
+                      placeholder={PLACEHOLDERS.log[placeholderIndex % PLACEHOLDERS.log.length]}
+                      value={title}
+                      onChange={handleInputChange}
+                      onKeyDown={handleKeyPress}
+                      className="w-full h-full bg-[#0a0a0a] text-stone-100 hover:bg-[#080808]/50 border border-stone-850 rounded-xl px-4 py-3 text-sm placeholder-stone-600 focus:outline-none focus:border-stone-500/50 focus:bg-stone-950 transition-all shadow-inner"
+                    />
+                  </div>
                   <button
                     type="submit"
-                    className="max-sm:hidden px-6 bg-stone-850 text-stone-300 hover:bg-stone-800 border border-stone-700 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all duration-250 active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer"
+                    className="max-sm:hidden px-5 bg-stone-850/80 hover:bg-stone-800 text-stone-200 border border-stone-700/80 hover:border-stone-600 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer shadow-sm"
                   >
-                    <span>Save Log</span>
+                    <span>Save</span>
                     <Send className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -1338,7 +1394,8 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
 
               {/* EVENT INJECT */}
               {activeType === 'event' && (
-                <div className="relative w-full flex gap-3.5 items-stretch h-full">
+                <div className="relative w-full flex gap-2 items-stretch h-full">
+                  {/* Pencil Detailed Modal Button */}
                   <button
                     type="button"
                     onClick={() => {
@@ -1346,7 +1403,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                       setModalContent('');
                       setIsNoteModalOpen(true);
                     }}
-                    className="flex items-center justify-center px-4 bg-stone-950 border border-stone-850 hover:border-stone-750 text-amber-400 hover:text-amber-300 rounded-xl transition-all hover:bg-stone-900 cursor-pointer"
+                    className="flex items-center justify-center px-3.5 bg-stone-950 border border-stone-850 hover:border-stone-750 text-amber-400 hover:text-amber-300 rounded-xl transition-all hover:bg-stone-900 cursor-pointer"
                     title="Write detailed event with title and body content"
                   >
                     <svg
@@ -1365,22 +1422,40 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                       <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
                     </svg>
                   </button>
-                  <input
-                    id="input-event-title"
-                    type="text"
-                    required
-                    maxLength={100}
-                    placeholder="Event title details (e.g. Project briefing presentation tomorrow at 10am)..."
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    onKeyDown={handleKeyPress}
-                    className="flex-1 bg-[#0a0a0a] text-stone-100 hover:bg-[#080808]/55 border border-stone-850 rounded-xl px-4 py-3 text-sm placeholder-stone-600 focus:outline-none focus:border-amber-500/50 focus:bg-stone-950 transition-all shadow-inner"
-                  />
+
+                  {/* Clock Manual Time & Calendar button */}
+                  <div className="relative inline-block">
+                    <button
+                      type="button"
+                      onClick={() => setShowTimePopup(!showTimePopup)}
+                      className={`h-full px-3.5 flex items-center justify-center bg-stone-950 border border-stone-850 hover:border-stone-750 text-amber-400 hover:text-amber-300 rounded-xl transition-all hover:bg-stone-900 cursor-pointer ${
+                        showTimePopup ? 'border-amber-500/50 bg-stone-900 ring-1 ring-amber-500/30' : ''
+                      }`}
+                      title="Set event date & time span"
+                    >
+                      <Clock className="w-4 h-4" />
+                    </button>
+                    {renderCalendarTimePopup()}
+                  </div>
+
+                  <div className="relative flex-1">
+                    <input
+                      id="input-event-title"
+                      type="text"
+                      required
+                      maxLength={100}
+                      placeholder={PLACEHOLDERS.event[placeholderIndex % PLACEHOLDERS.event.length]}
+                      value={title}
+                      onChange={handleInputChange}
+                      onKeyDown={handleKeyPress}
+                      className="w-full h-full bg-[#0a0a0a] text-stone-100 hover:bg-[#080808]/55 border border-stone-850 rounded-xl px-4 py-3 text-sm placeholder-stone-600 focus:outline-none focus:border-amber-500/50 focus:bg-stone-950 transition-all shadow-inner"
+                    />
+                  </div>
                   <button
                     type="submit"
-                    className="max-sm:hidden px-6 bg-amber-500 text-[#0e0c08] hover:bg-amber-400 border border-amber-400 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all duration-250 active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer"
+                    className="max-sm:hidden px-5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 hover:border-amber-500/50 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer shadow-sm"
                   >
-                    <span>Save Entry</span>
+                    <span>Save</span>
                     <Send className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -1388,7 +1463,8 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
 
               {/* NOTE INJECT */}
               {activeType === 'note' && (
-                <div className="relative w-full flex gap-3.5 items-stretch h-full">
+                <div className="relative w-full flex gap-2 items-stretch h-full">
+                  {/* Pencil Detailed Modal Button */}
                   <button
                     type="button"
                     onClick={() => {
@@ -1396,7 +1472,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                       setModalContent('');
                       setIsNoteModalOpen(true);
                     }}
-                    className="flex items-center justify-center px-4 bg-stone-950 border border-stone-850 hover:border-stone-750 text-blue-400 hover:text-blue-300 rounded-xl transition-all hover:bg-stone-900 cursor-pointer"
+                    className="flex items-center justify-center px-3.5 bg-stone-950 border border-stone-850 hover:border-stone-750 text-blue-400 hover:text-blue-300 rounded-xl transition-all hover:bg-stone-900 cursor-pointer"
                     title="Write detailed note with title and body content"
                   >
                     <svg
@@ -1415,21 +1491,39 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                       <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
                     </svg>
                   </button>
-                  <input
-                    id="input-note-title"
-                    type="text"
-                    required
-                    placeholder="Enter note title (e.g. Brainstorming session today)..."
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    onKeyDown={handleKeyPress}
-                    className="flex-1 bg-[#0a0a0a] text-stone-100 hover:bg-[#080808]/60 border border-stone-850 rounded-xl px-4 py-3 text-sm placeholder-stone-600 focus:outline-none focus:border-blue-500/50 focus:bg-stone-950 transition-all shadow-inner"
-                  />
+
+                  {/* Clock Manual Time & Calendar button */}
+                  <div className="relative inline-block">
+                    <button
+                      type="button"
+                      onClick={() => setShowTimePopup(!showTimePopup)}
+                      className={`h-full px-3.5 flex items-center justify-center bg-stone-950 border border-stone-850 hover:border-stone-750 text-blue-400 hover:text-blue-300 rounded-xl transition-all hover:bg-stone-900 cursor-pointer ${
+                        showTimePopup ? 'border-blue-500/50 bg-stone-900 ring-1 ring-blue-500/30' : ''
+                      }`}
+                      title="Set note date & timestamp"
+                    >
+                      <Clock className="w-4 h-4" />
+                    </button>
+                    {renderCalendarTimePopup()}
+                  </div>
+
+                  <div className="relative flex-1">
+                    <input
+                      id="input-note-title"
+                      type="text"
+                      required
+                      placeholder={PLACEHOLDERS.note[placeholderIndex % PLACEHOLDERS.note.length]}
+                      value={title}
+                      onChange={handleInputChange}
+                      onKeyDown={handleKeyPress}
+                      className="w-full h-full bg-[#0a0a0a] text-stone-100 hover:bg-[#080808]/60 border border-stone-850 rounded-xl px-4 py-3 text-sm placeholder-stone-600 focus:outline-none focus:border-blue-500/50 focus:bg-stone-950 transition-all shadow-inner"
+                    />
+                  </div>
                   <button
                     type="submit"
-                    className="max-sm:hidden px-6 bg-blue-500 text-[#070a0e] hover:bg-blue-400 border border-blue-400 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all duration-250 active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer"
+                    className="max-sm:hidden px-5 bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 border border-blue-500/30 hover:border-blue-500/50 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer shadow-sm"
                   >
-                    <span>Save Entry</span>
+                    <span>Save</span>
                     <Send className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -1437,23 +1531,40 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
 
               {/* TIME BLOCK INJECT */}
               {activeType === 'time-block' && (
-                <div className="relative w-full flex gap-3.5 items-stretch h-full">
-                  <input
-                    id="input-timeblock-title"
-                    type="text"
-                    required
-                    maxLength={100}
-                    placeholder="Focus time block name (e.g. Deep Work blocks from 3pm to 5pm or at 9am 1h30)..."
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    onKeyDown={handleKeyPress}
-                    className="flex-1 bg-[#0a0a0a] text-stone-100 hover:bg-[#080808]/50 border border-stone-850 rounded-xl px-4 py-3 text-sm placeholder-stone-600 focus:outline-none focus:border-indigo-500/50 focus:bg-stone-950 transition-all shadow-inner"
-                  />
+                <div className="relative w-full flex gap-2.5 items-stretch h-full">
+                  {/* Clock Manual Time & Calendar button */}
+                  <div className="relative inline-block">
+                    <button
+                      type="button"
+                      onClick={() => setShowTimePopup(!showTimePopup)}
+                      className={`h-full px-3.5 flex items-center justify-center bg-stone-950 border border-stone-850 hover:border-stone-750 text-indigo-400 hover:text-indigo-300 rounded-xl transition-all hover:bg-stone-900 cursor-pointer ${
+                        showTimePopup ? 'border-indigo-500/50 bg-stone-900 ring-1 ring-indigo-500/30' : ''
+                      }`}
+                      title="Set time block start & end frames"
+                    >
+                      <Clock className="w-4 h-4" />
+                    </button>
+                    {renderCalendarTimePopup()}
+                  </div>
+
+                  <div className="relative flex-1">
+                    <input
+                      id="input-timeblock-title"
+                      type="text"
+                      required
+                      maxLength={100}
+                      placeholder={PLACEHOLDERS['time-block'][placeholderIndex % PLACEHOLDERS['time-block'].length]}
+                      value={title}
+                      onChange={handleInputChange}
+                      onKeyDown={handleKeyPress}
+                      className="w-full h-full bg-[#0a0a0a] text-stone-100 hover:bg-[#080808]/50 border border-stone-850 rounded-xl px-4 py-3 text-sm placeholder-stone-600 focus:outline-none focus:border-indigo-500/50 focus:bg-stone-950 transition-all shadow-inner"
+                    />
+                  </div>
                   <button
                     type="submit"
-                    className="max-sm:hidden px-6 bg-indigo-500 text-[#07070e] hover:bg-indigo-400 border border-indigo-400 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all duration-250 active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer"
+                    className="max-sm:hidden px-5 bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-400 border border-indigo-500/30 hover:border-indigo-500/50 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer shadow-sm"
                   >
-                    <span>Save Entry</span>
+                    <span>Save</span>
                     <Send className="w-3.5 h-3.5" />
                   </button>
                 </div>

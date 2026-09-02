@@ -437,7 +437,7 @@ export default function DayHighlights({
                                   <span className="text-[9px] font-mono text-stone-500 bg-stone-900 px-1 py-0.5 rounded border border-stone-850">
                                     {dateFormatted}
                                   </span>
-                                  {isTask && (
+                                  {(isTask || entry.type === 'log') && (
                                     <button
                                       type="button"
                                       onClick={async (e) => {
@@ -459,7 +459,7 @@ export default function DayHighlights({
                                     >
                                       <Trophy
                                         className={`w-3.5 h-3.5 ${
-                                          isAccomplishment ? 'fill-amber-400' : ''
+                                          isAccomplishment ? 'fill-current' : ''
                                         }`}
                                       />
                                     </button>
@@ -671,7 +671,7 @@ export default function DayHighlights({
                                 <span className="text-[9px] font-mono text-stone-500 bg-stone-900 px-1.5 py-0.5 rounded border border-stone-850">
                                   {dateFormatted}
                                 </span>
-                                {isTask && (
+                                {(isTask || entry.type === 'log') && (
                                   <button
                                     type="button"
                                     onClick={async (e) => {
@@ -688,12 +688,12 @@ export default function DayHighlights({
                                     className={`p-1 rounded transition-colors cursor-pointer ${
                                       isAccomplishment
                                         ? 'text-amber-400 bg-amber-500/10 border border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.15)]'
-                                        : 'text-stone-500 hover:text-amber-400 hover:bg-stone-850 border border-stone-800'
+                                        : 'text-stone-500 hover:text-amber-400 bg-stone-900 border border-stone-850'
                                     }`}
                                   >
                                     <Trophy
                                       className={`w-3.5 h-3.5 ${
-                                        isAccomplishment ? 'fill-amber-400' : ''
+                                        isAccomplishment ? 'fill-current' : ''
                                       }`}
                                     />
                                   </button>
