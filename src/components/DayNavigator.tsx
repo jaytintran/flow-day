@@ -27,6 +27,7 @@ import {
   StickyNote,
 } from 'lucide-react';
 import HabitConsistencyModal from './HabitConsistencyModal';
+import AnimatedFireIcon from './AnimatedFireIcon';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../db';
@@ -63,6 +64,7 @@ export default function DayNavigator({
   toggleHighlights,
 }: DayNavigatorProps) {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isHabitDrawerOpen, setIsHabitDrawerOpen] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
   const [newAchievementText, setNewAchievementText] = useState<Record<string, string>>({});
   const [logWinText, setLogWinText] = useState('');
@@ -295,14 +297,15 @@ export default function DayNavigator({
     return () => window.removeEventListener('pointerdown', handler);
   }, [contextMenuPos, closeContextMenu]);
 
-  const handleQuickTick = async (habit: Habit) => {
-    const todayLogs = habitLogs.filter(
-      (l) => l.habit_id === habit.id && toLocalDateString(new Date(l.timestamp)) === activeDateStr,
+  const handleQuickTick = async (habit: Habit, targetDate: Date = activeDate) => {
+    const targetDateStr = toLocalDateString(targetDate);
+    const targetLogs = habitLogs.filter(
+      (l) => l.habit_id === habit.id && toLocalDateString(new Date(l.timestamp)) === targetDateStr,
     );
-    if (todayLogs.length > 0) {
-      await db.entries.delete(todayLogs[todayLogs.length - 1].id);
+    if (targetLogs.length > 0) {
+      await db.entries.delete(targetLogs[targetLogs.length - 1].id);
     } else {
-      const logTimestamp = new Date(activeDate);
+      const logTimestamp = new Date(targetDate);
       const now = new Date();
       logTimestamp.setHours(
         now.getHours(),
@@ -322,6 +325,34 @@ export default function DayNavigator({
       await db.entries.add(log as any);
     }
   };
+
+  // 7-day sliding window for habit cards (ending at activeDate or current week Monday–Sunday)
+  const habitWeekDays = React.useMemo(() => {
+    // Show current week (Monday to Sunday) containing activeDate
+    const d = new Date(activeDate);
+    const day = d.getDay(); // 0 is Sunday
+    const diffToMonday = (day === 0 ? -6 : 1) - day;
+    const monday = new Date(d);
+    monday.setDate(d.getDate() + diffToMonday);
+
+    const days = [];
+    const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + i);
+      const dateStr = toLocalDateString(date);
+      const isTodayDate = isSameDay(date, new Date());
+      const isActiveDate = isSameDay(date, activeDate);
+      days.push({
+        date,
+        dateStr,
+        label: DAY_LABELS[i],
+        isToday: isTodayDate,
+        isActive: isActiveDate,
+      });
+    }
+    return days;
+  }, [activeDate]);
 
   const dayStatsMap = React.useMemo(() => {
     const map: {
@@ -530,7 +561,7 @@ export default function DayNavigator({
         )}
       </div>
 
-      {/* Scratchpad, Calendar & Highlights (Star) Buttons */}
+      {/* Scratchpad, Habits Drawer, Calendar & Highlights (Star) Buttons */}
       <div className="flex items-center gap-0.5 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 h-9 shrink-0">
         {toggleScratchpad && (
           <button
@@ -547,9 +578,26 @@ export default function DayNavigator({
           </button>
         )}
         <button
+          id="toggle-habit-drawer-btn"
+          onClick={() => {
+            setIsHabitDrawerOpen(!isHabitDrawerOpen);
+            setIsCalendarOpen(false);
+            setIsMobileViewMenuOpen(false);
+          }}
+          className={`h-full px-2 rounded-md active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
+            isHabitDrawerOpen
+              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+              : 'text-stone-500 hover:text-emerald-400 hover:bg-stone-800/50'
+          }`}
+          title="Habit Rituals & 7-Day Consistency Drawer"
+        >
+          <Repeat2 className="w-[18px] h-[18px]" />
+        </button>
+        <button
           id="toggle-calendar-btn"
           onClick={() => {
             setIsCalendarOpen(!isCalendarOpen);
+            setIsHabitDrawerOpen(false);
             setIsMobileViewMenuOpen(false);
           }}
           className={`h-full px-2 rounded-md active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
@@ -567,6 +615,7 @@ export default function DayNavigator({
             onClick={() => {
               toggleHighlights();
               setIsCalendarOpen(false);
+              setIsHabitDrawerOpen(false);
               setIsMobileViewMenuOpen(false);
             }}
             className={`h-full px-2 rounded-md active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
@@ -783,7 +832,7 @@ export default function DayNavigator({
           </div>
         </div>
 
-        {/* Quick-tick Habit strip — only when active habits exist */}
+        {/* Quick-tick Habit strip (Collapsed State) — only when active habits exist */}
         {sortedActiveHabits.length > 0 &&
           (() => {
             const totalHabits = sortedActiveHabits.length;
@@ -838,10 +887,11 @@ export default function DayNavigator({
                           : 'border-stone-700/60 text-stone-500 hover:border-amber-500/30 hover:text-amber-400',
                       };
                       const cls = colorMap[habit.color ?? 'emerald'] ?? colorMap.emerald;
+
                       return (
                         <button
                           key={habit.id}
-                          onClick={() => handleQuickTick(habit)}
+                          onClick={() => handleQuickTick(habit, activeDate)}
                           onContextMenu={(e) => {
                             e.preventDefault();
                             openContextMenu(habit, e.clientX, e.clientY);
@@ -872,8 +922,12 @@ export default function DayNavigator({
                               : `Check "${habit.title}" — right-click for insights`
                           }
                         >
-                          {isTicked && <Check className="w-3 h-3 stroke-[3]" />}
-                          {habit.title}
+                          {isTicked ? (
+                            <AnimatedFireIcon size={12} />
+                          ) : (
+                            <span className="w-1.5 h-1.5 rounded-full bg-stone-600" />
+                          )}
+                          <span>{habit.title}</span>
                           {count > 1 && <span className="ml-0.5 opacity-70">×{count}</span>}
                         </button>
                       );
@@ -881,18 +935,41 @@ export default function DayNavigator({
                   </div>
                 </div>
 
-                {/* Completion ratio badge */}
-                <span
-                  className={`shrink-0 flex items-center gap-1 font-mono text-[9px] px-1.5 py-0.5 rounded border transition-colors select-none ${
-                    allDone
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                      : 'bg-stone-900 border-stone-800 text-stone-500'
+                {/* Completion ratio badge & Expand Drawer Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsHabitDrawerOpen(!isHabitDrawerOpen);
+                    setIsCalendarOpen(false);
+                    setIsMobileViewMenuOpen(false);
+                  }}
+                  className={`shrink-0 flex items-center gap-1.5 font-mono text-[9px] px-2 py-1 rounded-lg border transition-all cursor-pointer active:scale-95 select-none ${
+                    isHabitDrawerOpen
+                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                      : allDone
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:border-emerald-500/50'
+                        : 'bg-stone-900 border-stone-800 text-stone-400 hover:border-stone-700 hover:text-stone-300'
                   }`}
-                  title={`${tickedCount} of ${totalHabits} habits done today`}
+                  title={
+                    isHabitDrawerOpen
+                      ? 'Collapse Habit Drawer'
+                      : `Expand 7-Day Habit Drawer (${tickedCount}/${totalHabits} done today)`
+                  }
                 >
-                  {allDone ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : null}
-                  {tickedCount}/{totalHabits}
-                </span>
+                  {allDone ? (
+                    <AnimatedFireIcon size={11} />
+                  ) : (
+                    <Repeat2 className="w-3 h-3 text-stone-500" />
+                  )}
+                  <span>
+                    {tickedCount}/{totalHabits}
+                  </span>
+                  <ChevronDown
+                    className={`w-3 h-3 text-stone-500 transition-transform duration-200 ${
+                      isHabitDrawerOpen ? 'rotate-180 text-emerald-400' : ''
+                    }`}
+                  />
+                </button>
               </div>
             );
           })()}
@@ -1008,6 +1085,210 @@ export default function DayNavigator({
           </div>
         )}
       </div>
+
+      {/* FULL-WIDTH HABIT RITUALS & CONSISTENCY DRAWER */}
+      <AnimatePresence initial={false}>
+        {isHabitDrawerOpen && sortedActiveHabits.length > 0 && (
+          <motion.div
+            id="habit-drawer"
+            key="habit-drawer"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+            style={{ overflow: 'hidden' }}
+            className="border-t border-emerald-950/40 bg-[#0c0c0c] shadow-2xl relative z-20"
+          >
+            <div className="max-w-6xl mx-auto px-5 md:px-6 py-5">
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-stone-850">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
+                    <Repeat2 className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-stone-200">
+                      Weekly Habit Rituals
+                    </h3>
+                    <p className="text-[10px] font-mono text-stone-500">
+                      Week of {habitWeekDays[0]?.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {habitWeekDays[6]?.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsHabitDrawerOpen(false)}
+                    className="p-1.5 rounded-lg border border-stone-800 hover:border-stone-700 bg-stone-900/60 text-stone-400 hover:text-stone-200 transition-colors cursor-pointer"
+                    title="Close Drawer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Habit Cards Grid (Spacious 2-Row Design with Large Tappable Day Circles) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {sortedActiveHabits.map((habit) => {
+                  const allHabitLogs = habitLogs.filter((l) => l.habit_id === habit.id);
+                  const loggedDayStrings = new Set(
+                    allHabitLogs.map((l) => toLocalDateString(new Date(l.timestamp))),
+                  );
+                  const isTickedToday = loggedDayStrings.has(activeDateStr);
+
+                  // Calculate current consecutive streak
+                  let streak = 0;
+                  const checkDate = new Date();
+                  if (!loggedDayStrings.has(toLocalDateString(checkDate))) {
+                    checkDate.setDate(checkDate.getDate() - 1);
+                  }
+                  while (loggedDayStrings.has(toLocalDateString(checkDate))) {
+                    streak++;
+                    checkDate.setDate(checkDate.getDate() - 1);
+                  }
+
+                  // Count completed days this week
+                  const completedThisWeek = habitWeekDays.filter((d) =>
+                    loggedDayStrings.has(d.dateStr),
+                  ).length;
+                  const weeklyRate = Math.round((completedThisWeek / 7) * 100);
+
+                  const themeMap: Record<
+                    string,
+                    { cardBg: string; border: string; text: string; headerBadge: string }
+                  > = {
+                    emerald: {
+                      cardBg: isTickedToday ? 'bg-emerald-950/20' : 'bg-[#121212]',
+                      border: isTickedToday
+                        ? 'border-emerald-500/40 hover:border-emerald-400/60'
+                        : 'border-stone-800 hover:border-stone-700',
+                      text: isTickedToday ? 'text-emerald-300' : 'text-stone-200',
+                      headerBadge: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+                    },
+                    sky: {
+                      cardBg: isTickedToday ? 'bg-sky-950/20' : 'bg-[#121212]',
+                      border: isTickedToday
+                        ? 'border-sky-500/40 hover:border-sky-400/60'
+                        : 'border-stone-800 hover:border-stone-700',
+                      text: isTickedToday ? 'text-sky-300' : 'text-stone-200',
+                      headerBadge: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+                    },
+                    violet: {
+                      cardBg: isTickedToday ? 'bg-violet-950/20' : 'bg-[#121212]',
+                      border: isTickedToday
+                        ? 'border-violet-500/40 hover:border-violet-400/60'
+                        : 'border-stone-800 hover:border-stone-700',
+                      text: isTickedToday ? 'text-violet-300' : 'text-stone-200',
+                      headerBadge: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
+                    },
+                    rose: {
+                      cardBg: isTickedToday ? 'bg-rose-950/20' : 'bg-[#121212]',
+                      border: isTickedToday
+                        ? 'border-rose-500/40 hover:border-rose-400/60'
+                        : 'border-stone-800 hover:border-stone-700',
+                      text: isTickedToday ? 'text-rose-300' : 'text-stone-200',
+                      headerBadge: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+                    },
+                    amber: {
+                      cardBg: isTickedToday ? 'bg-amber-950/20' : 'bg-[#121212]',
+                      border: isTickedToday
+                        ? 'border-amber-500/40 hover:border-amber-400/60'
+                        : 'border-stone-800 hover:border-stone-700',
+                      text: isTickedToday ? 'text-amber-300' : 'text-stone-200',
+                      headerBadge: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+                    },
+                  };
+                  const theme = themeMap[habit.color ?? 'emerald'] ?? themeMap.emerald;
+
+                  return (
+                    <div
+                      key={habit.id}
+                      className={`flex flex-col justify-between p-3.5 rounded-2xl border transition-all duration-200 shadow-md ${theme.cardBg} ${theme.border}`}
+                    >
+                      {/* Row 1: Habit Info, Title, Streaks & Stats button */}
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div
+                          onClick={() => handleQuickTick(habit, activeDate)}
+                          className="flex-1 cursor-pointer"
+                          title={`Click to ${isTickedToday ? 'unmark' : 'mark'} today`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-mono font-bold leading-tight ${theme.text}`}>
+                              {habit.title}
+                            </span>
+                            {isTickedToday && (
+                              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                                Done Today
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] font-mono text-stone-500 block mt-0.5">
+                            {completedThisWeek}/7 this week ({weeklyRate}%)
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {streak > 0 ? (
+                            <span className="flex items-center gap-1 text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 rounded-full shadow-sm">
+                              <AnimatedFireIcon size={12} />
+                              <span>{streak}d streak</span>
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-mono text-stone-600 px-1.5 py-0.5">
+                              0d streak
+                            </span>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setConsistencyHabit(habit)}
+                            className="p-1 rounded-lg border border-stone-800 hover:border-stone-700 bg-stone-900 text-stone-400 hover:text-amber-400 transition-colors cursor-pointer"
+                            title="View Full 365-Day Heatmap & Consistency Analytics"
+                          >
+                            <BarChart2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Row 2: 7 Large Tactile Day Circles */}
+                      <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-stone-850/80">
+                        {habitWeekDays.map((d) => {
+                          const isDone = loggedDayStrings.has(d.dateStr);
+                          return (
+                            <button
+                              key={d.dateStr}
+                              type="button"
+                              onClick={() => handleQuickTick(habit, d.date)}
+                              title={`${d.label} · ${d.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} (${isDone ? 'Completed' : 'Click to log'})`}
+                              className={`flex-1 min-h-[44px] rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer active:scale-95 border ${
+                                isDone
+                                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.15)]'
+                                  : 'bg-[#181818] border-stone-800/80 hover:border-stone-700 text-stone-500 hover:text-stone-300'
+                              } ${d.isToday ? 'ring-2 ring-amber-400/40 ring-offset-1 ring-offset-[#121212]' : ''}`}
+                            >
+                              <span className="text-[8.5px] font-mono uppercase font-bold text-stone-500">
+                                {d.label}
+                              </span>
+                              {isDone ? (
+                                <AnimatedFireIcon size={14} />
+                              ) : (
+                                <span className="text-[10px] font-mono font-medium leading-none text-stone-600">
+                                  {d.date.getDate()}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* FULL-WIDTH CALENDAR DRAWER */}
       <AnimatePresence initial={false}>
