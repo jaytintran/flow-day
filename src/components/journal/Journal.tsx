@@ -23,7 +23,8 @@ import ListsView from "./ListsView";
 import GoalsSheet from "../GoalsSheet";
 import ObjectivesSheet from "../ObjectivesSheet";
 import HabitsSheet from "../HabitsSheet";
-import HubCanvas from "./hub/HubCanvas";
+import MindmapCanvas from "./hub/MindmapCanvas";
+import { SkillTreeCanvas } from "./hub/skilltree/SkillTreeCanvas";
 import GenericEntitySheet from "./hub/GenericEntitySheet";
 
 import FocusSheet from "../FocusSheet";
@@ -33,7 +34,7 @@ import MarkdownPreview from "../MarkdownPreview";
 interface JournalProps {
 	activeDate: Date;
 	setActiveDate: (date: Date) => void;
-	viewMode: "day" | "timeline" | "records" | "lists" | "hub";
+	viewMode: "day" | "timeline" | "records" | "lists" | "habits" | "hub";
 	dayRange?: DayRange;
 	setDayRange?: (range: DayRange) => void;
 	activeTaskId: string | null;
@@ -427,6 +428,7 @@ export default function Journal({
 	const [isDetailOpen, setIsDetailOpen] = useState(false);
 	const [editTitle, setEditTitle] = useState("");
 	const [editContent, setEditContent] = useState("");
+	const [hubSubView, setHubSubView] = useState<"mindmap" | "skilltree">("mindmap");
 	const [isEditingContent, setIsEditingContent] = useState(false);
 	const [isEditingTitle, setIsEditingTitle] = useState(false);
 	const [editTimestamp, setEditTimestamp] = useState("");
@@ -1056,66 +1058,26 @@ export default function Journal({
 						entries={entries}
 						getDayRenderItems={getDayRenderItems}
 					/>
+				) : viewMode === "habits" ? (
+					<div className="w-full flex-1 min-h-0 flex flex-col pt-2 h-[calc(100vh-140px)]">
+						<div className="w-full h-full max-w-4xl mx-auto overflow-y-auto bg-[#121212] border border-stone-850 rounded-2xl shadow-inner">
+							<HabitsSheet
+								isInline
+								activeDate={activeDate}
+								highlightPurposeIds={highlightPurposeIds}
+								highlightDomainId={highlightDomainId}
+							/>
+						</div>
+					</div>
 				) : viewMode === "hub" ? (
 					<div className="w-full flex-1 min-h-0 flex flex-col pt-2 h-[calc(100vh-140px)]">
-						{/* Desktop: System Canvas & Habits Studio */}
-						<div className="hidden md:flex w-full h-full flex-col">
-							{activeHubTab === "habits" ? (
-								<div className="w-full h-full max-w-4xl mx-auto overflow-y-auto bg-[#121212] border border-stone-850 rounded-2xl shadow-inner">
-									<HabitsSheet
-										isInline
-										activeDate={activeDate}
-										highlightPurposeIds={highlightPurposeIds}
-										highlightDomainId={highlightDomainId}
-										onSwitchToCanvas={() => setActiveHubTab?.("focus")}
-									/>
-								</div>
+						{/* Desktop & Mobile: Hub Mindmap vs RPG Skill Tree */}
+						<div className="w-full h-full flex flex-col">
+							{hubSubView === "skilltree" ? (
+								<SkillTreeCanvas onSwitchToMindmap={() => setHubSubView("mindmap")} />
 							) : (
-								<HubCanvas onSwitchToHabits={() => setActiveHubTab?.("habits")} />
+								<MindmapCanvas onSwitchToSkillTree={() => setHubSubView("skilltree")} />
 							)}
-						</div>
-
-						{/* Mobile: Dynamic Sub-tabs management sheets */}
-						<div className="md:hidden h-full flex flex-col pb-2 overflow-y-auto">
-							{activeHubTab === "focus" && (
-								<FocusSheet
-									isInline
-									selectedPurposeId={selectedPurposeId}
-									selectedDomainId={selectedDomainId}
-									onSelectPurpose={setSelectedPurposeId}
-									onSelectDomain={setSelectedDomainId}
-								/>
-							)}
-							{activeHubTab === "goals" && (
-								<GoalsSheet
-									isInline
-									highlightPurposeIds={highlightPurposeIds}
-									highlightDomainId={highlightDomainId}
-								/>
-							)}
-							{activeHubTab === "objectives" && (
-								<ObjectivesSheet
-									isInline
-									highlightPurposeIds={highlightPurposeIds}
-									highlightDomainId={highlightDomainId}
-								/>
-							)}
-							{activeHubTab === "habits" && (
-								<HabitsSheet
-									isInline
-									activeDate={activeDate}
-									highlightPurposeIds={highlightPurposeIds}
-									highlightDomainId={highlightDomainId}
-								/>
-							)}
-							{/* Dynamic Custom Entity Sheet for User-Defined Types */}
-							{activeHubTab &&
-								!["focus", "goals", "objectives", "habits"].includes(activeHubTab) && (
-									<GenericEntitySheet
-										entityTypeId={activeHubTab}
-										isInline
-									/>
-								)}
 						</div>
 					</div>
 				) : (

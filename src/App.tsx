@@ -13,8 +13,8 @@ import DayHighlights from './components/journal/DayHighlights';
 
 import { DayRange } from './types';
 
-type ViewMode = 'day' | 'timeline' | 'records' | 'lists' | 'hub';
-const VALID_MODES: ViewMode[] = ['day', 'timeline', 'records', 'lists', 'hub'];
+type ViewMode = 'day' | 'timeline' | 'records' | 'lists' | 'habits' | 'hub';
+const VALID_MODES: ViewMode[] = ['day', 'timeline', 'records', 'lists', 'habits', 'hub'];
 
 function getInitialViewMode(): ViewMode {
   try {
@@ -148,7 +148,7 @@ export default function App() {
       </main>
 
       {/* ZONE 3 — INPUT BAR (FIXED BOTTOM) */}
-      {viewMode !== 'hub' && (
+      {viewMode !== 'hub' && viewMode !== 'habits' && (
         <footer
           className="flex-none relative z-35 bg-[#121212]"
           id="app-fixed-input"

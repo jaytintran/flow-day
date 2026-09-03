@@ -6,7 +6,7 @@ import {
   renderLucideIcon,
   COLOR_THEMES,
   LUCIDE_ICONS,
-} from './CanvasNodes';
+} from './MindmapNodes';
 import {
   Plus,
   Trash2,

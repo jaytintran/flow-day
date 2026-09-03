@@ -37,8 +37,8 @@ import { formatDateLabel, isSameDay, toLocalDateString } from '../utils';
 interface DayNavigatorProps {
   activeDate: Date;
   setActiveDate: (date: Date) => void;
-  viewMode: 'lists' | 'day' | 'timeline' | 'records' | 'hub';
-  setViewMode: (mode: 'day' | 'timeline' | 'records' | 'lists' | 'hub') => void;
+  viewMode: 'lists' | 'day' | 'timeline' | 'records' | 'habits' | 'hub';
+  setViewMode: (mode: 'day' | 'timeline' | 'records' | 'lists' | 'habits' | 'hub') => void;
   dayRange?: DayRange;
   setDayRange?: (range: DayRange) => void;
   activeHubTab?: 'goals' | 'objectives' | 'habits' | 'focus';
@@ -493,14 +493,20 @@ export default function DayNavigator({
             {viewMode === 'day' && <Calendar className="w-4 h-4" />}
             {viewMode === 'timeline' && <Clock className="w-4 h-4" />}
             {viewMode === 'records' && <BarChart2 className="w-4 h-4" />}
+            {viewMode === 'habits' && <Repeat2 className="w-4 h-4 text-emerald-400" />}
             {viewMode === 'hub' && <Target className="w-4 h-4" />}
           </div>
 
-          <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-300">
+          <span
+            className={`text-xs font-mono font-bold uppercase tracking-wider ${
+              viewMode === 'habits' ? 'text-emerald-300' : 'text-amber-300'
+            }`}
+          >
             {viewMode === 'lists' && 'Lists'}
             {viewMode === 'day' && 'Day'}
             {viewMode === 'timeline' && 'Timeline'}
             {viewMode === 'records' && 'Records'}
+            {viewMode === 'habits' && 'Habits'}
             {viewMode === 'hub' && 'Hub'}
           </span>
 
@@ -521,10 +527,12 @@ export default function DayNavigator({
               { id: 'day', label: 'Day', desc: 'Daily schedule', icon: Calendar },
               { id: 'timeline', label: 'Timeline', desc: 'Continuous stream', icon: Clock },
               { id: 'records', label: 'Records', desc: 'Catalog & logs', icon: BarChart2 },
+              { id: 'habits', label: 'Habits', desc: 'Routines & streaks', icon: Repeat2 },
               { id: 'hub', label: 'Hub', desc: 'Goals & focus', icon: Target },
             ].map((item) => {
               const IconComp = item.icon;
               const isSelected = viewMode === item.id;
+              const isHabitItem = item.id === 'habits';
               return (
                 <button
                   key={item.id}
@@ -535,14 +543,18 @@ export default function DayNavigator({
                   }}
                   className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-mono transition-all cursor-pointer text-left ${
                     isSelected
-                      ? 'bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30'
+                      ? isHabitItem
+                        ? 'bg-emerald-500/15 text-emerald-300 font-bold border border-emerald-500/30'
+                        : 'bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30'
                       : 'text-stone-300 hover:bg-stone-800/80 hover:text-white border border-transparent'
                   }`}
                 >
                   <div
                     className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
                       isSelected
-                        ? 'bg-amber-500/20 text-amber-400'
+                        ? isHabitItem
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : 'bg-amber-500/20 text-amber-400'
                         : 'bg-stone-900 text-stone-500'
                     }`}
                   >
@@ -640,7 +652,7 @@ export default function DayNavigator({
       >
         <div className="flex md:flex-row flex-col items-center justify-between gap-4 w-full">
           {/* 1. Day Navigator Controls / Records Catalog Title */}
-          {viewMode === 'records' || viewMode === 'lists' || viewMode === 'hub' ? (
+          {viewMode === 'records' || viewMode === 'lists' || viewMode === 'habits' || viewMode === 'hub' ? (
             <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
               <div className="flex items-center gap-4">
                 <span className="py-1.5 text-stone-100 text-sm font-mono tracking-widest uppercase text-center font-bold flex items-center gap-2">
@@ -653,6 +665,11 @@ export default function DayNavigator({
                     <>
                       <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]" />
                       All Active Lists & Tasks
+                    </>
+                  ) : viewMode === 'habits' ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]" />
+                      Habits Studio
                     </>
                   ) : viewMode === 'hub' ? (
                     <>
@@ -817,6 +834,17 @@ export default function DayNavigator({
               }`}
             >
               Records
+            </button>
+            <button
+              id="view-mode-habits"
+              onClick={() => setViewMode('habits')}
+              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer whitespace-nowrap ${
+                viewMode === 'habits'
+                  ? 'bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                  : 'text-stone-500 hover:text-emerald-400'
+              }`}
+            >
+              Habits
             </button>
             <button
               id="view-mode-hub"
@@ -1088,67 +1116,6 @@ export default function DayNavigator({
           />
         )}
 
-        {/* Mobile-only sub-tab switcher for Hub */}
-        {viewMode === 'hub' && (
-          <div className="md:hidden flex gap-1 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 w-full overflow-x-auto scrollbar-none">
-            <button
-              id="view-mode-hub"
-              onClick={() => setActiveHubTab?.('focus' as any)}
-              className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all whitespace-nowrap shrink-0 ${
-                activeHubTab === 'focus'
-                  ? 'bg-indigo-500/10 text-sky-400 border border-sky-500/20'
-                  : 'text-stone-500 border border-transparent hover:text-stone-400'
-              }`}
-            >
-              Focus
-            </button>
-            <button
-              onClick={() => setActiveHubTab?.('goals' as any)}
-              className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all whitespace-nowrap shrink-0 ${
-                activeHubTab === 'goals'
-                  ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
-                  : 'text-stone-500 border border-transparent hover:text-stone-400'
-              }`}
-            >
-              Goals
-            </button>
-            <button
-              onClick={() => setActiveHubTab?.('objectives' as any)}
-              className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all whitespace-nowrap shrink-0 ${
-                activeHubTab === 'objectives'
-                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                  : 'text-stone-500 border border-transparent hover:text-stone-400'
-              }`}
-            >
-              Objectives
-            </button>
-            <button
-              onClick={() => setActiveHubTab?.('habits' as any)}
-              className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all whitespace-nowrap shrink-0 ${
-                activeHubTab === 'habits'
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                  : 'text-stone-500 border border-transparent hover:text-stone-400'
-              }`}
-            >
-              Habits
-            </button>
-
-            {/* Render any Custom Entity Types on Mobile */}
-            {customEntityTypes.map((customType) => (
-              <button
-                key={customType.id}
-                onClick={() => setActiveHubTab?.(customType.id as any)}
-                className={`px-3 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-widest font-mono cursor-pointer transition-all whitespace-nowrap shrink-0 ${
-                  activeHubTab === customType.id
-                    ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
-                    : 'text-stone-500 border border-transparent hover:text-stone-400'
-                }`}
-              >
-                {customType.name}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* FULL-WIDTH HABIT RITUALS & CONSISTENCY DRAWER */}
