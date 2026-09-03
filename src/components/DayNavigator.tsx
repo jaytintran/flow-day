@@ -862,36 +862,63 @@ export default function DayNavigator({
                     className="flex items-center gap-2 overflow-x-auto pb-0.5 md:flex-wrap md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                   >
                     {sortedActiveHabits.map((habit) => {
-                      const logsToday = habitLogs.filter(
-                        (l) =>
-                          l.habit_id === habit.id &&
-                          toLocalDateString(new Date(l.timestamp)) === activeDateStr,
+                      const allHabitLogs = habitLogs.filter((l) => l.habit_id === habit.id);
+                      const loggedDayStrings = new Set(
+                        allHabitLogs.map((l) => toLocalDateString(new Date(l.timestamp))),
                       );
-                      const count = logsToday.length;
-                      const isTicked = count > 0;
-                      const colorMap: Record<string, string> = {
-                        emerald: isTicked
-                          ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                          : 'border-stone-700/60 text-stone-500 hover:border-emerald-500/30 hover:text-emerald-400',
-                        sky: isTicked
-                          ? 'bg-sky-500/15 border-sky-500/40 text-sky-300'
-                          : 'border-stone-700/60 text-stone-500 hover:border-sky-500/30 hover:text-sky-400',
-                        violet: isTicked
-                          ? 'bg-violet-500/15 border-violet-500/40 text-violet-300'
-                          : 'border-stone-700/60 text-stone-500 hover:border-violet-500/30 hover:text-violet-400',
-                        rose: isTicked
-                          ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
-                          : 'border-stone-700/60 text-stone-500 hover:border-rose-500/30 hover:text-rose-400',
-                        amber: isTicked
-                          ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-                          : 'border-stone-700/60 text-stone-500 hover:border-amber-500/30 hover:text-amber-400',
+                      const isTickedToday = loggedDayStrings.has(activeDateStr);
+
+                      // Color themes
+                      const themeMap: Record<
+                        string,
+                        { cardBg: string; border: string; text: string; activeDash: string }
+                      > = {
+                        emerald: {
+                          cardBg: isTickedToday ? 'bg-emerald-950/20' : 'bg-[#111111]',
+                          border: isTickedToday
+                            ? 'border-emerald-500/40 hover:border-emerald-400/60'
+                            : 'border-stone-800 hover:border-stone-700',
+                          text: isTickedToday ? 'text-emerald-300' : 'text-stone-300',
+                          activeDash: 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]',
+                        },
+                        sky: {
+                          cardBg: isTickedToday ? 'bg-sky-950/20' : 'bg-[#111111]',
+                          border: isTickedToday
+                            ? 'border-sky-500/40 hover:border-sky-400/60'
+                            : 'border-stone-800 hover:border-stone-700',
+                          text: isTickedToday ? 'text-sky-300' : 'text-stone-300',
+                          activeDash: 'bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]',
+                        },
+                        violet: {
+                          cardBg: isTickedToday ? 'bg-violet-950/20' : 'bg-[#111111]',
+                          border: isTickedToday
+                            ? 'border-violet-500/40 hover:border-violet-400/60'
+                            : 'border-stone-800 hover:border-stone-700',
+                          text: isTickedToday ? 'text-violet-300' : 'text-stone-300',
+                          activeDash: 'bg-violet-400 shadow-[0_0_6px_rgba(167,139,250,0.8)]',
+                        },
+                        rose: {
+                          cardBg: isTickedToday ? 'bg-rose-950/20' : 'bg-[#111111]',
+                          border: isTickedToday
+                            ? 'border-rose-500/40 hover:border-rose-400/60'
+                            : 'border-stone-800 hover:border-stone-700',
+                          text: isTickedToday ? 'text-rose-300' : 'text-stone-300',
+                          activeDash: 'bg-rose-400 shadow-[0_0_6px_rgba(251,113,133,0.8)]',
+                        },
+                        amber: {
+                          cardBg: isTickedToday ? 'bg-amber-950/20' : 'bg-[#111111]',
+                          border: isTickedToday
+                            ? 'border-amber-500/40 hover:border-amber-400/60'
+                            : 'border-stone-800 hover:border-stone-700',
+                          text: isTickedToday ? 'text-amber-300' : 'text-stone-300',
+                          activeDash: 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)]',
+                        },
                       };
-                      const cls = colorMap[habit.color ?? 'emerald'] ?? colorMap.emerald;
+                      const theme = themeMap[habit.color ?? 'emerald'] ?? themeMap.emerald;
 
                       return (
-                        <button
+                        <div
                           key={habit.id}
-                          onClick={() => handleQuickTick(habit, activeDate)}
                           onContextMenu={(e) => {
                             e.preventDefault();
                             openContextMenu(habit, e.clientX, e.clientY);
@@ -915,21 +942,59 @@ export default function DayNavigator({
                               longPressTimerRef.current = null;
                             }
                           }}
-                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-mono font-semibold uppercase tracking-wide transition-all active:scale-95 cursor-pointer shrink-0 select-none ${cls}`}
-                          title={
-                            isTicked
-                              ? `Uncheck "${habit.title}" — right-click for insights`
-                              : `Check "${habit.title}" — right-click for insights`
-                          }
+                          className={`flex flex-col justify-between px-2.5 py-1 rounded-xl border transition-all shrink-0 select-none shadow-sm ${theme.cardBg} ${theme.border} min-w-[105px]`}
                         >
-                          {isTicked ? (
-                            <AnimatedFireIcon size={12} />
-                          ) : (
-                            <span className="w-1.5 h-1.5 rounded-full bg-stone-600" />
-                          )}
-                          <span>{habit.title}</span>
-                          {count > 1 && <span className="ml-0.5 opacity-70">×{count}</span>}
-                        </button>
+                          {/* Row 1: Habit Flame / Dot + Title */}
+                          <button
+                            type="button"
+                            onClick={() => handleQuickTick(habit, activeDate)}
+                            className="flex items-center gap-1.5 cursor-pointer active:scale-95 w-full text-left"
+                            title={
+                              isTickedToday
+                                ? `Uncheck "${habit.title}" for today`
+                                : `Check "${habit.title}" for today`
+                            }
+                          >
+                            {isTickedToday ? (
+                              <AnimatedFireIcon size={11} />
+                            ) : (
+                              <span className="w-1.5 h-1.5 rounded-full bg-stone-600 shrink-0" />
+                            )}
+                            <span
+                              className={`text-[10px] font-mono font-semibold uppercase tracking-wide truncate max-w-[100px] ${theme.text}`}
+                            >
+                              {habit.title}
+                            </span>
+                          </button>
+
+                          {/* Row 2: Mini 7-Dash Calendar Strip Below Title */}
+                          <div
+                            className="flex items-center justify-between gap-[3px] pt-1 mt-0.5 border-t border-stone-850/60 w-full"
+                            title="7-Day Mini Calendar: Click any dash to toggle that day"
+                          >
+                            {habitWeekDays.map((d) => {
+                              const isDone = loggedDayStrings.has(d.dateStr);
+                              return (
+                                <button
+                                  key={d.dateStr}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleQuickTick(habit, d.date);
+                                  }}
+                                  title={`${d.label} (${d.dateStr}): ${isDone ? 'Completed' : 'Empty'} · Click to toggle`}
+                                  className={`flex-1 h-1.5 rounded-[1.5px] transition-all cursor-pointer hover:scale-125 ${
+                                    isDone
+                                      ? theme.activeDash
+                                      : d.isToday
+                                        ? 'bg-stone-700 ring-1 ring-amber-400/40'
+                                        : 'bg-stone-850 hover:bg-stone-700'
+                                  }`}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
@@ -1251,7 +1316,7 @@ export default function DayNavigator({
                         </div>
                       </div>
 
-                      {/* Row 2: 7 Large Tactile Day Circles */}
+                      {/* Row 2: 7 Circular Day Orbs */}
                       <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-stone-850/80">
                         {habitWeekDays.map((d) => {
                           const isDone = loggedDayStrings.has(d.dateStr);
@@ -1261,21 +1326,23 @@ export default function DayNavigator({
                               type="button"
                               onClick={() => handleQuickTick(habit, d.date)}
                               title={`${d.label} · ${d.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} (${isDone ? 'Completed' : 'Click to log'})`}
-                              className={`flex-1 min-h-[44px] rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer active:scale-95 border ${
+                              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer active:scale-95 border ${
                                 isDone
-                                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.15)]'
+                                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
                                   : 'bg-[#181818] border-stone-800/80 hover:border-stone-700 text-stone-500 hover:text-stone-300'
                               } ${d.isToday ? 'ring-2 ring-amber-400/40 ring-offset-1 ring-offset-[#121212]' : ''}`}
                             >
-                              <span className="text-[8.5px] font-mono uppercase font-bold text-stone-500">
-                                {d.label}
-                              </span>
                               {isDone ? (
-                                <AnimatedFireIcon size={14} />
+                                <AnimatedFireIcon size={16} />
                               ) : (
-                                <span className="text-[10px] font-mono font-medium leading-none text-stone-600">
-                                  {d.date.getDate()}
-                                </span>
+                                <>
+                                  <span className="text-[7.5px] font-mono uppercase font-bold text-stone-500 leading-none">
+                                    {d.label}
+                                  </span>
+                                  <span className="text-[9.5px] font-mono font-medium leading-none text-stone-600">
+                                    {d.date.getDate()}
+                                  </span>
+                                </>
                               )}
                             </button>
                           );
