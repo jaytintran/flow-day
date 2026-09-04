@@ -811,7 +811,7 @@ export default function DayScratchpad({
               animate={{ opacity: 1, scale: 1, x: position.x, y: position.y }}
               exit={{ opacity: 0, scale: 0.95, x: position.x, y: position.y + 15 }}
               transition={{ duration: 0.2 }}
-              className="fixed z-50 bottom-20 right-8 w-[500px] max-w-[90vw] max-h-[620px] bg-[#141414]/95 border border-stone-800 rounded-2xl shadow-2xl backdrop-blur-md flex flex-col overflow-hidden font-sans"
+              className="fixed z-50 bottom-20 right-8 w-[420px] max-w-[90vw] max-h-[620px] bg-[#141414]/95 border border-stone-800 rounded-2xl shadow-2xl backdrop-blur-md flex flex-col overflow-hidden font-sans"
             >
               {/* Window Header (Drag Handle) */}
               <div className="flex items-center justify-between px-4 py-2.5 bg-[#181818] border-b border-stone-850 cursor-grab active:cursor-grabbing select-none">
