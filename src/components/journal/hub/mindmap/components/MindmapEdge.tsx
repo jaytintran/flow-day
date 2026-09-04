@@ -4,7 +4,8 @@ import {
   EdgeLabelRenderer,
   getSmoothStepPath,
   getStraightPath,
-  EdgeProps,
+  type EdgeProps,
+  type Edge,
 } from '@xyflow/react';
 import { MindmapEdgeData } from '../types';
 
@@ -19,7 +20,7 @@ export function MindmapEdge({
   style = {},
   markerEnd,
   data,
-}: EdgeProps<MindmapEdgeData>) {
+}: EdgeProps<Edge<MindmapEdgeData>>) {
   const isStraight = data?.styleType === 'straight';
 
   const [edgePath, labelX, labelY] = isStraight

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { UnifiedEntity } from '../../../../types';
+import { UnifiedEntity } from '../../../../../types';
 
 interface UseMindmapKeyboardProps {
   selectedNodeId: string | null;

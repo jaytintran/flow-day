@@ -60,7 +60,7 @@ export interface MindmapEdgeMetadata {
   styleType?: 'solid' | 'dashed' | 'dotted' | 'smooth' | 'straight';
 }
 
-export interface MindmapEdgeData {
+export interface MindmapEdgeData extends Record<string, unknown> {
   title?: string;
   description?: string;
   isDimmed?: boolean;

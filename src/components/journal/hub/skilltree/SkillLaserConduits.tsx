@@ -1,48 +1,37 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { SkillNodeItem, ELEMENTAL_THEMES } from './types';
+import { TreeConduitLine } from './treeLayout';
 
 interface SkillLaserConduitsProps {
-  skills: SkillNodeItem[];
-  containerRef: React.RefObject<HTMLDivElement | null>;
-  activeLineageIds: Set<string>;
+  skills?: SkillNodeItem[];
+  conduits?: TreeConduitLine[];
+  containerRef?: React.RefObject<HTMLDivElement | null>;
+  activeLineageIds?: Set<string>;
   showParticles?: boolean;
 }
 
-interface ConduitLine {
-  id: string;
-  sourceId: string;
-  targetId: string;
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  color: string;
-  isMastered: boolean;
-  isLearning: boolean;
-  isHighlighted: boolean;
-  isDimmed: boolean;
-}
-
 export function SkillLaserConduits({
-  skills,
+  skills = [],
+  conduits: directConduits,
   containerRef,
-  activeLineageIds,
+  activeLineageIds = new Set(),
   showParticles = true,
 }: SkillLaserConduitsProps) {
-  const [conduits, setConduits] = useState<ConduitLine[]>([]);
+  const [measuredConduits, setMeasuredConduits] = useState<TreeConduitLine[]>([]);
   const [svgDimensions, setSvgDimensions] = useState({ width: 0, height: 0 });
 
-  const calculateConduits = () => {
-    if (!containerRef.current) return;
-    const containerRect = containerRef.current.getBoundingClientRect();
-    const scrollLeft = containerRef.current.scrollLeft || 0;
-    const scrollTop = containerRef.current.scrollTop || 0;
+  const conduits = directConduits || measuredConduits;
 
-    const fullWidth = containerRef.current.scrollWidth || containerRect.width;
-    const fullHeight = containerRef.current.scrollHeight || containerRect.height;
+  const calculateConduits = () => {
+    if (directConduits || !containerRef?.current) return;
+    const containerEl = containerRef.current;
+    const containerRect = containerEl.getBoundingClientRect();
+
+    const fullWidth = containerEl.offsetWidth || containerRect.width;
+    const fullHeight = containerEl.offsetHeight || containerRect.height;
     setSvgDimensions({ width: fullWidth, height: fullHeight });
 
-    const lines: ConduitLine[] = [];
+    const lines: TreeConduitLine[] = [];
     const skillMap = new Map<string, SkillNodeItem>();
     skills.forEach((s) => skillMap.set(s.id, s));
 
@@ -51,18 +40,20 @@ export function SkillLaserConduits({
         const parent = skillMap.get(parentId);
         if (!parent) return;
 
-        const parentEl = containerRef.current?.querySelector(`[data-skill-id="${parent.id}"]`);
-        const childEl = containerRef.current?.querySelector(`[data-skill-id="${child.id}"]`);
+        const parentEl = containerEl.querySelector(`[data-skill-id="${parent.id}"]`);
+        const childEl = containerEl.querySelector(`[data-skill-id="${child.id}"]`);
 
         if (parentEl && childEl) {
           const pRect = parentEl.getBoundingClientRect();
           const cRect = childEl.getBoundingClientRect();
 
-          // Coordinates relative to the scrollable container's content space
-          const x1 = pRect.left - containerRect.left + scrollLeft + pRect.width / 2;
-          const y1 = pRect.top - containerRect.top + scrollTop + pRect.height / 2;
-          const x2 = cRect.left - containerRect.left + scrollLeft + cRect.width / 2;
-          const y2 = cRect.top - containerRect.top + scrollTop + cRect.height / 2;
+          const scale = containerEl.offsetWidth > 0 ? containerRect.width / containerEl.offsetWidth : 1;
+          const currentScale = scale > 0 ? scale : 1;
+
+          const x1 = (pRect.left + pRect.width / 2 - containerRect.left) / currentScale;
+          const y1 = (pRect.top + pRect.height / 2 - containerRect.top) / currentScale;
+          const x2 = (cRect.left + cRect.width / 2 - containerRect.left) / currentScale;
+          const y2 = (cRect.top + cRect.height / 2 - containerRect.top) / currentScale;
 
           const isChildMastered = child.rank >= child.maxRank || child.status === 'mastered';
           const isLearning = child.status === 'learning' || child.rank > 0;
@@ -72,7 +63,6 @@ export function SkillLaserConduits({
             activeLineageIds.has(child.id);
           const isDimmed = activeLineageIds.size > 0 && !isHighlighted;
 
-          // Resolve conduit laser color from 24 themes
           const c = child.color || parent.color || 'sky';
           const themeDef = ELEMENTAL_THEMES.find((t) => t.id === c);
           const colorHex = isChildMastered
@@ -97,53 +87,37 @@ export function SkillLaserConduits({
       });
     });
 
-    setConduits(lines);
+    setMeasuredConduits(lines);
   };
 
   useLayoutEffect(() => {
+    if (directConduits) return;
     calculateConduits();
     const handleResize = () => calculateConduits();
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [skills, activeLineageIds]);
 
-  useEffect(() => {
-    // Recalculate on DOM mutation or image load
-    const timer = setTimeout(calculateConduits, 100);
-    return () => clearTimeout(timer);
-  }, [skills]);
+    let ro: ResizeObserver | null = null;
+    if (containerRef?.current) {
+      ro = new ResizeObserver(() => calculateConduits());
+      ro.observe(containerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      ro?.disconnect();
+    };
+  }, [skills, activeLineageIds, directConduits]);
 
   if (conduits.length === 0) return null;
 
   return (
     <svg
-      className="absolute inset-0 pointer-events-none z-0"
+      className="absolute inset-0 pointer-events-none z-0 overflow-visible"
       style={{
-        width: svgDimensions.width || '100%',
-        height: svgDimensions.height || '100%',
+        width: directConduits ? '100%' : svgDimensions.width || '100%',
+        height: directConduits ? '100%' : svgDimensions.height || '100%',
       }}
     >
-      <defs>
-        {/* Glow Filters */}
-        <filter id="laser-glow" x="-30%" y="-30%" width="160%" height="160%">
-          <feGaussianBlur stdDeviation="3" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-
-        <filter id="intense-laser-glow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="6" result="blur1" />
-          <feGaussianBlur stdDeviation="2" result="blur2" />
-          <feMerge>
-            <feMergeNode in="blur1" />
-            <feMergeNode in="blur2" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-
       {conduits.map((c) => {
         // Compute smooth vertical S-curve bezier path
         const dy = c.y2 - c.y1;
@@ -151,36 +125,27 @@ export function SkillLaserConduits({
         const cy2 = c.y2 - dy * 0.5;
         const pathData = `M ${c.x1} ${c.y1} C ${c.x1} ${cy1}, ${c.x2} ${cy2}, ${c.x2} ${c.y2}`;
 
-        const strokeOpacity = c.isDimmed ? 0.15 : c.isHighlighted ? 1 : 0.65;
-        const strokeWidth = c.isHighlighted ? 3.5 : c.isMastered ? 2.5 : 2;
+        const strokeOpacity = c.isDimmed ? 0.15 : c.isHighlighted ? 0.95 : 0.6;
+        const strokeWidth = c.isHighlighted ? 2.5 : c.isMastered ? 2 : 1.5;
 
         return (
-          <g key={c.id} className="transition-all duration-300">
-            {/* Outer Diffuse Neon Halo */}
+          <g key={c.id} className="transition-all duration-200">
+            {/* Clean Crisp Laser Filament */}
             <path
               d={pathData}
               fill="none"
-              stroke={c.color}
-              strokeWidth={strokeWidth + 4}
-              strokeOpacity={strokeOpacity * 0.35}
-              filter="url(#intense-laser-glow)"
-            />
-
-            {/* Core Laser Filament */}
-            <path
-              d={pathData}
-              fill="none"
-              stroke={c.isMastered || c.isHighlighted ? '#ffffff' : c.color}
+              stroke={c.isMastered ? '#f59e0b' : c.isHighlighted ? '#38bdf8' : c.color}
               strokeWidth={strokeWidth}
               strokeOpacity={strokeOpacity}
-              filter="url(#laser-glow)"
-              strokeDasharray={c.isLearning || c.isHighlighted ? '8 6' : undefined}
-              className={c.isLearning || c.isHighlighted ? 'animate-pulse' : ''}
+              strokeDasharray={c.isLearning || c.isHighlighted ? '6 4' : undefined}
             />
 
-            {/* Animated Travelling Energy Photons (Particle pulses flowing down the conduit) */}
+            {/* Clean Travelling Energy Photons */}
             {showParticles && (c.isLearning || c.isMastered || c.isHighlighted) && !c.isDimmed && (
-              <circle r={c.isHighlighted ? 4 : 3} fill={c.color} filter="url(#laser-glow)">
+              <circle
+                r={c.isHighlighted ? 3 : 2}
+                fill={c.isMastered ? '#fbbf24' : c.color}
+              >
                 <animateMotion
                   path={pathData}
                   dur={c.isHighlighted ? '1.8s' : '3s'}

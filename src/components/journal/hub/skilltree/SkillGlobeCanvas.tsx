@@ -10,6 +10,8 @@ interface SkillGlobeCanvasProps {
   viewSettings: SkillViewSettings;
   onSelect: (skill: SkillNodeItem) => void;
   onHover: (skill: SkillNodeItem | null) => void;
+  onContextMenu?: (skill: SkillNodeItem, e: React.MouseEvent) => void;
+  onIconClick?: (skill: SkillNodeItem, e: React.MouseEvent) => void;
 }
 
 interface PositionedGlobeNode {
@@ -29,6 +31,7 @@ interface SolarSystemData {
   centerY: number;
   nodes: PositionedGlobeNode[];
   colorHex: string;
+  dynamicRadii?: Record<number, number>;
 }
 
 // Radii for concentric planetary orbits from system center
@@ -55,6 +58,8 @@ export function SkillGlobeCanvas({
   viewSettings,
   onSelect,
   onHover,
+  onContextMenu,
+  onIconClick,
 }: SkillGlobeCanvasProps) {
   // Keplerian Orbital Revolution time tracking
   const [isOrbiting, setIsOrbiting] = useState(true);
@@ -127,17 +132,32 @@ export function SkillGlobeCanvas({
         }
       });
 
+      const t2Count = tierGroups[2].length;
+      const t3Count = tierGroups[3].length;
+      const t4Count = tierGroups[4].length;
+      const t5Count = tierGroups[5].length;
+
+      const minRadiusT2 = Math.max(175, Math.round((t2Count * 85) / (2 * Math.PI)));
+      const minRadiusT3 = Math.max(minRadiusT2 + 130, Math.round((t3Count * 75) / (2 * Math.PI)));
+      const minRadiusT4 = Math.max(minRadiusT3 + 125, Math.round((t4Count * 65) / (2 * Math.PI)));
+      const minRadiusT5 = Math.max(minRadiusT4 + 115, Math.round((t5Count * 55) / (2 * Math.PI)));
+
+      const dynamicRadii: Record<number, number> = {
+        1: 0,
+        2: minRadiusT2,
+        3: minRadiusT3,
+        4: minRadiusT4,
+        5: minRadiusT5,
+      };
+
       const baseNodeAngles = new Map<string, number>();
 
-      // 1. Distribute Tier 2 Clusters evenly around 360 degrees
       const t2Nodes = tierGroups[2];
-      const t2Count = t2Nodes.length;
       t2Nodes.forEach((node, idx) => {
         const angle = -Math.PI / 2 + (idx * 2 * Math.PI) / (t2Count || 1);
         baseNodeAngles.set(node.id, angle);
       });
 
-      // 2. Distribute Tier 3, 4, 5 radiating out from their parent angles
       const distributeTier = (tierNum: number) => {
         const nodes = tierGroups[tierNum];
         const byParent = new Map<string, SkillNodeItem[]>();
@@ -155,7 +175,7 @@ export function SkillGlobeCanvas({
           if (count === 1) {
             baseNodeAngles.set(children[0].id, parentAngle);
           } else {
-            const maxSpread = Math.min(Math.PI * 0.45, ((2 * Math.PI) / (t2Count || 1)) * 0.85);
+            const maxSpread = Math.min(Math.PI * 0.55, ((2 * Math.PI) / (t2Count || 1)) * 0.9);
             const step = maxSpread / (count - 1);
             children.forEach((child, cIdx) => {
               const angle = parentAngle - maxSpread / 2 + cIdx * step;
@@ -169,10 +189,8 @@ export function SkillGlobeCanvas({
       distributeTier(4);
       distributeTier(5);
 
-      // Compute live coordinates with Keplerian orbital rotation
       const positionedNodes: PositionedGlobeNode[] = [];
 
-      // Add Core Sun at EXACT Center (0, 0)
       positionedNodes.push({
         skill: core,
         x: centerX,
@@ -183,13 +201,12 @@ export function SkillGlobeCanvas({
         systemColor: core.color || 'amber',
       });
 
-      // Add orbiting satellites with live rotation delta
       [2, 3, 4, 5].forEach((tier) => {
         const nodes = tierGroups[tier];
-        const radius = ORBIT_RADII[tier];
+        const baseRadius = dynamicRadii[tier];
         const speed = ORBIT_SPEEDS[tier] || 180;
-        // Rotation offset in radians based on elapsed orbital time
         const rotationOffset = (elapsedTime * (2 * Math.PI)) / speed;
+        const shouldStagger = nodes.length > (tier === 2 ? 6 : 8);
 
         nodes.forEach((node, nodeIdx) => {
           let baseAngle = baseNodeAngles.get(node.id);
@@ -198,6 +215,9 @@ export function SkillGlobeCanvas({
           }
 
           const currentAngle = baseAngle + rotationOffset;
+          const staggerOffset = shouldStagger ? (nodeIdx % 2 === 0 ? -16 : 16) : 0;
+          const radius = baseRadius + staggerOffset;
+
           const nx = centerX + Math.cos(currentAngle) * radius;
           const ny = centerY + Math.sin(currentAngle) * radius;
 
@@ -220,6 +240,7 @@ export function SkillGlobeCanvas({
         systemIndex: sysIdx,
         centerX,
         centerY,
+        dynamicRadii,
         nodes: positionedNodes,
         colorHex: themeDef.glow,
       };
@@ -231,21 +252,20 @@ export function SkillGlobeCanvas({
   const galaxyWidth = Math.max(1400, totalSystems * systemSpacing + 400);
   const galaxyHeight = 1400;
 
-  // Stardust Particle Belt along orbital paths
   const stardustParticles = useMemo(() => {
     const particles: Array<{ x: number; y: number; r: number; opacity: number; orbit: number; angle: number }> = [];
     [2, 3, 4, 5].forEach((tier) => {
       const radius = ORBIT_RADII[tier];
-      const count = tier * 12; // 24 to 60 stardust specks per orbit
+      const count = tier * 10;
       for (let i = 0; i < count; i++) {
         const angle = (i * 2 * Math.PI) / count + (i % 3) * 0.1;
-        const rOffset = (Math.sin(i * 99) * 8); // slight drift from center line
+        const rOffset = (Math.sin(i * 99) * 6);
         const r = radius + rOffset;
         particles.push({
           x: Math.cos(angle) * r,
           y: Math.sin(angle) * r,
-          r: 0.8 + (i % 3) * 0.6,
-          opacity: 0.15 + (i % 5) * 0.1,
+          r: 0.7 + (i % 3) * 0.5,
+          opacity: 0.2 + (i % 4) * 0.1,
           orbit: tier,
           angle,
         });
@@ -293,68 +313,63 @@ export function SkillGlobeCanvas({
         viewBox={`-${galaxyWidth / 2} -${galaxyHeight / 2} ${galaxyWidth} ${galaxyHeight}`}
         style={{ width: `${galaxyWidth}px`, height: `${galaxyHeight}px` }}
       >
-        <defs>
-          <filter id="globe-laser-glow" x="-40%" y="-40%" width="180%" height="180%">
-            <feGaussianBlur stdDeviation="3.5" result="blur1" />
-            <feGaussianBlur stdDeviation="1.5" result="blur2" />
-            <feMerge>
-              <feMergeNode in="blur1" />
-              <feMergeNode in="blur2" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-
-          {/* Living Pulsing Solar Flare Shaders */}
-          <radialGradient id="sun-core-pulse" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.8" />
-            <stop offset="35%" stopColor="#f59e0b" stopOpacity="0.45" />
-            <stop offset="70%" stopColor="#d97706" stopOpacity="0.15" />
-            <stop offset="100%" stopColor="#b45309" stopOpacity="0" />
-          </radialGradient>
-
-          <radialGradient id="sun-outer-flare" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#fef08a" stopOpacity="0.4" />
-            <stop offset="50%" stopColor="#f59e0b" stopOpacity="0.1" />
-            <stop offset="100%" stopColor="#78350f" stopOpacity="0" />
-          </radialGradient>
-        </defs>
-
         {systemsData.map((sys) => (
           <g key={`sys-${sys.core.id}`}>
-            {/* Living Solar Flare Corona Layers */}
+            {/* Center Keystone Accent Ring */}
             <circle
               cx={sys.centerX}
               cy={sys.centerY}
-              r={130}
-              fill="url(#sun-outer-flare)"
-              className="animate-pulse"
-              style={{ animationDuration: '4s' }}
-            />
-            <circle
-              cx={sys.centerX}
-              cy={sys.centerY}
-              r={85}
-              fill="url(#sun-core-pulse)"
-              className="animate-pulse"
-              style={{ animationDuration: '2.5s' }}
+              r={56}
+              fill="none"
+              stroke={sys.colorHex}
+              strokeWidth="1"
+              strokeDasharray="4 4"
+              strokeOpacity="0.25"
             />
 
             {/* Concentric Planetary Orbital Rings */}
             {[2, 3, 4, 5].map((tier) => {
-              const r = ORBIT_RADII[tier];
+              const r = sys.dynamicRadii?.[tier] || ORBIT_RADII[tier];
+              const nodesInTier = sys.nodes.filter((n) => n.tier === tier);
+              const isCrowded = nodesInTier.length > (tier === 2 ? 6 : 8);
+
               return (
                 <g key={`orbit-${sys.core.id}-t${tier}`}>
-                  {/* Glowing orbital guide ring */}
-                  <circle
-                    cx={sys.centerX}
-                    cy={sys.centerY}
-                    r={r}
-                    fill="none"
-                    stroke={sys.colorHex}
-                    strokeWidth="1.2"
-                    strokeDasharray="4 8"
-                    strokeOpacity="0.22"
-                  />
+                  {isCrowded ? (
+                    <>
+                      <circle
+                        cx={sys.centerX}
+                        cy={sys.centerY}
+                        r={r - 16}
+                        fill="none"
+                        stroke={sys.colorHex}
+                        strokeWidth="1"
+                        strokeDasharray="3 6"
+                        strokeOpacity="0.15"
+                      />
+                      <circle
+                        cx={sys.centerX}
+                        cy={sys.centerY}
+                        r={r + 16}
+                        fill="none"
+                        stroke={sys.colorHex}
+                        strokeWidth="1"
+                        strokeDasharray="3 6"
+                        strokeOpacity="0.15"
+                      />
+                    </>
+                  ) : (
+                    <circle
+                      cx={sys.centerX}
+                      cy={sys.centerY}
+                      r={r}
+                      fill="none"
+                      stroke={sys.colorHex}
+                      strokeWidth="1"
+                      strokeDasharray="4 8"
+                      strokeOpacity="0.2"
+                    />
+                  )}
 
                   {/* Radial Crosshairs */}
                   <line
@@ -382,9 +397,9 @@ export function SkillGlobeCanvas({
                   {viewSettings.showTierBanners && (
                     <text
                       x={sys.centerX}
-                      y={sys.centerY - r - 8}
+                      y={sys.centerY - (isCrowded ? r + 24 : r + 8)}
                       fill={sys.colorHex}
-                      fillOpacity="0.45"
+                      fillOpacity="0.4"
                       fontSize="9"
                       fontFamily="monospace"
                       fontWeight="bold"
@@ -392,24 +407,25 @@ export function SkillGlobeCanvas({
                       className="select-none tracking-widest uppercase"
                     >
                       {tier === 2
-                        ? 'Orbit II • Clusters'
+                        ? `Orbit II • Clusters (${nodesInTier.length})`
                         : tier === 3
-                          ? 'Orbit III • Topics'
+                          ? `Orbit III • Topics (${nodesInTier.length})`
                           : tier === 4
-                            ? 'Orbit IV • Abilities'
-                            : 'Orbit V • Drills & Katas'}
+                            ? `Orbit IV • Abilities (${nodesInTier.length})`
+                            : `Orbit V • Katas (${nodesInTier.length})`}
                     </text>
                   )}
                 </g>
               );
             })}
 
-            {/* Drifting Stardust Streams along the planetary orbits */}
+            {/* Drifting Stardust Streams */}
             {stardustParticles.map((pt, pIdx) => {
+              const r = sys.dynamicRadii?.[pt.orbit] || ORBIT_RADII[pt.orbit];
               const speed = ORBIT_SPEEDS[pt.orbit] || 180;
               const rot = (elapsedTime * (2 * Math.PI)) / speed;
-              const px = sys.centerX + Math.cos(pt.angle + rot) * ORBIT_RADII[pt.orbit];
-              const py = sys.centerY + Math.sin(pt.angle + rot) * ORBIT_RADII[pt.orbit];
+              const px = sys.centerX + Math.cos(pt.angle + rot) * r;
+              const py = sys.centerY + Math.sin(pt.angle + rot) * r;
               return (
                 <circle
                   key={`stardust-${sys.core.id}-${pIdx}`}
@@ -422,7 +438,7 @@ export function SkillGlobeCanvas({
               );
             })}
 
-            {/* Gravitational Curved Laser Conduits & Synaptic Pulses */}
+            {/* Clean Curved Laser Filaments */}
             {viewSettings.showConduits &&
               sys.nodes.map((nodeItem) => {
                 const child = nodeItem.skill;
@@ -443,34 +459,23 @@ export function SkillGlobeCanvas({
                     ELEMENTAL_THEMES[0];
                   const filamentColor = isChildMastered ? '#f59e0b' : themeDef.glow;
 
-                  // Dynamic Gravitational Arc (Curves slightly towards system center)
                   const midX = (parentItem.x + nodeItem.x) / 2;
                   const midY = (parentItem.y + nodeItem.y) / 2;
-                  // Pull control point slightly towards Sun center for a realistic orbital arc
                   const pullFactor = 0.18;
                   const ctrlX = midX + (sys.centerX - midX) * pullFactor;
                   const ctrlY = midY + (sys.centerY - midY) * pullFactor;
 
                   const pathData = `M ${parentItem.x} ${parentItem.y} Q ${ctrlX} ${ctrlY} ${nodeItem.x} ${nodeItem.y}`;
-                  const strokeOpacity = isDimmed ? 0.12 : isHighlighted ? 1 : 0.65;
-                  const strokeWidth = isHighlighted ? 3.5 : isChildMastered ? 2.5 : 1.5;
+                  const strokeOpacity = isDimmed ? 0.15 : isHighlighted ? 0.95 : 0.6;
+                  const strokeWidth = isHighlighted ? 2.5 : isChildMastered ? 2 : 1.5;
 
                   return (
                     <g key={`filament-${parentItem.skill.id}-${child.id}`}>
-                      {/* Outer Glow Halo Beam */}
+                      {/* Clean Laser Filament */}
                       <path
                         d={pathData}
                         fill="none"
-                        stroke={filamentColor}
-                        strokeWidth={strokeWidth + 3}
-                        strokeOpacity={strokeOpacity * 0.35}
-                        filter="url(#globe-laser-glow)"
-                      />
-                      {/* Core Laser Filament */}
-                      <path
-                        d={pathData}
-                        fill="none"
-                        stroke={isChildMastered || isHighlighted ? '#ffffff' : filamentColor}
+                        stroke={isChildMastered ? '#f59e0b' : isHighlighted ? '#38bdf8' : filamentColor}
                         strokeWidth={strokeWidth}
                         strokeOpacity={strokeOpacity}
                         strokeDasharray={isLearning || isHighlighted ? '6 4' : undefined}
@@ -479,7 +484,10 @@ export function SkillGlobeCanvas({
                       {viewSettings.showParticles &&
                         (isLearning || isChildMastered || isHighlighted) &&
                         !isDimmed && (
-                          <circle r={isHighlighted ? 4.5 : 2.5} fill={filamentColor} filter="url(#globe-laser-glow)">
+                          <circle
+                            r={isHighlighted ? 3 : 2}
+                            fill={isChildMastered ? '#fbbf24' : filamentColor}
+                          >
                             <animateMotion
                               path={pathData}
                               dur={isHighlighted ? '1.2s' : '2.2s'}
@@ -492,7 +500,7 @@ export function SkillGlobeCanvas({
                 });
               })}
 
-            {/* Render Node Medallions via SVG ForeignObject (100% Locked Coordinates) */}
+            {/* Render Node Medallions via SVG ForeignObject */}
             {sys.nodes.map((n) => (
               <foreignObject
                 key={`node-fo-${n.skill.id}`}
@@ -509,9 +517,10 @@ export function SkillGlobeCanvas({
                     isHighlighted={activeLineageIds.has(n.skill.id)}
                     isDimmed={activeLineageIds.size > 0 && !activeLineageIds.has(n.skill.id)}
                     showRankBadges={viewSettings.showRankBadges}
-                    showAuras={viewSettings.showAuras}
                     onSelect={onSelect}
                     onHover={onHover}
+                    onContextMenu={onContextMenu}
+                    onIconClick={onIconClick}
                   />
                 </div>
               </foreignObject>

@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, Reorder, useDragControls } from 'motion/react';
 import { db } from '../../db';
-import { Task } from '../../types';
+import { Task, ViewMode } from '../../types';
 import {
   StickyNote,
   X,
@@ -34,7 +34,7 @@ export interface Scratchpad {
 
 interface DayScratchpadProps {
   activeDate: Date;
-  viewMode?: 'day' | 'timeline' | 'records' | 'lists' | 'hub';
+  viewMode?: ViewMode;
   isOpen?: boolean;
   onToggle?: () => void;
 }

@@ -15,6 +15,8 @@ export type EntryType =
 
 export type DayRange = '1D' | '3D' | '4D' | '1W';
 
+export type ViewMode = 'day' | 'timeline' | 'records' | 'lists' | 'habits' | 'hub';
+
 export interface MicroWin {
   id: string;
   text: string;
@@ -123,6 +125,9 @@ export interface Goal extends BaseEntry {
 
 export type TimelineEntry = Task | Log | Event | Note | TimeBlock | Objective | Goal | HabitLog;
 
+export type RoutineSlot = 'morning' | 'afternoon' | 'evening' | 'anytime';
+export type HabitFrequencyType = 'daily' | 'weekly_target' | 'specific_days';
+
 // Habit template — stored in the `habits` Dexie table, NOT a TimelineEntry
 export interface Habit {
   id: string;
@@ -134,6 +139,12 @@ export interface Habit {
   sort_order?: number; // display ordering
   purpose_ids?: string[];
   domain_ids?: string[];
+  routine_slot?: RoutineSlot;
+  frequency_type?: HabitFrequencyType;
+  target_days_per_week?: number; // e.g. 3 for 3x/week
+  target_weekdays?: number[]; // 0=Sun, 1=Mon, ..., 6=Sat
+  target_value?: number; // e.g. 2000 (ml) or 20 (pages)
+  unit?: string; // e.g. "ml", "pages", "mins"
 }
 
 // One log per tick — IS a TimelineEntry (appears in the daily timeline)
@@ -142,6 +153,7 @@ export interface HabitLog extends BaseEntry {
   habit_id: string;
   title: string; // copied from Habit.title at log time
   timestamp: Date; // exact completion time (shown in time gutter)
+  value?: number; // for numeric / measurable habits
 }
 
 export type CategoryScope = 'goal' | 'objective' | 'task-list' | 'record-category';

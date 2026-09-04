@@ -470,7 +470,7 @@ export default function EntryContextMenu({
                           className="flex items-center justify-between w-full px-2.5 py-1.5 rounded-lg text-left text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer text-xs"
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <CategoryIcon icon={list.icon} className="w-3.5 h-3.5 shrink-0" />
+                            <CategoryIcon name={list.icon} color={list.color} className="w-3.5 h-3.5 shrink-0" />
                             <span className="truncate">{list.name}</span>
                           </div>
                           {isAssigned && <CheckCircle2 className="w-3 h-3 text-amber-400 shrink-0" />}

@@ -27,8 +27,9 @@ export interface SkillViewSettings {
   showParticles: boolean;
   showRankBadges: boolean;
   showTierBanners: boolean;
-  showAuras: boolean;
   showLockedNodes: boolean;
+  horizontalSpacing: number; // Center-to-center horizontal slot spacing in px
+  verticalSpacing: number; // Tier-to-tier vertical distance in px
 }
 
 export const DEFAULT_VIEW_SETTINGS: SkillViewSettings = {
@@ -36,8 +37,9 @@ export const DEFAULT_VIEW_SETTINGS: SkillViewSettings = {
   showParticles: true,
   showRankBadges: true,
   showTierBanners: true,
-  showAuras: true,
   showLockedNodes: true,
+  horizontalSpacing: 150,
+  verticalSpacing: 150,
 };
 
 export type SkillLayoutMode = 'tree' | 'orbit';

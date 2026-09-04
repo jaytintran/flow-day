@@ -25,15 +25,41 @@ export function parseSkillDrills(content?: string): SkillDrill[] {
   return drills;
 }
 
-// Convert drill array back to markdown content string
-export function serializeSkillDrills(originalContent: string | undefined, drills: SkillDrill[]): string {
-  const lines = (originalContent || '').split('\n');
+// Extract pure markdown notes (excluding drill lines)
+export function extractSkillNotes(content?: string): string {
+  if (!content) return '';
+  const lines = content.split('\n');
   const nonDrillLines = lines.filter(
     (line) => !line.trim().startsWith('- [ ]') && !line.trim().startsWith('- [x]') && !line.trim().startsWith('- [X]'),
   );
+  return nonDrillLines.join('\n').trim();
+}
 
+// Convert drill array back to markdown content string
+export function serializeSkillDrills(originalContent: string | undefined, drills: SkillDrill[]): string {
+  const notes = extractSkillNotes(originalContent);
   const drillLines = drills.map((d) => `- [${d.completed ? 'x' : ' '}] ${d.title}`);
-  return [...nonDrillLines, ...drillLines].join('\n').trim();
+  
+  if (!notes) {
+    return drillLines.join('\n');
+  }
+  if (drillLines.length === 0) {
+    return notes;
+  }
+  return `${notes}\n\n${drillLines.join('\n')}`.trim();
+}
+
+// Combine user updated notes with existing drills
+export function combineSkillNotesAndDrills(notes: string, drills: SkillDrill[]): string {
+  const cleanNotes = notes.trim();
+  const drillLines = drills.map((d) => `- [${d.completed ? 'x' : ' '}] ${d.title}`);
+  if (!cleanNotes) {
+    return drillLines.join('\n');
+  }
+  if (drillLines.length === 0) {
+    return cleanNotes;
+  }
+  return `${cleanNotes}\n\n${drillLines.join('\n')}`.trim();
 }
 
 // Calculate total XP and level from tracked hours + drills completed

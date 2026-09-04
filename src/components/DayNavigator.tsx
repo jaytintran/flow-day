@@ -25,24 +25,26 @@ import {
   BarChart2,
   Clock,
   StickyNote,
+  ExternalLink,
 } from 'lucide-react';
 import HabitConsistencyModal from './HabitConsistencyModal';
 import AnimatedFireIcon from './AnimatedFireIcon';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../db';
-import { Task, Habit, HabitLog, TaskAchievement, DayRange } from '../types';
+import { Task, Habit, HabitLog, TaskAchievement, DayRange, ViewMode } from '../types';
 import { formatDateLabel, isSameDay, toLocalDateString } from '../utils';
+import { getRoutineSlotForCurrentTime } from '../lib/habitUtils';
 
 interface DayNavigatorProps {
   activeDate: Date;
   setActiveDate: (date: Date) => void;
-  viewMode: 'lists' | 'day' | 'timeline' | 'records' | 'habits' | 'hub';
-  setViewMode: (mode: 'day' | 'timeline' | 'records' | 'lists' | 'habits' | 'hub') => void;
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
   dayRange?: DayRange;
   setDayRange?: (range: DayRange) => void;
-  activeHubTab?: 'goals' | 'objectives' | 'habits' | 'focus';
-  setActiveHubTab?: (tab: 'goals' | 'objectives' | 'habits' | 'focus') => void;
+  activeHubTab?: 'goals' | 'objectives' | 'habits' | 'focus' | string;
+  setActiveHubTab?: (tab: any) => void;
   isScratchpadOpen?: boolean;
   toggleScratchpad?: () => void;
   isHighlightsOpen?: boolean;
@@ -239,18 +241,23 @@ export default function DayNavigator({
       .map((key) => groupsMap[key]);
   }, [starredTasks, searchQuery, filterYear, filterMonth]);
 
-  // Habits for quick-tick strip (sorted by sort_order)
+  // Habits for quick-tick strip (sorted by circadian routine slot and sort_order)
   const activeHabits = (useLiveQuery(() => db.habits.where('status').equals('active').toArray()) ||
     []) as Habit[];
-  const sortedActiveHabits = React.useMemo(
-    () =>
-      [...activeHabits].sort(
-        (a, b) =>
-          (a.sort_order ?? Date.parse(a.created_at.toString())) -
-          (b.sort_order ?? Date.parse(b.created_at.toString())),
-      ),
-    [activeHabits],
-  );
+  const sortedActiveHabits = React.useMemo(() => {
+    const currentSlot = getRoutineSlotForCurrentTime();
+    return [...activeHabits].sort((a, b) => {
+      // Prioritize current routine slot
+      const aIsCurrent = a.routine_slot === currentSlot ? 1 : 0;
+      const bIsCurrent = b.routine_slot === currentSlot ? 1 : 0;
+      if (aIsCurrent !== bIsCurrent) return bIsCurrent - aIsCurrent;
+
+      return (
+        (a.sort_order ?? Date.parse(a.created_at.toString())) -
+        (b.sort_order ?? Date.parse(b.created_at.toString()))
+      );
+    });
+  }, [activeHabits]);
   const habitLogs = (useLiveQuery(
     () => db.entries.where('type').equals('habit-log').toArray() as Promise<HabitLog[]>,
   ) || []) as HabitLog[];
@@ -403,12 +410,11 @@ export default function DayNavigator({
     }
   }, [isCalendarOpen, activeDate]);
 
-  // Click outside listener to close calendar & trophy drawers
+  // Click outside listener to close calendar
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsCalendarOpen(false);
-        setIsTrophyOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -478,7 +484,6 @@ export default function DayNavigator({
           onClick={() => {
             setIsMobileViewMenuOpen(!isMobileViewMenuOpen);
             setIsCalendarOpen(false);
-            setIsTrophyOpen(false);
           }}
           className={`flex items-center gap-2 px-3 h-9 rounded-lg border transition-all cursor-pointer select-none active:scale-95 ${
             isMobileViewMenuOpen
@@ -1079,6 +1084,16 @@ export default function DayNavigator({
                 {contextHabit.title}
               </p>
             </div>
+            <button
+              className="flex items-center gap-2 w-full px-3 py-1.5 text-[11px] font-sans text-stone-300 hover:bg-stone-800 hover:text-emerald-400 transition-colors cursor-pointer"
+              onClick={() => {
+                setViewMode('habits');
+                closeContextMenu();
+              }}
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-stone-400" />
+              Open in Habits View
+            </button>
             <button
               className="flex items-center gap-2 w-full px-3 py-1.5 text-[11px] font-sans text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer"
               onClick={() => {

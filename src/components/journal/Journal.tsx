@@ -9,6 +9,8 @@ import {
 	TimeBlock,
 	TaskAchievement,
 	DayRange,
+	MicroWin,
+	Purpose,
 } from "../../types";
 import {
 	formatDuration,
@@ -23,6 +25,7 @@ import ListsView from "./ListsView";
 import GoalsSheet from "../GoalsSheet";
 import ObjectivesSheet from "../ObjectivesSheet";
 import HabitsSheet from "../HabitsSheet";
+import HabitsView from "./habits/HabitsView";
 import MindmapCanvas from "./hub/MindmapCanvas";
 import { SkillTreeCanvas } from "./hub/skilltree/SkillTreeCanvas";
 import GenericEntitySheet from "./hub/GenericEntitySheet";
@@ -984,8 +987,8 @@ export default function Journal({
 	return (
 		<div
 			className={`flex-1 px-2 md:px-6 pb-4 md:pb-6 ${
-				viewMode === "hub"
-					? "overflow-hidden pt-3 flex flex-col h-full"
+				viewMode === "hub" || viewMode === "habits"
+					? "overflow-hidden pt-1 pb-1 px-1 md:px-4 flex flex-col h-full"
 					: viewMode === "records"
 						? "overflow-y-auto pt-4 md:pt-6"
 						: viewMode === "lists"
@@ -999,8 +1002,8 @@ export default function Journal({
 		>
 			<div
 				className={`w-full md:mx-auto ${
-					viewMode === "hub"
-						? "h-full md:max-w-9xl flex flex-col"
+					viewMode === "hub" || viewMode === "habits"
+						? "h-full md:max-w-none flex flex-col"
 						: viewMode === "lists" || viewMode === "records"
 							? "md:max-w-9xl "
 							: viewMode === "timeline"
@@ -1059,15 +1062,12 @@ export default function Journal({
 						getDayRenderItems={getDayRenderItems}
 					/>
 				) : viewMode === "habits" ? (
-					<div className="w-full flex-1 min-h-0 flex flex-col pt-2 h-[calc(100vh-140px)]">
-						<div className="w-full h-full max-w-4xl mx-auto overflow-y-auto bg-[#121212] border border-stone-850 rounded-2xl shadow-inner">
-							<HabitsSheet
-								isInline
-								activeDate={activeDate}
-								highlightPurposeIds={highlightPurposeIds}
-								highlightDomainId={highlightDomainId}
-							/>
-						</div>
+					<div className="w-full flex-1 min-h-0 flex flex-col h-full overflow-hidden">
+						<HabitsView
+							activeDate={activeDate}
+							highlightPurposeIds={highlightPurposeIds}
+							highlightDomainId={highlightDomainId}
+						/>
 					</div>
 				) : viewMode === "hub" ? (
 					<div className="w-full flex-1 min-h-0 flex flex-col pt-2 h-[calc(100vh-140px)]">

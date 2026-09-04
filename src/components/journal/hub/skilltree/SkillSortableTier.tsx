@@ -22,9 +22,10 @@ interface SortableSkillItemProps {
   isHighlighted: boolean;
   isDimmed: boolean;
   showRankBadges: boolean;
-  showAuras: boolean;
   onSelect: (skill: SkillNodeItem) => void;
   onHover: (skill: SkillNodeItem | null) => void;
+  onContextMenu?: (skill: SkillNodeItem, e: React.MouseEvent) => void;
+  onIconClick?: (skill: SkillNodeItem, e: React.MouseEvent) => void;
 }
 
 function SortableSkillItem({
@@ -33,9 +34,10 @@ function SortableSkillItem({
   isHighlighted,
   isDimmed,
   showRankBadges,
-  showAuras,
   onSelect,
   onHover,
+  onContextMenu,
+  onIconClick,
 }: SortableSkillItemProps) {
   const {
     attributes,
@@ -62,9 +64,10 @@ function SortableSkillItem({
         isHighlighted={isHighlighted}
         isDimmed={isDimmed}
         showRankBadges={showRankBadges}
-        showAuras={showAuras}
         onSelect={onSelect}
         onHover={onHover}
+        onContextMenu={onContextMenu}
+        onIconClick={onIconClick}
       />
     </div>
   );
@@ -79,10 +82,11 @@ interface SkillSortableTierProps {
   activeLineageIds: Set<string>;
   showTierBanners: boolean;
   showRankBadges: boolean;
-  showAuras: boolean;
   onReorder: (tier: number, newOrderedIds: string[]) => void;
   onSelect: (skill: SkillNodeItem) => void;
   onHover: (skill: SkillNodeItem | null) => void;
+  onContextMenu?: (skill: SkillNodeItem, e: React.MouseEvent) => void;
+  onIconClick?: (skill: SkillNodeItem, e: React.MouseEvent) => void;
 }
 
 export function SkillSortableTier({
@@ -94,10 +98,11 @@ export function SkillSortableTier({
   activeLineageIds,
   showTierBanners,
   showRankBadges,
-  showAuras,
   onReorder,
   onSelect,
   onHover,
+  onContextMenu,
+  onIconClick,
 }: SkillSortableTierProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -166,9 +171,10 @@ export function SkillSortableTier({
                 isHighlighted={activeLineageIds.has(s.id)}
                 isDimmed={activeLineageIds.size > 0 && !activeLineageIds.has(s.id)}
                 showRankBadges={showRankBadges}
-                showAuras={showAuras}
                 onSelect={onSelect}
                 onHover={onHover}
+                onContextMenu={onContextMenu}
+                onIconClick={onIconClick}
               />
             ))}
           </div>

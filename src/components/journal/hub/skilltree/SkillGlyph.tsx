@@ -9,10 +9,14 @@ interface SkillGlyphProps {
   isHighlighted?: boolean;
   isDimmed?: boolean;
   showRankBadges?: boolean;
-  showAuras?: boolean;
+  isWiringSource?: boolean;
+  isWiringTarget?: boolean;
+  isWiringInvalid?: boolean;
   onSelect: (skill: SkillNodeItem) => void;
   onHover?: (skill: SkillNodeItem | null) => void;
-  onQuickLevelUp?: (skill: SkillNodeItem) => void;
+  onContextMenu?: (skill: SkillNodeItem, e: React.MouseEvent) => void;
+  onIconClick?: (skill: SkillNodeItem, e: React.MouseEvent) => void;
+  onNodePointerDown?: (skill: SkillNodeItem, e: React.PointerEvent) => void;
 }
 
 export function SkillGlyph({
@@ -21,10 +25,14 @@ export function SkillGlyph({
   isHighlighted,
   isDimmed,
   showRankBadges = true,
-  showAuras = true,
+  isWiringSource,
+  isWiringTarget,
+  isWiringInvalid,
   onSelect,
   onHover,
-  onQuickLevelUp,
+  onContextMenu,
+  onIconClick,
+  onNodePointerDown,
 }: SkillGlyphProps) {
   // Dynamically resolve lucide icon
   const IconComponent = (Icons as any)[skill.icon || 'Sparkles'] || Icons.Sparkles;
@@ -51,69 +59,93 @@ export function SkillGlyph({
             ? 'w-11 h-11 text-base'
             : 'w-9 h-9 text-sm';
 
-  // Dynamic Border & Glow based on custom color & status
+  // Dynamic Theme Colors
   const c = skill.color || (isMastered ? 'amber' : isLearning ? 'sky' : 'emerald');
   const themeDef = ELEMENTAL_THEMES.find((t) => t.id === c) || ELEMENTAL_THEMES[0];
-  const glowHex = isMastered ? '#f59e0b' : themeDef.glow;
+  const colorHex = isMastered ? '#f59e0b' : themeDef.glow;
 
   return (
     <div
       data-skill-id={skill.id}
       onClick={() => onSelect(skill)}
+      onPointerDown={(e) => {
+        if (onNodePointerDown) {
+          onNodePointerDown(skill, e);
+        }
+      }}
+      onContextMenu={(e) => {
+        if (onContextMenu) {
+          e.preventDefault();
+          e.stopPropagation();
+          onContextMenu(skill, e);
+        }
+      }}
       onMouseEnter={() => onHover?.(skill)}
       onMouseLeave={() => onHover?.(null)}
-      className={`group relative flex flex-col items-center cursor-pointer select-none transition-all duration-300 transform hover:scale-110 ${
-        isDimmed ? 'opacity-25 blur-[0.5px] scale-95' : isHighlighted ? 'scale-105 z-10' : ''
-      }`}
+      className={`group relative flex items-center justify-center cursor-pointer select-none transition-transform duration-200 transform hover:scale-105 ${
+        isDimmed ? 'opacity-30 scale-95' : isHighlighted ? 'scale-105 z-10' : ''
+      } ${isWiringTarget ? 'scale-115 z-30' : ''} ${isWiringSource ? 'scale-110 z-20' : ''}`}
     >
-      {/* Halo for Mastered, Selected, or Highlighted Lineage */}
-      {showAuras && (isMastered || isSelected || isHighlighted) && (
-        <div
-          className="absolute -inset-2 rounded-full blur-md opacity-70 animate-pulse pointer-events-none"
-          style={{ backgroundColor: glowHex }}
-        />
-      )}
-
-      {/* Outer Socket Medallion */}
+      {/* Outer Socket Medallion (Centered, Clean High-Contrast Borders) */}
       <div
-        className={`relative ${sizeClass} rounded-full border-2 flex items-center justify-center transition-all ${
-          isLocked ? 'border-stone-800 bg-[#101012] opacity-40 grayscale' : 'bg-[#101014]'
-        } ${isSelected ? 'ring-2 ring-white ring-offset-2 ring-offset-black' : ''}`}
-        style={{
-          borderColor: isLocked ? undefined : glowHex,
-          boxShadow: isLocked
-            ? undefined
+        className={`relative ${sizeClass} rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+          isLocked
+            ? 'border-stone-800 bg-[#101012] opacity-40 grayscale'
             : isMastered
-              ? `0 0 25px ${glowHex}80, inset 0 0 15px ${glowHex}40`
-              : `0 0 16px ${glowHex}40`,
+              ? 'border-amber-400 bg-[#161410]'
+              : 'bg-[#121216]'
+        } ${isSelected ? 'ring-2 ring-white ring-offset-2 ring-offset-black scale-105' : ''} ${
+          isHighlighted ? 'ring-1 ring-amber-400/60 ring-offset-1 ring-offset-black' : ''
+        } ${
+          isWiringTarget
+            ? isWiringInvalid
+              ? 'ring-2 ring-rose-500 ring-offset-2 ring-offset-black animate-pulse'
+              : 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-black scale-110'
+            : isWiringSource
+              ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-black'
+              : ''
+        }`}
+        style={{
+          borderColor: isLocked
+            ? undefined
+            : isWiringTarget
+              ? isWiringInvalid
+                ? '#f43f5e'
+                : '#10b981'
+              : isWiringSource
+                ? '#f59e0b'
+                : isMastered
+                  ? '#f59e0b'
+                  : colorHex,
         }}
       >
-        {/* Tier 1 Orbital Ring */}
+        {/* Tier 1 Subtle Accent Ring */}
         {skill.tier === 1 && (
           <div
-            className="absolute -inset-2 rounded-full border border-dashed animate-spin-slow pointer-events-none"
-            style={{ borderColor: `${glowHex}80` }}
+            className="absolute -inset-1.5 rounded-full border border-dashed pointer-events-none opacity-50"
+            style={{ borderColor: isMastered ? '#f59e0b' : colorHex }}
           />
         )}
 
         {/* Icon or Lock */}
         {isLocked ? (
-          <Lock className="w-4 h-4 text-stone-600" />
+          <Lock className="w-4 h-4 text-stone-600 pointer-events-none" />
         ) : (
-          <IconComponent
-            className={`${
-              skill.tier <= 2 ? 'w-7 h-7' : skill.tier === 3 ? 'w-5 h-5' : 'w-4 h-4'
-            }`}
-            style={{
-              color: glowHex,
-              filter: `drop-shadow(0 0 6px ${glowHex})`,
-            }}
-          />
+          <div className="w-full h-full rounded-full flex items-center justify-center pointer-events-none">
+            <IconComponent
+              className={`${
+                skill.tier <= 2 ? 'w-7 h-7' : skill.tier === 3 ? 'w-5 h-5' : 'w-4 h-4'
+              }`}
+              style={{
+                color: isMastered ? '#fbbf24' : colorHex,
+              }}
+            />
+          </div>
         )}
 
         {/* Mastered Crown/Sparkle Badge */}
         {showRankBadges && isMastered && (
-          <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-amber-400 text-stone-950 rounded-full flex items-center justify-center shadow-md">
+          <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-amber-400 text-stone-950 rounded-full flex items-center justify-center shadow-md pointer-events-none">
             <Check className="w-2.5 h-2.5 stroke-[3]" />
           </div>
         )}
@@ -126,8 +158,8 @@ export function SkillGlyph({
         )}
       </div>
 
-      {/* Skill Title & Rank Underneath */}
-      <div className="mt-2 text-center max-w-[120px]">
+      {/* Skill Title & Rank Label Positioned Absolutely Below the Medallion Center */}
+      <div className="absolute top-full pt-1.5 left-1/2 -translate-x-1/2 text-center w-32 pointer-events-none">
         <p
           className={`text-[11px] font-mono font-semibold tracking-wide truncate ${
             isMastered
@@ -149,7 +181,17 @@ export function SkillGlyph({
           ) : isLocked ? (
             <span>Locked</span>
           ) : (
-            <span>{skill.tier === 1 ? 'Core' : skill.tier === 2 ? 'Cluster' : skill.tier === 3 ? 'Topic' : skill.tier === 4 ? 'Ability' : 'Drill'}</span>
+            <span>
+              {skill.tier === 1
+                ? 'Core'
+                : skill.tier === 2
+                  ? 'Cluster'
+                  : skill.tier === 3
+                    ? 'Topic'
+                    : skill.tier === 4
+                      ? 'Ability'
+                      : 'Drill'}
+            </span>
           )}
         </p>
       </div>

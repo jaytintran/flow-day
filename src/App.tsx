@@ -53,9 +53,9 @@ export default function App() {
   }, []);
 
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
-  const [activeHubTab, setActiveHubTab] = useState<'focus' | 'goals' | 'objectives' | 'habits'>(
-    'goals',
-  );
+  const [activeHubTab, setActiveHubTab] = useState<
+    'focus' | 'goals' | 'objectives' | 'habits' | string
+  >('goals');
 
   const [isScratchpadOpen, setIsScratchpadOpen] = useState<boolean>(() => {
     try {

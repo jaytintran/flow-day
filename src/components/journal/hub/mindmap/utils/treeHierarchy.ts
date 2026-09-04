@@ -1,4 +1,4 @@
-import { UnifiedEntity } from '../../../../types';
+import { UnifiedEntity } from '../../../../../types';
 
 // ─── Ancestor Depth (Tier) Calculation ──────────────────────────────────────
 // Any node with 0 parents is Tier 0 (Root).

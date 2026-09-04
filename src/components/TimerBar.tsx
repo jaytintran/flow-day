@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
-import { Task, Objective, Goal, TimerState, TaskAchievement } from '../types';
+import { Task, Objective, Goal, TimerState, TaskAchievement, ViewMode } from '../types';
 import { formatDuration } from '../utils';
 import {
   Search,
@@ -36,7 +36,7 @@ import GoalPickerSheet from './GoalPickerSheet';
 interface TimerBarProps {
   activeTaskId: string | null;
   setActiveTaskId: (id: string | null) => void;
-  viewMode?: 'day' | 'timeline' | 'records' | 'lists' | 'hub';
+  viewMode?: ViewMode;
   activeDate?: Date;
 }
 

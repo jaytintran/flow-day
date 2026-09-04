@@ -11,7 +11,7 @@ interface TimeRulerOverlayProps {
   entry: TimelineEntry | any;
   initialDate: Date;
   initialEndDate?: Date;
-  mode?: 'start' | 'end' | 'span' | 'completed';
+  mode?: 'start' | 'end' | 'span' | 'completed' | 'created';
   originY: number;
   originX: number;
   formatTime: (date: Date | string) => string;

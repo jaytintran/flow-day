@@ -161,7 +161,7 @@ export default function DayTimeline({
     entry: TimelineEntry | TimeBlock;
     initialDate: Date;
     initialEndDate?: Date;
-    mode: 'start' | 'end' | 'span';
+    mode: 'start' | 'end' | 'span' | 'completed' | 'created';
     originY: number;
     originX: number;
   } | null>(null);
@@ -170,7 +170,7 @@ export default function DayTimeline({
     x: number;
     y: number;
     entry: TimelineEntry | TimeBlock;
-    mode: 'start' | 'end' | 'span';
+    mode: 'start' | 'end' | 'span' | 'completed' | 'created';
     initialDate: Date;
     initialEndDate?: Date;
   } | null>(null);
