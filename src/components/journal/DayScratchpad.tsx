@@ -150,24 +150,24 @@ function MobileScratchpadItem({
       value={item}
       dragListener={false}
       dragControls={dragControls}
-      className="flex items-start gap-2 bg-[#1b1b1b] border border-stone-850/80 rounded-xl p-2.5 focus-within:border-amber-500/40 transition-colors"
+      className="flex items-start gap-1.5 bg-[#1b1b1b] border border-stone-850/80 rounded-lg px-2.5 py-1.5 focus-within:border-amber-500/40 transition-colors"
     >
       <button
         type="button"
         onPointerDown={(e) => dragControls.start(e)}
-        className="p-1 -ml-1 text-stone-600 active:text-amber-400 touch-none cursor-grab active:cursor-grabbing shrink-0 mt-0.5"
+        className="p-0.5 -ml-0.5 text-stone-600 active:text-amber-400 touch-none cursor-grab active:cursor-grabbing shrink-0 mt-0.5"
         title="Drag to reorder"
       >
-        <GripVertical className="w-4 h-4" />
+        <GripVertical className="w-3.5 h-3.5" />
       </button>
 
       <button
         type="button"
         onClick={() => onToggleComplete(item)}
         title="Mark as completed"
-        className="w-4 h-4 rounded-full border border-stone-600 active:border-emerald-400 flex items-center justify-center shrink-0 mt-1 cursor-pointer transition-colors"
+        className="w-3.5 h-3.5 rounded-full border border-stone-600 active:border-emerald-400 flex items-center justify-center shrink-0 mt-0.5 cursor-pointer transition-colors"
       >
-        <Check className="w-2.5 h-2.5 text-transparent active:text-emerald-400" />
+        <Check className="w-2 h-2 text-transparent active:text-emerald-400" />
       </button>
 
       <textarea
@@ -177,28 +177,28 @@ function MobileScratchpadItem({
         onChange={(e) => onTextChange(item.id, e.target.value, e.target)}
         onKeyDown={(e) => onKeyDown(e, item, index)}
         placeholder="Jot thought / task..."
-        className={`flex-1 bg-transparent text-sm focus:outline-none placeholder-stone-600 resize-none overflow-hidden leading-relaxed ${
+        className={`flex-1 bg-transparent text-xs focus:outline-none placeholder-stone-600 resize-none overflow-hidden leading-normal ${
           item.isConverted ? 'text-stone-500' : 'text-stone-200'
         }`}
       />
-      <div className="flex items-center gap-1 shrink-0 mt-0.5">
+      <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
         {!item.isConverted && item.text.trim() && (
           <button
             type="button"
             onClick={() => onConvertToTask(item)}
             title="Convert to Task for Today"
-            className="p-1.5 text-stone-400 hover:text-amber-400 bg-stone-900/80 hover:bg-stone-850 border border-stone-800 rounded-lg text-[10px] font-mono flex items-center gap-1"
+            className="p-1 text-stone-400 hover:text-amber-400 bg-stone-900/80 hover:bg-stone-850 border border-stone-800 rounded-md text-[9px] font-mono flex items-center gap-0.5"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <Sparkles className="w-3 h-3 text-amber-500" />
             <span>Task</span>
           </button>
         )}
         <button
           type="button"
           onClick={() => onDeleteItem(item.id)}
-          className="p-1 text-stone-500 hover:text-rose-400 rounded-lg"
+          className="p-0.5 text-stone-500 hover:text-rose-400 rounded"
         >
-          <X className="w-4 h-4" />
+          <X className="w-3.5 h-3.5" />
         </button>
       </div>
     </Reorder.Item>
@@ -688,7 +688,7 @@ export default function DayScratchpad({
                     axis="y"
                     values={activeItems}
                     onReorder={handleReorderActiveItems}
-                    className="space-y-2"
+                    className="space-y-1.5"
                   >
                     {activeItems.map((item, index) => (
                       <MobileScratchpadItem
@@ -716,31 +716,31 @@ export default function DayScratchpad({
                   <button
                     type="button"
                     onClick={() => handleAddItem()}
-                    className="w-full py-2.5 px-3 border border-dashed border-stone-800 hover:border-amber-500/40 rounded-xl text-stone-400 hover:text-amber-400 text-xs font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    className="w-full py-2 px-2.5 border border-dashed border-stone-800 hover:border-amber-500/40 rounded-lg text-stone-400 hover:text-amber-400 text-xs font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
-                    <Plus className="w-4 h-4" /> Add Item
+                    <Plus className="w-3.5 h-3.5" /> Add Item
                   </button>
 
                   {/* Collapsible Completed Section (Mobile) */}
                   {completedItems.length > 0 && (
-                    <div className="pt-3 border-t border-stone-850 mt-3">
-                      <div className="flex items-center justify-between py-1 px-1">
+                    <div className="pt-2.5 border-t border-stone-850 mt-2.5">
+                      <div className="flex items-center justify-between py-0.5 px-1">
                         <button
                           type="button"
                           onClick={() => setIsCompletedOpen((prev) => !prev)}
                           className="flex items-center gap-1.5 text-xs font-mono text-stone-400 hover:text-stone-200 cursor-pointer select-none"
                         >
                           {isCompletedOpen ? (
-                            <ChevronDown className="w-3.5 h-3.5" />
+                            <ChevronDown className="w-3 h-3" />
                           ) : (
-                            <ChevronRight className="w-3.5 h-3.5" />
+                            <ChevronRight className="w-3 h-3" />
                           )}
                           <span>Completed ({completedItems.length})</span>
                         </button>
                         <button
                           type="button"
                           onClick={handleClearDone}
-                          className="text-[10px] font-mono text-stone-500 hover:text-rose-400 px-1.5 py-0.5 rounded cursor-pointer"
+                          className="text-[9px] font-mono text-stone-500 hover:text-rose-400 px-1 py-0.5 rounded cursor-pointer"
                         >
                           Clear
                         </button>
@@ -752,36 +752,36 @@ export default function DayScratchpad({
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
-                            className="space-y-1.5 mt-2 overflow-hidden"
+                            className="space-y-1 mt-1.5 overflow-hidden"
                           >
                             {completedItems.map((item) => (
                               <div
                                 key={item.id}
-                                className="flex items-start gap-2 bg-[#171717] border border-stone-850/60 rounded-xl p-2.5 opacity-75"
+                                className="flex items-start gap-1.5 bg-[#171717] border border-stone-850/60 rounded-lg px-2.5 py-1.5 opacity-75"
                               >
                                 <button
                                   type="button"
                                   onClick={() => handleToggleComplete(item)}
                                   title="Mark as active"
-                                  className="w-4 h-4 rounded-full border bg-emerald-500/20 border-emerald-500/60 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 cursor-pointer"
+                                  className="w-3.5 h-3.5 rounded-full border bg-emerald-500/20 border-emerald-500/60 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 cursor-pointer"
                                 >
-                                  <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                  <Check className="w-2 h-2 stroke-[3]" />
                                 </button>
-                                <span className="flex-1 text-xs sm:text-sm text-stone-500 select-text break-words py-0.5 leading-relaxed">
+                                <span className="flex-1 text-xs text-stone-500 select-text break-words py-0.5 leading-normal">
                                   {item.text}
                                 </span>
-                                <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                                <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
                                   {item.isConverted && (
-                                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400/70 border border-amber-500/20">
+                                    <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-amber-500/10 text-amber-400/70 border border-amber-500/20">
                                       Task
                                     </span>
                                   )}
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteItem(item.id)}
-                                    className="p-1 text-stone-500 hover:text-rose-400 rounded-lg cursor-pointer"
+                                    className="p-0.5 text-stone-500 hover:text-rose-400 rounded cursor-pointer"
                                   >
-                                    <X className="w-3.5 h-3.5" />
+                                    <X className="w-3 h-3" />
                                   </button>
                                 </div>
                               </div>
@@ -963,23 +963,23 @@ export default function DayScratchpad({
                     axis="y"
                     values={activeItems}
                     onReorder={handleReorderActiveItems}
-                    className="space-y-2"
+                    className="space-y-1.5"
                   >
                     {activeItems.map((item, index) => (
                       <Reorder.Item
                         key={item.id}
                         value={item}
-                        className="group flex items-start gap-2 bg-[#1b1b1b]/80 hover:bg-[#1f1f1f] border border-stone-850 rounded-xl px-3 py-2 focus-within:border-amber-500/40 focus-within:bg-[#202020] transition-colors"
+                        className="group flex items-start gap-1.5 bg-[#1b1b1b]/80 hover:bg-[#1f1f1f] border border-stone-850 rounded-lg px-2.5 py-1.5 focus-within:border-amber-500/40 focus-within:bg-[#202020] transition-colors"
                       >
-                        <GripVertical className="w-3.5 h-3.5 text-stone-600 group-hover:text-stone-400 shrink-0 cursor-grab active:cursor-grabbing mt-1" />
+                        <GripVertical className="w-3 h-3 text-stone-600 group-hover:text-stone-400 shrink-0 cursor-grab active:cursor-grabbing mt-0.5" />
                         
                         <button
                           type="button"
                           onClick={() => handleToggleComplete(item)}
                           title="Mark as completed (Ctrl+Enter)"
-                          className="w-4 h-4 rounded-full border border-stone-600 hover:border-emerald-400 flex items-center justify-center shrink-0 mt-1 cursor-pointer transition-colors group/check"
+                          className="w-3.5 h-3.5 rounded-full border border-stone-600 hover:border-emerald-400 flex items-center justify-center shrink-0 mt-0.5 cursor-pointer transition-colors group/check"
                         >
-                          <Check className="w-2.5 h-2.5 text-transparent group-hover/check:text-emerald-400/70" />
+                          <Check className="w-2 h-2 text-transparent group-hover/check:text-emerald-400/70" />
                         </button>
 
                         <textarea
@@ -997,21 +997,21 @@ export default function DayScratchpad({
                           onChange={(e) => handleTextChange(item.id, e.target.value, e.target)}
                           onKeyDown={(e) => handleKeyDown(e, item, index)}
                           placeholder="Jot idea / action..."
-                          className={`flex-1 bg-transparent text-xs sm:text-sm focus:outline-none placeholder-stone-600 resize-none overflow-hidden leading-relaxed ${
+                          className={`flex-1 bg-transparent text-xs focus:outline-none placeholder-stone-600 resize-none overflow-hidden leading-normal ${
                             item.isConverted
                               ? 'text-stone-500'
                               : 'text-stone-200'
                           }`}
                         />
-                        <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                        <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
                           {!item.isConverted && item.text.trim() && (
                             <button
                               type="button"
                               onClick={() => handleConvertToTask(item)}
                               title="Convert to Task for Today"
-                              className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1 text-stone-400 hover:text-amber-400 hover:bg-stone-800 border border-stone-800 rounded-md shrink-0 text-[10px] font-mono flex items-center gap-1 transition-opacity cursor-pointer"
+                              className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-0.5 px-1.5 text-stone-400 hover:text-amber-400 hover:bg-stone-800 border border-stone-800 rounded-md shrink-0 text-[9px] font-mono flex items-center gap-0.5 transition-opacity cursor-pointer"
                             >
-                              <Sparkles className="w-3 h-3 text-amber-500" />
+                              <Sparkles className="w-2.5 h-2.5 text-amber-500" />
                               <span>Task</span>
                             </button>
                           )}
@@ -1019,9 +1019,9 @@ export default function DayScratchpad({
                             type="button"
                             onClick={() => handleDeleteItem(item.id)}
                             title="Delete item"
-                            className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1 text-stone-500 hover:text-rose-400 rounded transition-opacity cursor-pointer shrink-0"
+                            className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-0.5 text-stone-500 hover:text-rose-400 rounded transition-opacity cursor-pointer shrink-0"
                           >
-                            <X className="w-3.5 h-3.5" />
+                            <X className="w-3 h-3" />
                           </button>
                         </div>
                       </Reorder.Item>
@@ -1032,31 +1032,31 @@ export default function DayScratchpad({
                 <button
                   type="button"
                   onClick={() => handleAddItem()}
-                  className="w-full py-2.5 px-3 border border-dashed border-stone-850 hover:border-amber-500/30 rounded-xl text-stone-500 hover:text-amber-400 text-xs font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  className="w-full py-1.5 px-2.5 border border-dashed border-stone-850 hover:border-amber-500/30 rounded-lg text-stone-500 hover:text-amber-400 text-xs font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" /> Add scratch item (or press Enter)
                 </button>
 
                 {/* Collapsible Completed Section (Desktop) */}
                 {completedItems.length > 0 && (
-                  <div className="pt-2 border-t border-stone-850/60 mt-3">
-                    <div className="flex items-center justify-between py-1 px-1">
+                  <div className="pt-2 border-t border-stone-850/60 mt-2.5">
+                    <div className="flex items-center justify-between py-0.5 px-1">
                       <button
                         type="button"
                         onClick={() => setIsCompletedOpen((prev) => !prev)}
                         className="flex items-center gap-1.5 text-xs font-mono text-stone-500 hover:text-stone-300 transition-colors cursor-pointer select-none"
                       >
                         {isCompletedOpen ? (
-                          <ChevronDown className="w-3.5 h-3.5" />
+                          <ChevronDown className="w-3 h-3" />
                         ) : (
-                          <ChevronRight className="w-3.5 h-3.5" />
+                          <ChevronRight className="w-3 h-3" />
                         )}
                         <span>Completed ({completedItems.length})</span>
                       </button>
                       <button
                         type="button"
                         onClick={handleClearDone}
-                        className="text-[10px] font-mono text-stone-500 hover:text-rose-400 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                        className="text-[9px] font-mono text-stone-500 hover:text-rose-400 px-1 py-0.5 rounded transition-colors cursor-pointer"
                         title="Clear completed items"
                       >
                         Clear
@@ -1069,27 +1069,27 @@ export default function DayScratchpad({
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
                           exit={{ opacity: 0, height: 0 }}
-                          className="space-y-1.5 mt-1.5 overflow-hidden"
+                          className="space-y-1 mt-1.5 overflow-hidden"
                         >
                           {completedItems.map((item) => (
                             <div
                               key={item.id}
-                              className="group flex items-start gap-2 bg-stone-900/30 border border-stone-850/50 rounded-xl px-3 py-2 transition-colors opacity-75 hover:opacity-100"
+                              className="group flex items-start gap-1.5 bg-stone-900/30 border border-stone-850/50 rounded-lg px-2.5 py-1.5 transition-colors opacity-75 hover:opacity-100"
                             >
                               <button
                                 type="button"
                                 onClick={() => handleToggleComplete(item)}
                                 title="Mark as active"
-                                className="w-4 h-4 rounded-full border bg-emerald-500/20 border-emerald-500/60 text-emerald-400 flex items-center justify-center shrink-0 mt-1 cursor-pointer transition-all hover:bg-emerald-500/30"
+                                className="w-3.5 h-3.5 rounded-full border bg-emerald-500/20 border-emerald-500/60 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 cursor-pointer transition-all hover:bg-emerald-500/30"
                               >
-                                <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                <Check className="w-2 h-2 stroke-[3]" />
                               </button>
-                              <span className="flex-1 text-xs sm:text-sm text-stone-500 select-text break-words py-0.5 leading-relaxed">
+                              <span className="flex-1 text-xs text-stone-500 select-text break-words py-0.5 leading-normal">
                                 {item.text}
                               </span>
-                              <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                              <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
                                 {item.isConverted && (
-                                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400/70 border border-amber-500/20">
+                                  <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-amber-500/10 text-amber-400/70 border border-amber-500/20">
                                     Task
                                   </span>
                                 )}
@@ -1097,9 +1097,9 @@ export default function DayScratchpad({
                                   type="button"
                                   onClick={() => handleDeleteItem(item.id)}
                                   title="Delete item"
-                                  className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1 text-stone-600 hover:text-rose-400 rounded transition-opacity cursor-pointer shrink-0"
+                                  className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-0.5 text-stone-600 hover:text-rose-400 rounded transition-opacity cursor-pointer shrink-0"
                                 >
-                                  <X className="w-3.5 h-3.5" />
+                                  <X className="w-3 h-3" />
                                 </button>
                               </div>
                             </div>
