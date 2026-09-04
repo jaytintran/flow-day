@@ -231,36 +231,36 @@ export default function DayHighlights({
         return (
           <span
             title="Task"
-            className="p-1 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.25)]"
+            className="p-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.25)]"
           >
-            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+            <Check className="w-3 h-3 stroke-[2.5]" />
           </span>
         );
       case 'event':
         return (
           <span
             title="Event"
-            className="p-1 rounded-md bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(99,102,241,0.25)]"
+            className="p-0.5 rounded-md bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(99,102,241,0.25)]"
           >
-            <Calendar className="w-3.5 h-3.5 stroke-[2]" />
+            <Calendar className="w-3 h-3 stroke-[2]" />
           </span>
         );
       case 'note':
         return (
           <span
             title="Note"
-            className="p-1 rounded-md bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(59,130,246,0.25)]"
+            className="p-0.5 rounded-md bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(59,130,246,0.25)]"
           >
-            <FileText className="w-3.5 h-3.5 stroke-[2]" />
+            <FileText className="w-3 h-3 stroke-[2]" />
           </span>
         );
       case 'time-block':
         return (
           <span
             title="Time Block"
-            className="p-1 rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(245,158,11,0.25)]"
+            className="p-0.5 rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(245,158,11,0.25)]"
           >
-            <Clock className="w-3.5 h-3.5 stroke-[2]" />
+            <Clock className="w-3 h-3 stroke-[2]" />
           </span>
         );
       case 'log':
@@ -268,9 +268,9 @@ export default function DayHighlights({
         return (
           <span
             title="Log"
-            className="p-1 rounded-md bg-orange-500/15 text-orange-400 border border-orange-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(249,115,22,0.25)]"
+            className="p-0.5 rounded-md bg-orange-500/15 text-orange-400 border border-orange-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(249,115,22,0.25)]"
           >
-            <Sparkles className="w-3.5 h-3.5 stroke-[2]" />
+            <Sparkles className="w-3 h-3 stroke-[2]" />
           </span>
         );
     }
@@ -408,10 +408,10 @@ export default function DayHighlights({
                                   handleStartEdit(entry);
                                 }
                               }}
-                              className="bg-[#1b1b1b] border border-stone-850 rounded-xl p-3 flex flex-col gap-2 cursor-pointer"
+                              className="bg-[#1b1b1b] border border-stone-850 rounded-lg p-2.5 flex flex-col gap-1.5 cursor-pointer"
                             >
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-1.5">
+                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
                                   {getTypeIconBadge(entry.type)}
                                   {isEditingThis ? (
                                     <input
@@ -425,15 +425,15 @@ export default function DayHighlights({
                                       onBlur={() => handleSaveEdit(entry.id)}
                                       onClick={(e) => e.stopPropagation()}
                                       autoFocus
-                                      className="bg-[#101010] border border-amber-500/40 rounded px-2 py-0.5 text-xs text-stone-100 font-sans w-full focus:outline-none focus:ring-1 focus:ring-amber-500/40"
+                                      className="bg-[#101010] border border-amber-500/40 rounded px-1.5 py-0.5 text-xs text-stone-100 font-sans w-full focus:outline-none focus:ring-1 focus:ring-amber-500/40"
                                     />
                                   ) : (
-                                    <span className="text-xs font-semibold text-stone-200 truncate select-none">
+                                    <span className="text-xs font-medium text-stone-200 truncate select-none">
                                       {entry.title || 'Untitled'}
                                     </span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
+                                <div className="flex items-center gap-1 shrink-0">
                                   <span className="text-[9px] font-mono text-stone-500 bg-stone-900 px-1 py-0.5 rounded border border-stone-850">
                                     {dateFormatted}
                                   </span>
@@ -451,14 +451,14 @@ export default function DayHighlights({
                                           ? 'Marked as Accomplishment'
                                           : 'Mark as Accomplishment (Trophy)'
                                       }
-                                      className={`p-1 rounded transition-colors ${
+                                      className={`p-0.5 rounded transition-colors ${
                                         isAccomplishment
                                           ? 'text-amber-400 bg-amber-500/10 border border-amber-500/30'
                                           : 'text-stone-500 hover:text-amber-400 bg-stone-900 border border-stone-850'
                                       }`}
                                     >
                                       <Trophy
-                                        className={`w-3.5 h-3.5 ${
+                                        className={`w-3 h-3 ${
                                           isAccomplishment ? 'fill-current' : ''
                                         }`}
                                       />
@@ -468,14 +468,14 @@ export default function DayHighlights({
                                     type="button"
                                     onClick={(e) => handleDelete(entry.id, e)}
                                     title="Delete entry"
-                                    className="p-1 text-stone-500 hover:text-rose-400 rounded-lg cursor-pointer transition-colors"
+                                    className="p-0.5 text-stone-500 hover:text-rose-400 rounded cursor-pointer transition-colors"
                                   >
-                                    <X className="w-3.5 h-3.5" />
+                                    <X className="w-3 h-3" />
                                   </button>
                                 </div>
                               </div>
                               {(entry as any).content && (
-                                <p className="text-[11px] text-stone-400 font-serif line-clamp-2 pl-5">
+                                <p className="text-[10px] text-stone-400 font-serif line-clamp-1 leading-normal pl-4">
                                   {(entry as any).content}
                                 </p>
                               )}
@@ -484,13 +484,13 @@ export default function DayHighlights({
                                   entry.micro_wins || (entry as any).achievements || [];
                                 if (wins.length === 0) return null;
                                 return (
-                                  <div className="flex items-center gap-2 pl-6 pt-1 border-t border-stone-850/60 overflow-hidden">
+                                  <div className="flex items-center gap-1.5 pl-4 pt-1 border-t border-stone-850/60 overflow-hidden">
                                     {wins.slice(0, 2).map((w: any) => (
                                       <span
                                         key={w.id}
-                                        className="text-[10px] font-mono text-stone-400 flex items-center gap-1 truncate"
+                                        className="text-[9px] font-mono text-stone-400 flex items-center gap-1 truncate"
                                       >
-                                        <Sparkles className="w-2.5 h-2.5 text-amber-500/70 shrink-0" />
+                                        <Sparkles className="w-2 h-2 text-amber-500/70 shrink-0" />
                                         <span className="truncate">{w.text}</span>
                                       </span>
                                     ))}
@@ -524,7 +524,7 @@ export default function DayHighlights({
             animate={{ opacity: 1, scale: 1, x: position.x, y: position.y }}
             exit={{ opacity: 0, scale: 0.95, x: position.x, y: position.y + 15 }}
             transition={{ duration: 0.2 }}
-            className="fixed z-50 bottom-16 right-12 w-[560px] max-w-[92vw] max-h-[640px] bg-[#141414]/95 border border-stone-800 rounded-2xl shadow-2xl backdrop-blur-md flex flex-col overflow-hidden font-sans"
+            className="fixed z-50 bottom-16 right-12 w-[460px] max-w-[92vw] max-h-[640px] bg-[#141414]/95 border border-stone-800 rounded-2xl shadow-2xl backdrop-blur-md flex flex-col overflow-hidden font-sans"
           >
             {/* Header (Drag Handle) */}
             <div className="flex items-center justify-between px-4 py-2.5 bg-[#181818] border-b border-stone-850 cursor-grab active:cursor-grabbing select-none">
@@ -592,7 +592,7 @@ export default function DayHighlights({
             </div>
 
             {/* Feed Content — Single Row per Entry Layout */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-5 max-h-[480px]">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[480px]">
               {groupedHighlights.length === 0 ? (
                 <div className="py-16 text-center text-stone-600 text-xs font-mono flex flex-col items-center gap-2">
                   <Star className="w-8 h-8 stroke-1 text-stone-700" />
@@ -613,7 +613,7 @@ export default function DayHighlights({
                       </span>
                     </div>
 
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-1.5">
                       {group.entries.map((entry) => {
                         const dateObj = new Date(
                           (entry as any).completed_at ||
@@ -641,10 +641,10 @@ export default function DayHighlights({
                                 handleStartEdit(entry);
                               }
                             }}
-                            className="group/item bg-[#1a1a1a]/80 hover:bg-[#1f1f1f] border border-stone-850 hover:border-amber-500/30 rounded-xl p-2.5 flex flex-col gap-1.5 transition-all cursor-pointer shadow-sm relative overflow-hidden"
+                            className="group/item bg-[#1a1a1a]/80 hover:bg-[#1f1f1f] border border-stone-850 hover:border-amber-500/30 rounded-lg p-2 flex flex-col gap-1 transition-all cursor-pointer shadow-sm relative overflow-hidden"
                           >
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
                                 {getTypeIconBadge(entry.type)}
                                 {isEditingThis ? (
                                   <input
@@ -658,17 +658,17 @@ export default function DayHighlights({
                                     onBlur={() => handleSaveEdit(entry.id)}
                                     onClick={(e) => e.stopPropagation()}
                                     autoFocus
-                                    className="bg-[#101010] border border-amber-500/40 rounded px-2 py-0.5 text-xs text-stone-100 font-sans w-full focus:outline-none focus:ring-1 focus:ring-amber-500/40"
+                                    className="bg-[#101010] border border-amber-500/40 rounded px-1.5 py-0.5 text-xs text-stone-100 font-sans w-full focus:outline-none focus:ring-1 focus:ring-amber-500/40"
                                   />
                                 ) : (
-                                  <span className="text-xs font-semibold text-stone-200 group-hover/item:text-amber-300 transition-colors truncate select-none">
+                                  <span className="text-xs font-medium text-stone-200 group-hover/item:text-amber-300 transition-colors truncate select-none">
                                     {entry.title || 'Untitled'}
                                   </span>
                                 )}
                               </div>
 
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span className="text-[9px] font-mono text-stone-500 bg-stone-900 px-1.5 py-0.5 rounded border border-stone-850">
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className="text-[9px] font-mono text-stone-500 bg-stone-900 px-1 py-0.5 rounded border border-stone-850">
                                   {dateFormatted}
                                 </span>
                                 {(isTask || entry.type === 'log') && (
@@ -685,14 +685,14 @@ export default function DayHighlights({
                                         ? 'Marked as Accomplishment'
                                         : 'Mark as Accomplishment (Trophy)'
                                     }
-                                    className={`p-1 rounded transition-colors cursor-pointer ${
+                                    className={`p-0.5 rounded transition-colors cursor-pointer ${
                                       isAccomplishment
                                         ? 'text-amber-400 bg-amber-500/10 border border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.15)]'
                                         : 'text-stone-500 hover:text-amber-400 bg-stone-900 border border-stone-850'
                                     }`}
                                   >
                                     <Trophy
-                                      className={`w-3.5 h-3.5 ${
+                                      className={`w-3 h-3 ${
                                         isAccomplishment ? 'fill-current' : ''
                                       }`}
                                     />
@@ -702,15 +702,15 @@ export default function DayHighlights({
                                   type="button"
                                   onClick={(e) => handleDelete(entry.id, e)}
                                   title="Delete entry"
-                                  className="opacity-0 group-hover/item:opacity-100 text-stone-500 hover:text-rose-400 p-1 rounded-lg transition-all cursor-pointer"
+                                  className="opacity-0 group-hover/item:opacity-100 text-stone-500 hover:text-rose-400 p-0.5 rounded transition-all cursor-pointer"
                                 >
-                                  <X className="w-3.5 h-3.5" />
+                                  <X className="w-3 h-3" />
                                 </button>
                               </div>
                             </div>
 
                             {(entry as any).content && (
-                              <p className="text-[11px] text-stone-400 font-serif line-clamp-1 leading-relaxed pl-5">
+                              <p className="text-[10px] text-stone-400 font-serif line-clamp-1 leading-normal pl-4">
                                 {(entry as any).content}
                               </p>
                             )}
@@ -720,13 +720,13 @@ export default function DayHighlights({
                                 entry.micro_wins || (entry as any).achievements || [];
                               if (wins.length === 0) return null;
                               return (
-                                <div className="flex items-center gap-2 pl-6 pt-1 border-t border-stone-850/60 overflow-hidden">
+                                <div className="flex items-center gap-1.5 pl-4 pt-1 border-t border-stone-850/60 overflow-hidden">
                                   {wins.slice(0, 3).map((w: any) => (
                                     <span
                                       key={w.id}
-                                      className="text-[10px] font-mono text-stone-400 flex items-center gap-1 truncate"
+                                      className="text-[9px] font-mono text-stone-400 flex items-center gap-1 truncate"
                                     >
-                                      <Sparkles className="w-2.5 h-2.5 text-amber-500/70 shrink-0" />
+                                      <Sparkles className="w-2 h-2 text-amber-500/70 shrink-0" />
                                       <span className="truncate">{w.text}</span>
                                     </span>
                                   ))}
