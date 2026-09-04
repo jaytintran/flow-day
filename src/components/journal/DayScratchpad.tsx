@@ -12,15 +12,17 @@ import {
   X,
   Plus,
   GripVertical,
-  Trash2,
   Sparkles,
-  Edit2,
   Check,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 
 export interface ScratchpadItem {
   id: string;
   text: string;
+  isCompleted?: boolean;
+  completedAt?: string;
   isConverted?: boolean;
   convertedTaskId?: string;
 }
@@ -124,7 +126,8 @@ interface MobileScratchpadItemProps {
   index: number;
   textareaRef: (el: HTMLTextAreaElement | null) => void;
   onTextChange: (id: string, text: string, targetEl?: HTMLTextAreaElement) => void;
-  onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>, id: string, index: number) => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>, item: ScratchpadItem, index: number) => void;
+  onToggleComplete: (item: ScratchpadItem) => void;
   onConvertToTask: (item: ScratchpadItem) => void;
   onDeleteItem: (id: string) => void;
 }
@@ -135,6 +138,7 @@ function MobileScratchpadItem({
   textareaRef,
   onTextChange,
   onKeyDown,
+  onToggleComplete,
   onConvertToTask,
   onDeleteItem,
 }: MobileScratchpadItemProps) {
@@ -156,15 +160,25 @@ function MobileScratchpadItem({
       >
         <GripVertical className="w-4 h-4" />
       </button>
+
+      <button
+        type="button"
+        onClick={() => onToggleComplete(item)}
+        title="Mark as completed"
+        className="w-4 h-4 rounded-full border border-stone-600 active:border-emerald-400 flex items-center justify-center shrink-0 mt-1 cursor-pointer transition-colors"
+      >
+        <Check className="w-2.5 h-2.5 text-transparent active:text-emerald-400" />
+      </button>
+
       <textarea
         ref={textareaRef}
         rows={1}
         value={item.text}
         onChange={(e) => onTextChange(item.id, e.target.value, e.target)}
-        onKeyDown={(e) => onKeyDown(e, item.id, index)}
+        onKeyDown={(e) => onKeyDown(e, item, index)}
         placeholder="Jot thought / task..."
         className={`flex-1 bg-transparent text-sm focus:outline-none placeholder-stone-600 resize-none overflow-hidden leading-relaxed ${
-          item.isConverted ? 'line-through text-stone-500 italic' : 'text-stone-200'
+          item.isConverted ? 'text-stone-500' : 'text-stone-200'
         }`}
       />
       <div className="flex items-center gap-1 shrink-0 mt-0.5">
@@ -222,12 +236,16 @@ export default function DayScratchpad({
 
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [isClearConfirming, setIsClearConfirming] = useState(false);
-  const [isDeletePadConfirming, setIsDeletePadConfirming] = useState(false);
+  const [deletingPadId, setDeletingPadId] = useState<string | null>(null);
+  const [isCompletedOpen, setIsCompletedOpen] = useState<boolean>(false);
   const textareaRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
 
   // Ensure valid active pad
   const currentPad = pads.find((p) => p.id === activePadId) || pads[0] || createDefaultPad();
   const items = currentPad.items;
+
+  const activeItems = items.filter((i) => !i.isCompleted);
+  const completedItems = items.filter((i) => i.isCompleted);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -266,8 +284,8 @@ export default function DayScratchpad({
     handleSelectPad(newPad.id);
   };
 
-  const handleStartRenamePad = (pad: Scratchpad, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleStartRenamePad = (pad: Scratchpad, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setEditingPadId(pad.id);
     setEditingPadName(pad.name);
   };
@@ -285,13 +303,15 @@ export default function DayScratchpad({
     e.stopPropagation();
     if (pads.length <= 1) return; // Keep at least one pad
 
-    if (!isDeletePadConfirming) {
-      setIsDeletePadConfirming(true);
-      setTimeout(() => setIsDeletePadConfirming(false), 3000);
+    if (deletingPadId !== id) {
+      setDeletingPadId(id);
+      setTimeout(() => {
+        setDeletingPadId((curr) => (curr === id ? null : curr));
+      }, 3000);
       return;
     }
 
-    setIsDeletePadConfirming(false);
+    setDeletingPadId(null);
     const updated = pads.filter((p) => p.id !== id);
     setPads(updated);
     savePads(updated);
@@ -322,6 +342,10 @@ export default function DayScratchpad({
     savePads(updatedPads);
   };
 
+  const handleReorderActiveItems = (newActiveItems: ScratchpadItem[]) => {
+    handleUpdateItems([...newActiveItems, ...completedItems]);
+  };
+
   const handleTextChange = (id: string, text: string, targetEl?: HTMLTextAreaElement) => {
     if (targetEl) {
       targetEl.style.height = 'auto';
@@ -335,6 +359,7 @@ export default function DayScratchpad({
     const newItem: ScratchpadItem = {
       id: crypto.randomUUID(),
       text: '',
+      isCompleted: false,
     };
 
     let updated: ScratchpadItem[];
@@ -346,7 +371,19 @@ export default function DayScratchpad({
         updated = [...items, newItem];
       }
     } else {
-      updated = [...items, newItem];
+      const lastActiveIndex = items.reduce(
+        (acc, curr, idx) => (!curr.isCompleted ? idx : acc),
+        -1,
+      );
+      if (lastActiveIndex !== -1 && lastActiveIndex < items.length - 1) {
+        updated = [
+          ...items.slice(0, lastActiveIndex + 1),
+          newItem,
+          ...items.slice(lastActiveIndex + 1),
+        ];
+      } else {
+        updated = [...items, newItem];
+      }
     }
 
     handleUpdateItems(updated);
@@ -360,6 +397,32 @@ export default function DayScratchpad({
     }, 50);
   };
 
+  const handleToggleComplete = async (item: ScratchpadItem) => {
+    const nextCompleted = !item.isCompleted;
+    const updated = items.map((i) =>
+      i.id === item.id
+        ? {
+            ...i,
+            isCompleted: nextCompleted,
+            completedAt: nextCompleted ? new Date().toISOString() : undefined,
+          }
+        : i,
+    );
+    handleUpdateItems(updated);
+
+    // If this item was converted to a database task, sync status with Dexie
+    if (item.convertedTaskId) {
+      try {
+        await db.entries.update(item.convertedTaskId, {
+          status: nextCompleted ? 'done' : 'todo',
+          completed_at: nextCompleted ? new Date() : undefined,
+        });
+      } catch (e) {
+        console.error('Failed to update converted task status in DB:', e);
+      }
+    }
+  };
+
   const handleDeleteItem = (id: string) => {
     const updated = items.filter((item) => item.id !== id);
     handleUpdateItems(updated);
@@ -367,17 +430,23 @@ export default function DayScratchpad({
 
   const handleKeyDown = (
     e: React.KeyboardEvent<HTMLTextAreaElement>,
-    id: string,
-    index: number,
+    item: ScratchpadItem,
+    indexInActive: number,
   ) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleToggleComplete(item);
+      return;
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleAddItem(id);
-    } else if (e.key === 'Backspace' && items[index]?.text === '') {
+      handleAddItem(item.id);
+    } else if (e.key === 'Backspace' && item.text === '') {
       e.preventDefault();
-      handleDeleteItem(id);
-      if (index > 0) {
-        const prevId = items[index - 1].id;
+      handleDeleteItem(item.id);
+      if (indexInActive > 0) {
+        const prevId = activeItems[indexInActive - 1].id;
         setTimeout(() => {
           const el = textareaRefs.current.get(prevId);
           if (el) {
@@ -386,21 +455,21 @@ export default function DayScratchpad({
           }
         }, 50);
       }
-    } else if (e.key === 'ArrowUp' && index > 0) {
+    } else if (e.key === 'ArrowUp' && indexInActive > 0) {
       const target = e.currentTarget;
       if (target.selectionStart === 0 && target.selectionEnd === 0) {
         e.preventDefault();
-        const prevId = items[index - 1].id;
+        const prevId = activeItems[indexInActive - 1].id;
         textareaRefs.current.get(prevId)?.focus();
       }
-    } else if (e.key === 'ArrowDown' && index < items.length - 1) {
+    } else if (e.key === 'ArrowDown' && indexInActive < activeItems.length - 1) {
       const target = e.currentTarget;
       if (
         target.selectionStart === target.value.length &&
         target.selectionEnd === target.value.length
       ) {
         e.preventDefault();
-        const nextId = items[index + 1].id;
+        const nextId = activeItems[indexInActive + 1].id;
         textareaRefs.current.get(nextId)?.focus();
       }
     }
@@ -421,10 +490,11 @@ export default function DayScratchpad({
       id: taskId,
       type: 'task',
       title: item.text.trim(),
-      status: 'todo',
+      status: item.isCompleted ? 'done' : 'todo',
       time_spent: 0,
       ...(scheduledDate ? { scheduled_at: scheduledDate } : {}),
       created_at: new Date(),
+      ...(item.isCompleted ? { completed_at: new Date() } : {}),
     };
 
     await db.entries.add(newTask);
@@ -435,8 +505,8 @@ export default function DayScratchpad({
     handleUpdateItems(updated);
   };
 
-  const handleClearConverted = () => {
-    const updated = items.filter((item) => !item.isConverted);
+  const handleClearDone = () => {
+    const updated = items.filter((item) => !item.isCompleted && !item.isConverted);
     handleUpdateItems(updated);
   };
 
@@ -450,7 +520,11 @@ export default function DayScratchpad({
     handleUpdateItems([]);
   };
 
-  const uncompletedCount = items.filter((i) => !i.isConverted && i.text.trim().length > 0).length;
+  const uncompletedCount = items.filter(
+    (i) => !i.isCompleted && !i.isConverted && i.text.trim().length > 0,
+  ).length;
+
+  const hasDoneItems = items.some((i) => i.isCompleted || i.isConverted);
 
   return (
     <>
@@ -501,11 +575,11 @@ export default function DayScratchpad({
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      {items.some((i) => i.isConverted) && (
+                      {hasDoneItems && (
                         <button
                           type="button"
-                          onClick={handleClearConverted}
-                          className="text-[10px] font-mono text-stone-400 hover:text-stone-200 px-2 py-1 bg-stone-900 border border-stone-800 rounded-md"
+                          onClick={handleClearDone}
+                          className="text-[10px] font-mono text-stone-400 hover:text-stone-200 px-2 py-1 bg-stone-900 border border-stone-800 rounded-md cursor-pointer"
                         >
                           Clear Done
                         </button>
@@ -513,7 +587,7 @@ export default function DayScratchpad({
                       <button
                         type="button"
                         onClick={toggleOpen}
-                        className="p-1 text-stone-400 hover:text-stone-200 hover:bg-stone-850 rounded-lg"
+                        className="p-1 text-stone-400 hover:text-stone-200 hover:bg-stone-850 rounded-lg cursor-pointer"
                       >
                         <X className="w-5 h-5" />
                       </button>
@@ -525,7 +599,7 @@ export default function DayScratchpad({
                     {pads.map((pad) => {
                       const isActive = pad.id === currentPad.id;
                       const activeItemCount = pad.items.filter(
-                        (i) => !i.isConverted && i.text.trim().length > 0,
+                        (i) => !i.isCompleted && !i.isConverted && i.text.trim().length > 0,
                       ).length;
                       return (
                         <div
@@ -557,7 +631,15 @@ export default function DayScratchpad({
                             </div>
                           ) : (
                             <>
-                              <span onDoubleClick={(e) => handleStartRenamePad(pad, e)}>
+                              <span
+                                onClick={(e) => {
+                                  if (isActive) {
+                                    handleStartRenamePad(pad, e);
+                                  }
+                                }}
+                                className="cursor-pointer select-none"
+                                title="Click to rename"
+                              >
                                 {pad.name}
                               </span>
                               {activeItemCount > 0 && (
@@ -565,14 +647,22 @@ export default function DayScratchpad({
                                   {activeItemCount}
                                 </span>
                               )}
-                              {isActive && pads.length > 1 && (
+                              {pads.length > 1 && (
                                 <button
                                   type="button"
                                   onClick={(e) => handleDeletePad(pad.id, e)}
-                                  className="ml-1 text-stone-500 hover:text-rose-400 p-0.5"
-                                  title="Delete Pad"
+                                  className={`p-0.5 ml-0.5 rounded transition-colors cursor-pointer ${
+                                    deletingPadId === pad.id
+                                      ? 'bg-rose-950/90 text-rose-300 border border-rose-800 animate-pulse px-1'
+                                      : 'text-stone-500 hover:text-rose-400'
+                                  }`}
+                                  title={deletingPadId === pad.id ? 'Click again to confirm delete' : 'Delete Pad'}
                                 >
-                                  <Trash2 className="w-3 h-3" />
+                                  {deletingPadId === pad.id ? (
+                                    <span className="text-[9px] font-mono font-bold leading-none">Sure?</span>
+                                  ) : (
+                                    <X className="w-3 h-3" />
+                                  )}
                                 </button>
                               )}
                             </>
@@ -596,11 +686,11 @@ export default function DayScratchpad({
                 <div className="flex-1 overflow-y-auto p-4 space-y-2">
                   <Reorder.Group
                     axis="y"
-                    values={items}
-                    onReorder={handleUpdateItems}
+                    values={activeItems}
+                    onReorder={handleReorderActiveItems}
                     className="space-y-2"
                   >
-                    {items.map((item, index) => (
+                    {activeItems.map((item, index) => (
                       <MobileScratchpadItem
                         key={item.id}
                         item={item}
@@ -616,6 +706,7 @@ export default function DayScratchpad({
                         }}
                         onTextChange={handleTextChange}
                         onKeyDown={handleKeyDown}
+                        onToggleComplete={handleToggleComplete}
                         onConvertToTask={handleConvertToTask}
                         onDeleteItem={handleDeleteItem}
                       />
@@ -629,6 +720,77 @@ export default function DayScratchpad({
                   >
                     <Plus className="w-4 h-4" /> Add Item
                   </button>
+
+                  {/* Collapsible Completed Section (Mobile) */}
+                  {completedItems.length > 0 && (
+                    <div className="pt-3 border-t border-stone-850 mt-3">
+                      <div className="flex items-center justify-between py-1 px-1">
+                        <button
+                          type="button"
+                          onClick={() => setIsCompletedOpen((prev) => !prev)}
+                          className="flex items-center gap-1.5 text-xs font-mono text-stone-400 hover:text-stone-200 cursor-pointer select-none"
+                        >
+                          {isCompletedOpen ? (
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          ) : (
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          )}
+                          <span>Completed ({completedItems.length})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleClearDone}
+                          className="text-[10px] font-mono text-stone-500 hover:text-rose-400 px-1.5 py-0.5 rounded cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      </div>
+
+                      <AnimatePresence>
+                        {isCompletedOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="space-y-1.5 mt-2 overflow-hidden"
+                          >
+                            {completedItems.map((item) => (
+                              <div
+                                key={item.id}
+                                className="flex items-start gap-2 bg-[#171717] border border-stone-850/60 rounded-xl p-2.5 opacity-75"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleComplete(item)}
+                                  title="Mark as active"
+                                  className="w-4 h-4 rounded-full border bg-emerald-500/20 border-emerald-500/60 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 cursor-pointer"
+                                >
+                                  <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                </button>
+                                <span className="flex-1 text-xs sm:text-sm text-stone-500 select-text break-words py-0.5 leading-relaxed">
+                                  {item.text}
+                                </span>
+                                <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                                  {item.isConverted && (
+                                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400/70 border border-amber-500/20">
+                                      Task
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteItem(item.id)}
+                                    className="p-1 text-stone-500 hover:text-rose-400 rounded-lg cursor-pointer"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             </div>
@@ -662,11 +824,11 @@ export default function DayScratchpad({
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
-                  {items.some((i) => i.isConverted) && (
+                  {hasDoneItems && (
                     <button
                       type="button"
-                      onClick={handleClearConverted}
-                      title="Remove converted items"
+                      onClick={handleClearDone}
+                      title="Remove completed/converted items"
                       className="text-[10px] font-mono text-stone-400 hover:text-stone-200 px-2 py-0.5 bg-stone-900 border border-stone-800 hover:bg-stone-850 rounded transition-colors cursor-pointer"
                     >
                       Clear Done
@@ -702,7 +864,7 @@ export default function DayScratchpad({
                 {pads.map((pad) => {
                   const isActive = pad.id === currentPad.id;
                   const activeItemCount = pad.items.filter(
-                    (i) => !i.isConverted && i.text.trim().length > 0,
+                    (i) => !i.isCompleted && !i.isConverted && i.text.trim().length > 0,
                   ).length;
 
                   return (
@@ -729,34 +891,44 @@ export default function DayScratchpad({
                             onBlur={handleSaveRenamePad}
                             className="bg-stone-950 border border-amber-500/50 rounded px-1.5 py-0.5 text-xs text-amber-300 w-24 focus:outline-none"
                           />
-                          <button onClick={handleSaveRenamePad} className="text-emerald-400 p-0.5">
+                          <button onClick={handleSaveRenamePad} className="text-emerald-400 p-0.5 cursor-pointer">
                             <Check className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       ) : (
                         <>
-                          <span>{pad.name}</span>
+                          <span
+                            onClick={(e) => {
+                              if (isActive) {
+                                handleStartRenamePad(pad, e);
+                              }
+                            }}
+                            className="cursor-pointer select-none"
+                            title="Click to rename"
+                          >
+                            {pad.name}
+                          </span>
                           {activeItemCount > 0 && (
                             <span className="text-[9px] opacity-70 bg-stone-950/60 px-1 rounded-full">
                               {activeItemCount}
                             </span>
                           )}
-                          <button
-                            type="button"
-                            onClick={(e) => handleStartRenamePad(pad, e)}
-                            className="opacity-0 group-hover:opacity-100 hover:text-amber-400 p-0.5 text-stone-500 transition-opacity"
-                            title="Rename Pad"
-                          >
-                            <Edit2 className="w-2.5 h-2.5" />
-                          </button>
-                          {isActive && pads.length > 1 && (
+                          {pads.length > 1 && (
                             <button
                               type="button"
                               onClick={(e) => handleDeletePad(pad.id, e)}
-                              className="opacity-0 group-hover:opacity-100 hover:text-rose-400 p-0.5 text-stone-500 transition-opacity"
-                              title={isDeletePadConfirming ? 'Click again to confirm delete' : 'Delete Pad'}
+                              className={`p-0.5 ml-0.5 rounded transition-colors cursor-pointer ${
+                                deletingPadId === pad.id
+                                  ? 'bg-rose-950/90 text-rose-300 border border-rose-800 animate-pulse px-1'
+                                  : 'text-stone-500 hover:text-rose-400'
+                              }`}
+                              title={deletingPadId === pad.id ? 'Click again to confirm delete' : 'Delete Pad'}
                             >
-                              <Trash2 className="w-2.5 h-2.5" />
+                              {deletingPadId === pad.id ? (
+                                <span className="text-[9px] font-mono font-bold leading-none">Sure?</span>
+                              ) : (
+                                <X className="w-3 h-3" />
+                              )}
                             </button>
                           )}
                         </>
@@ -789,17 +961,27 @@ export default function DayScratchpad({
                 ) : (
                   <Reorder.Group
                     axis="y"
-                    values={items}
-                    onReorder={handleUpdateItems}
+                    values={activeItems}
+                    onReorder={handleReorderActiveItems}
                     className="space-y-2"
                   >
-                    {items.map((item, index) => (
+                    {activeItems.map((item, index) => (
                       <Reorder.Item
                         key={item.id}
                         value={item}
                         className="group flex items-start gap-2 bg-[#1b1b1b]/80 hover:bg-[#1f1f1f] border border-stone-850 rounded-xl px-3 py-2 focus-within:border-amber-500/40 focus-within:bg-[#202020] transition-colors"
                       >
                         <GripVertical className="w-3.5 h-3.5 text-stone-600 group-hover:text-stone-400 shrink-0 cursor-grab active:cursor-grabbing mt-1" />
+                        
+                        <button
+                          type="button"
+                          onClick={() => handleToggleComplete(item)}
+                          title="Mark as completed (Ctrl+Enter)"
+                          className="w-4 h-4 rounded-full border border-stone-600 hover:border-emerald-400 flex items-center justify-center shrink-0 mt-1 cursor-pointer transition-colors group/check"
+                        >
+                          <Check className="w-2.5 h-2.5 text-transparent group-hover/check:text-emerald-400/70" />
+                        </button>
+
                         <textarea
                           ref={(el) => {
                             if (el) {
@@ -813,11 +995,11 @@ export default function DayScratchpad({
                           rows={1}
                           value={item.text}
                           onChange={(e) => handleTextChange(item.id, e.target.value, e.target)}
-                          onKeyDown={(e) => handleKeyDown(e, item.id, index)}
+                          onKeyDown={(e) => handleKeyDown(e, item, index)}
                           placeholder="Jot idea / action..."
                           className={`flex-1 bg-transparent text-xs sm:text-sm focus:outline-none placeholder-stone-600 resize-none overflow-hidden leading-relaxed ${
                             item.isConverted
-                              ? 'line-through text-stone-500 italic'
+                              ? 'text-stone-500'
                               : 'text-stone-200'
                           }`}
                         />
@@ -854,12 +1036,85 @@ export default function DayScratchpad({
                 >
                   <Plus className="w-3.5 h-3.5" /> Add scratch item (or press Enter)
                 </button>
+
+                {/* Collapsible Completed Section (Desktop) */}
+                {completedItems.length > 0 && (
+                  <div className="pt-2 border-t border-stone-850/60 mt-3">
+                    <div className="flex items-center justify-between py-1 px-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsCompletedOpen((prev) => !prev)}
+                        className="flex items-center gap-1.5 text-xs font-mono text-stone-500 hover:text-stone-300 transition-colors cursor-pointer select-none"
+                      >
+                        {isCompletedOpen ? (
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        ) : (
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        )}
+                        <span>Completed ({completedItems.length})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleClearDone}
+                        className="text-[10px] font-mono text-stone-500 hover:text-rose-400 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                        title="Clear completed items"
+                      >
+                        Clear
+                      </button>
+                    </div>
+
+                    <AnimatePresence>
+                      {isCompletedOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="space-y-1.5 mt-1.5 overflow-hidden"
+                        >
+                          {completedItems.map((item) => (
+                            <div
+                              key={item.id}
+                              className="group flex items-start gap-2 bg-stone-900/30 border border-stone-850/50 rounded-xl px-3 py-2 transition-colors opacity-75 hover:opacity-100"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => handleToggleComplete(item)}
+                                title="Mark as active"
+                                className="w-4 h-4 rounded-full border bg-emerald-500/20 border-emerald-500/60 text-emerald-400 flex items-center justify-center shrink-0 mt-1 cursor-pointer transition-all hover:bg-emerald-500/30"
+                              >
+                                <Check className="w-2.5 h-2.5 stroke-[3]" />
+                              </button>
+                              <span className="flex-1 text-xs sm:text-sm text-stone-500 select-text break-words py-0.5 leading-relaxed">
+                                {item.text}
+                              </span>
+                              <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                                {item.isConverted && (
+                                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400/70 border border-amber-500/20">
+                                    Task
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteItem(item.id)}
+                                  title="Delete item"
+                                  className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1 text-stone-600 hover:text-rose-400 rounded transition-opacity cursor-pointer shrink-0"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
               </div>
 
               {/* Window Footer hint */}
               <div className="px-4 py-2 bg-[#121212] border-t border-stone-850/60 text-[10px] font-mono text-stone-500 flex justify-between items-center">
-                <span>Enter = new line</span>
-                <span>Double-click tab to rename</span>
+                <span>Enter = new line • Ctrl+Enter = complete</span>
+                <span>Click tab title to rename</span>
               </div>
             </motion.div>
           ))}
