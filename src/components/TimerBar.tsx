@@ -97,13 +97,22 @@ export default function TimerBar({
     statusMsg: syncStatusMsg,
     isDirty: isSyncDirty,
   } = useGistSync();
+  const [isPushConfirming, setIsPushConfirming] = useState(false);
   const [isPullConfirming, setIsPullConfirming] = useState(false);
 
   const handleQuickPush = async () => {
+    setIsPullConfirming(false);
+    if (!isPushConfirming) {
+      setIsPushConfirming(true);
+      setTimeout(() => setIsPushConfirming(false), 3500);
+      return;
+    }
+    setIsPushConfirming(false);
     await pushToCloud();
   };
 
   const handleQuickPull = async () => {
+    setIsPushConfirming(false);
     if (!isPullConfirming) {
       setIsPullConfirming(true);
       setTimeout(() => setIsPullConfirming(false), 3500);
@@ -619,34 +628,46 @@ export default function TimerBar({
                 {/* Quick-access sync buttons — only shown when Gist credentials are configured */}
                 {isSyncConfigured && (
                   <div className="flex items-center gap-1 shrink-0">
-                    {/* Push button — glows amber when local changes are unpushed */}
-                    <button
-                      id="quick-push-btn"
-                      type="button"
-                      onClick={handleQuickPush}
-                      disabled={syncStatus === 'loading'}
-                      title={
-                        isSyncDirty
-                          ? 'You have unpushed changes — click to back up'
-                          : 'Push to Cloud (backup local data)'
-                      }
-                      className={
-                        `px-2 bg-transparent active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all h-[46px] flex items-center justify-center cursor-pointer shrink-0 select-none ` +
-                        (syncStatus === 'idle' && isSyncDirty
-                          ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.55)] hover:text-amber-300'
-                          : 'text-stone-400 hover:text-amber-400')
-                      }
-                    >
-                      {syncStatus === 'loading' ? (
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                      ) : syncStatus === 'success' ? (
-                        <CheckCircle className="w-4 h-4 text-emerald-400" />
-                      ) : syncStatus === 'error' ? (
-                        <AlertTriangle className="w-4 h-4 text-red-400" />
-                      ) : (
-                        <UploadCloud className="w-4 h-4 shrink-0" />
-                      )}
-                    </button>
+                    {/* Push button — with inline confirmation */}
+                    {isPushConfirming ? (
+                      <button
+                        id="quick-push-confirm-btn"
+                        type="button"
+                        onClick={handleQuickPush}
+                        title="Confirm: upload and backup local data to cloud"
+                        className="px-2.5 h-[46px] flex items-center text-[10px] font-mono font-bold text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 bg-emerald-500/10 rounded-lg animate-pulse transition-all cursor-pointer shrink-0 select-none"
+                      >
+                        Sure?
+                      </button>
+                    ) : (
+                      <button
+                        id="quick-push-btn"
+                        type="button"
+                        onClick={handleQuickPush}
+                        disabled={syncStatus === 'loading'}
+                        title={
+                          isSyncDirty
+                            ? 'You have unpushed changes — click to back up'
+                            : 'Push to Cloud (backup local data)'
+                        }
+                        className={
+                          `px-2 bg-transparent active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all h-[46px] flex items-center justify-center cursor-pointer shrink-0 select-none ` +
+                          (syncStatus === 'idle' && isSyncDirty
+                            ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.55)] hover:text-amber-300'
+                            : 'text-stone-400 hover:text-amber-400')
+                        }
+                      >
+                        {syncStatus === 'loading' ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : syncStatus === 'success' ? (
+                          <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        ) : syncStatus === 'error' ? (
+                          <AlertTriangle className="w-4 h-4 text-red-400" />
+                        ) : (
+                          <UploadCloud className="w-4 h-4 shrink-0" />
+                        )}
+                      </button>
+                    )}
 
                     {/* Pull button — with inline "Sure?" confirmation */}
                     {isPullConfirming ? (

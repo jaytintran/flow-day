@@ -442,6 +442,34 @@ export default function Journal({
 		null,
 	);
 	const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
+	const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+	const [desktopHubLayout, setDesktopHubLayout] = useState<'canvas' | 'classic'>(() => {
+		try {
+			const stored = localStorage.getItem('flowday_desktop_hub_layout');
+			return stored === 'classic' ? 'classic' : 'canvas';
+		} catch {
+			return 'canvas';
+		}
+	});
+
+	useEffect(() => {
+		const checkMobile = () => setIsMobile(window.innerWidth < 768);
+		checkMobile();
+		window.addEventListener("resize", checkMobile);
+
+		const handleSettingsChange = () => {
+			try {
+				const stored = localStorage.getItem('flowday_desktop_hub_layout');
+				setDesktopHubLayout(stored === 'classic' ? 'classic' : 'canvas');
+			} catch {}
+		};
+		window.addEventListener("flowday-settings-change", handleSettingsChange);
+
+		return () => {
+			window.removeEventListener("resize", checkMobile);
+			window.removeEventListener("flowday-settings-change", handleSettingsChange);
+		};
+	}, []);
 
 	const allPurposes = (useLiveQuery(() => db.purposes.toArray()) ||
 		[]) as Purpose[];
@@ -568,15 +596,6 @@ export default function Journal({
 		setIsDetailOpen(false);
 		setSelectedEntry(null);
 	};
-
-	// Mobile detection
-	const [isMobile, setIsMobile] = useState(false);
-	useEffect(() => {
-		const checkMobile = () => setIsMobile(window.innerWidth < 768);
-		checkMobile();
-		window.addEventListener("resize", checkMobile);
-		return () => window.removeEventListener("resize", checkMobile);
-	}, []);
 
 	// Track which days are collapsed in timeline view
 	const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
@@ -1070,15 +1089,96 @@ export default function Journal({
 						/>
 					</div>
 				) : viewMode === "hub" ? (
-					<div className="w-full flex-1 min-h-0 flex flex-col pt-2 h-[calc(100vh-140px)]">
-						{/* Desktop & Mobile: Hub Mindmap vs RPG Skill Tree */}
-						<div className="w-full h-full flex flex-col">
-							{hubSubView === "skilltree" ? (
-								<SkillTreeCanvas onSwitchToMindmap={() => setHubSubView("mindmap")} />
-							) : (
-								<MindmapCanvas onSwitchToSkillTree={() => setHubSubView("skilltree")} />
-							)}
-						</div>
+					<div className="w-full flex-1 min-h-0 flex flex-col pt-1 pb-1 h-full overflow-hidden">
+						{/* Mobile: Lightweight Vertical Sheets (Bypasses Canvas Engines for 100% Performance) */}
+						{isMobile ? (
+							<div className="w-full h-full flex flex-col overflow-y-auto">
+								{(!activeHubTab || activeHubTab === "focus") && (
+									<FocusSheet
+										isInline={true}
+										selectedPurposeId={selectedPurposeId}
+										selectedDomainId={selectedDomainId}
+										onSelectPurpose={setSelectedPurposeId}
+										onSelectDomain={setSelectedDomainId}
+									/>
+								)}
+								{activeHubTab === "goals" && (
+									<GoalsSheet
+										isInline={true}
+										highlightPurposeIds={highlightPurposeIds}
+										highlightDomainId={highlightDomainId}
+									/>
+								)}
+								{activeHubTab === "objectives" && (
+									<ObjectivesSheet
+										isInline={true}
+										highlightPurposeIds={highlightPurposeIds}
+										highlightDomainId={highlightDomainId}
+									/>
+								)}
+								{activeHubTab === "habits" && (
+									<HabitsSheet
+										isInline={true}
+										activeDate={activeDate}
+										highlightPurposeIds={highlightPurposeIds}
+										highlightDomainId={highlightDomainId}
+									/>
+								)}
+								{activeHubTab &&
+									!["focus", "goals", "objectives", "habits"].includes(
+										activeHubTab,
+									) && (
+										<GenericEntitySheet
+											entityTypeId={activeHubTab}
+											isInline={true}
+										/>
+									)}
+							</div>
+						) : desktopHubLayout === "classic" ? (
+							/* Desktop Classic: 4-Column Responsive Layout (Focus, Goals, Objectives, Habits) */
+							<div className="w-full h-full min-h-0 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3.5 p-1 pb-2">
+								<div className="h-full min-h-0 flex flex-col overflow-hidden">
+									<FocusSheet
+										isInline={true}
+										selectedPurposeId={selectedPurposeId}
+										selectedDomainId={selectedDomainId}
+										onSelectPurpose={setSelectedPurposeId}
+										onSelectDomain={setSelectedDomainId}
+									/>
+								</div>
+								<div className="h-full min-h-0 flex flex-col overflow-hidden">
+									<GoalsSheet
+										isInline={true}
+										highlightPurposeIds={highlightPurposeIds}
+										highlightDomainId={highlightDomainId}
+									/>
+								</div>
+								<div className="h-full min-h-0 flex flex-col overflow-hidden">
+									<ObjectivesSheet
+										isInline={true}
+										highlightPurposeIds={highlightPurposeIds}
+										highlightDomainId={highlightDomainId}
+									/>
+								</div>
+								<div className="h-full min-h-0 flex flex-col overflow-hidden">
+									<HabitsSheet
+										isInline={true}
+										activeDate={activeDate}
+										highlightPurposeIds={highlightPurposeIds}
+										highlightDomainId={highlightDomainId}
+									/>
+								</div>
+							</div>
+						) : (
+							/* Desktop Mindmap / Skill Tree Canvas */
+							<div className="w-full h-full flex flex-col">
+								{hubSubView === "skilltree" ? (
+									<SkillTreeCanvas onSwitchToMindmap={() => setHubSubView("mindmap")} />
+								) : (
+									<MindmapCanvas onSwitchToSkillTree={() => setHubSubView("skilltree")} />
+								)}
+							</div>
+						)}
 					</div>
 				) : (
 					<TimelineView

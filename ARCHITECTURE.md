@@ -216,6 +216,26 @@ Synthesizes procedural sound effects using the Web Audio API without requiring a
 * **Mindmap (`hub/mindmap/`)**: Infinite graph canvas built on `@xyflow/react` with Dagre tree layout, keyboard navigation, and custom node/edge metadata.
 * **Skill Tree (`hub/skilltree/`)**: RPG-style gamified progression system with Keplerian celestial orbital revolution (`SkillGlobeCanvas`), laser conduits, XP curves, and skill grimoire drawers.
 
+### E. Adaptive Hub Architecture & Performance Optimization (Mobile vs Desktop)
+* **Zero-Overhead Mobile Hub (`< 768px`)**:
+  * On mobile viewports, heavy canvas engines (`MindmapCanvas`, `SkillTreeCanvas`, `@xyflow/react`, and Dagre layout calculators) are completely bypassed and never mounted to avoid GPU/memory bottlenecks and preserve battery life.
+  * Instead, mobile renders the native 5-tier vertical list sheets (`FocusSheet` for Purpose & Domain, `GoalsSheet`, `ObjectivesSheet`, `HabitsSheet`, and `GenericEntitySheet` for dynamic entity types).
+  * `DayNavigator.tsx` renders a dedicated horizontal sub-tab bar (`[ Focus | Goals | Objectives | Habits ]` + custom entity pills) for instantaneous 1-tap switching.
+* **Desktop Hub View Setting (`Settings.tsx` & `Journal.tsx`)**:
+  * Users can configure their preferred Desktop Hub layout mode in the Settings modal under **Preferences**:
+    * **`Mindmap` (Default)**: Full interactive node canvas & RPG skill tree views.
+    * **`Classic`**: High-density 4-column responsive matrix displaying Focus, Goals, Objectives, and Habits side-by-side.
+  * Preference is stored in `localStorage` under `flowday_desktop_hub_layout` and triggers reactive cross-component layout switching via the `flowday-settings-change` event.
+
+### F. Node Card Markdown Inline Editing & Context Menu Status Controls
+* **Rendered Markdown & Click-to-Edit (`NodeMarkdownSection` / `CanvasNodes.tsx` / `GenericEntitySheet.tsx`)**:
+  * Notes/descriptions in node cards and detail inspectors are rendered as final formatted Markdown by default (no more separate `Write | Preview` tabs).
+  * Clicking directly on the rendered markdown text activates inline editing; blurring or tapping **Done** commits changes via `onQuickUpdateDescription` to IndexedDB.
+  * Collapsible `> Notes` section on canvas node cards spans full card width (`w-full`) without character count clutter.
+* **Context Menu Status Switcher & Visual Reflection**:
+  * Right-clicking any node on the canvas opens a contextual status switcher (`Active`, `Done / Achieved`, `Archived`).
+  * Node card styling reacts immediately to reflect status (`isCompleted` with emerald glow and strikethrough, `isArchived` with dark slate muted palette and italicized title).
+
 ---
 
 ## 5. Development Guidelines & Best Practices
@@ -224,3 +244,4 @@ Synthesizes procedural sound effects using the Web Audio API without requiring a
 2. **Use the Parser Library**: When adding or testing input syntax, update `src/lib/parser/` and write pure function unit tests.
 3. **Use Shared Services**: Always invoke audio feedback through `playCompleteSound()` / `playStrikeSound()` in `src/services/audio.ts` rather than instantiating new `AudioContext` instances.
 4. **Type Strictness**: Use `ViewMode`, `DayRange`, and `TimelineEntry` from `src/types.ts` to ensure end-to-end type safety across headers, drawers, and views.
+5. **Mobile-First Performance**: Heavy visual canvas features must remain isolated from mobile viewports to prevent memory pressure on constrained mobile devices.

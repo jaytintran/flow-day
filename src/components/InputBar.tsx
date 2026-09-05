@@ -723,134 +723,152 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
       id="input-bar-container"
     >
       <div className="max-w-4xl mx-auto relative">
-        {/* Smart Parser Tooltip Handbooks */}
+        {/* Smart Parser Tooltip / Mobile Bottom Sheet */}
         <AnimatePresence>
           {showHelp && (
-            <motion.div
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 12, scale: 0.98 }}
-              transition={{ duration: 0.15, ease: 'easeOut' }}
-              className="absolute bottom-full mb-4 left-0 right-0 bg-[#141414] border border-stone-800/90 rounded-xl p-5 shadow-2xl z-50 text-stone-300 backdrop-blur-md"
-              id="smart-parser-help-tooltip"
-            >
-              <div className="flex items-center justify-between border-b border-stone-800 pb-2.5 mb-3">
-                <div className="flex items-center gap-2">
-                  {activeType === 'task' && <CheckSquare className="w-4 h-4 text-emerald-400" />}
-                  {activeType === 'log' && <CircleDot className="w-4 h-4 text-stone-400" />}
-                  {activeType === 'event' && <Calendar className="w-4 h-4 text-amber-400" />}
-                  {activeType === 'note' && <FileText className="w-4 h-4 text-blue-400" />}
-                  {activeType === 'time-block' && <Clock className="w-4 h-4 text-indigo-400" />}
-                  <h4 className="font-mono font-bold text-[11px] uppercase tracking-wider text-stone-100">
-                    {activeType} NLP Smart Engine Guidelines
-                  </h4>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowHelp(false)}
-                  className="p-1 hover:bg-stone-800 rounded-lg text-stone-500 hover:text-stone-300 transition-colors cursor-pointer"
-                  title="Dismiss help"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+            <>
+              {/* Dark backdrop overlay on mobile */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowHelp(false)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+              />
 
-              {/* Comprehensive Help Content */}
-              <div className="space-y-4 font-sans text-xs">
-                {/* 1. Universal Time & Span Parsing Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="bg-[#0b0b0b]/80 border border-stone-900 rounded-xl p-3 space-y-1.5">
-                    <div className="font-mono text-[9px] text-amber-400 uppercase tracking-widest font-bold flex items-center gap-1">
-                      <span>🕒 Exact & Point Times</span>
+              <motion.div
+                initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.98 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+                className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] rounded-t-2xl border-t border-stone-800 bg-[#141414] shadow-2xl flex flex-col md:absolute md:inset-x-auto md:bottom-full md:mb-4 md:left-0 md:right-0 md:rounded-xl md:border md:border-stone-800/90 md:max-h-[75vh] text-stone-300 backdrop-blur-md"
+                id="smart-parser-help-tooltip"
+                style={{ paddingBottom: 'env(safe-area-inset-bottom, 12px)' }}
+              >
+                {/* Mobile Drag Handle Indicator */}
+                <div className="md:hidden pt-2.5 pb-1 flex justify-center shrink-0">
+                  <div className="w-10 h-1 bg-stone-700 rounded-full" />
+                </div>
+
+                {/* Sticky Header */}
+                <div className="flex items-center justify-between border-b border-stone-800 px-4 md:px-5 py-2.5 md:py-3 shrink-0">
+                  <div className="flex items-center gap-2">
+                    {activeType === 'task' && <CheckSquare className="w-4 h-4 text-emerald-400" />}
+                    {activeType === 'log' && <CircleDot className="w-4 h-4 text-stone-400" />}
+                    {activeType === 'event' && <Calendar className="w-4 h-4 text-amber-400" />}
+                    {activeType === 'note' && <FileText className="w-4 h-4 text-blue-400" />}
+                    {activeType === 'time-block' && <Clock className="w-4 h-4 text-indigo-400" />}
+                    <h4 className="font-mono font-bold text-[11px] uppercase tracking-wider text-stone-100">
+                      {activeType} NLP Smart Engine Guidelines
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowHelp(false)}
+                    className="p-1 hover:bg-stone-800 rounded-lg text-stone-500 hover:text-stone-300 transition-colors cursor-pointer"
+                    title="Dismiss help"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Scrollable Comprehensive Content */}
+                <div className="overflow-y-auto overscroll-contain px-4 md:px-5 py-3 md:py-4 space-y-4 font-sans text-xs flex-1 min-h-0 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-stone-800 [&::-webkit-scrollbar-thumb]:rounded-full">
+                  {/* 1. Universal Time & Span Parsing Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="bg-[#0b0b0b]/80 border border-stone-900 rounded-xl p-3 space-y-1.5">
+                      <div className="font-mono text-[9px] text-amber-400 uppercase tracking-widest font-bold flex items-center gap-1">
+                        <span>🕒 Exact & Point Times</span>
+                      </div>
+                      <ul className="text-stone-300 space-y-1 text-[11px] font-mono leading-relaxed">
+                        <li>• <code className="text-emerald-400">at 3:45pm</code> / <code className="text-emerald-400">at 15:45</code></li>
+                        <li>• <code className="text-emerald-400">at 3pm20</code> / <code className="text-emerald-400">at 3pm</code></li>
+                        <li>• <code className="text-emerald-400">at 14h30</code> / <code className="text-emerald-400">at 14h</code></li>
+                        <li>• <code className="text-emerald-400">at now</code> / <code className="text-emerald-400">now</code></li>
+                      </ul>
                     </div>
-                    <ul className="text-stone-300 space-y-1 text-[11px] font-mono leading-relaxed">
-                      <li>• <code className="text-emerald-400">at 3:45pm</code> / <code className="text-emerald-400">at 15:45</code></li>
-                      <li>• <code className="text-emerald-400">at 3pm20</code> / <code className="text-emerald-400">at 3pm</code></li>
-                      <li>• <code className="text-emerald-400">at 14h30</code> / <code className="text-emerald-400">at 14h</code></li>
-                      <li>• <code className="text-emerald-400">at now</code> / <code className="text-emerald-400">now</code></li>
-                    </ul>
-                  </div>
 
-                  <div className="bg-[#0b0b0b]/80 border border-stone-900 rounded-xl p-3 space-y-1.5">
-                    <div className="font-mono text-[9px] text-sky-400 uppercase tracking-widest font-bold flex items-center gap-1">
-                      <span>↔️ "from X to Y" Spans</span>
+                    <div className="bg-[#0b0b0b]/80 border border-stone-900 rounded-xl p-3 space-y-1.5">
+                      <div className="font-mono text-[9px] text-sky-400 uppercase tracking-widest font-bold flex items-center gap-1">
+                        <span>↔️ "from X to Y" Spans</span>
+                      </div>
+                      <ul className="text-stone-300 space-y-1 text-[11px] font-mono leading-relaxed">
+                        <li>• <code className="text-sky-400">from 1pm to 3:30pm</code></li>
+                        <li>• <code className="text-sky-400">from 9 to 11am</code> <span className="text-stone-500">(inherits am)</span></li>
+                        <li>• <code className="text-sky-400">from 3pm40 to 5pm50</code></li>
+                        <li>• <code className="text-sky-400">from now to 4pm</code> / <code className="text-sky-400">from 10am to now</code></li>
+                      </ul>
                     </div>
-                    <ul className="text-stone-300 space-y-1 text-[11px] font-mono leading-relaxed">
-                      <li>• <code className="text-sky-400">from 1pm to 3:30pm</code></li>
-                      <li>• <code className="text-sky-400">from 9 to 11am</code> <span className="text-stone-500">(inherits am)</span></li>
-                      <li>• <code className="text-sky-400">from 3pm40 to 5pm50</code></li>
-                      <li>• <code className="text-sky-400">from now to 4pm</code> / <code className="text-sky-400">from 10am to now</code></li>
-                    </ul>
-                  </div>
 
-                  <div className="bg-[#0b0b0b]/80 border border-stone-900 rounded-xl p-3 space-y-1.5">
-                    <div className="font-mono text-[9px] text-indigo-400 uppercase tracking-widest font-bold flex items-center gap-1">
-                      <span>⏳ Durations & Dates</span>
+                    <div className="bg-[#0b0b0b]/80 border border-stone-900 rounded-xl p-3 space-y-1.5">
+                      <div className="font-mono text-[9px] text-indigo-400 uppercase tracking-widest font-bold flex items-center gap-1">
+                        <span>⏳ Durations & Dates</span>
+                      </div>
+                      <ul className="text-stone-300 space-y-1 text-[11px] font-mono leading-relaxed">
+                        <li>• <code className="text-indigo-400">at 10am 2h30</code> / <code className="text-indigo-400">now 45m</code></li>
+                        <li>• <code className="text-indigo-400">today</code> / <code className="text-indigo-400">tomorrow</code></li>
+                        <li>• <code className="text-indigo-400">in 3 days</code> / <code className="text-indigo-400">in 1 day</code></li>
+                        <li>• <code className="text-indigo-400">25/11/2026</code> or <code className="text-indigo-400">25/11</code></li>
+                      </ul>
                     </div>
-                    <ul className="text-stone-300 space-y-1 text-[11px] font-mono leading-relaxed">
-                      <li>• <code className="text-indigo-400">at 10am 2h30</code> / <code className="text-indigo-400">now 45m</code></li>
-                      <li>• <code className="text-indigo-400">today</code> / <code className="text-indigo-400">tomorrow</code></li>
-                      <li>• <code className="text-indigo-400">in 3 days</code> / <code className="text-indigo-400">in 1 day</code></li>
-                      <li>• <code className="text-indigo-400">25/11/2026</code> or <code className="text-indigo-400">25/11</code></li>
-                    </ul>
                   </div>
-                </div>
 
-                {/* 2. Specific Type Behaviors */}
-                <div className="bg-[#0a0a0a] border border-stone-850 rounded-xl p-3.5 space-y-2">
-                  <div className="font-mono text-[10px] text-stone-400 uppercase tracking-wider font-bold">
-                    Target Type Behavior: <span className="text-amber-400 uppercase font-extrabold">{activeType}</span>
+                  {/* 2. Specific Type Behaviors */}
+                  <div className="bg-[#0a0a0a] border border-stone-850 rounded-xl p-3.5 space-y-2">
+                    <div className="font-mono text-[10px] text-stone-400 uppercase tracking-wider font-bold">
+                      Target Type Behavior: <span className="text-amber-400 uppercase font-extrabold">{activeType}</span>
+                    </div>
+                    {activeType === 'task' && (
+                      <p className="text-stone-300 leading-relaxed text-xs">
+                        Tasks are scheduled when a time/date token is typed (e.g. <span className="text-emerald-400 font-mono">"Review PR from now to 3pm"</span>). Completing tasks taking &ge; 15 min automatically displays a timeline span.
+                      </p>
+                    )}
+                    {activeType === 'log' && (
+                      <p className="text-stone-300 leading-relaxed text-xs">
+                        Logs capture real-time reflections or past completed work (e.g. <span className="text-stone-300 font-mono">"Debugged database from 10am to now"</span>). Easily starred <span className="text-amber-400 font-mono">⭐</span> to Highlights or marked as Accomplishment <span className="text-amber-400 font-mono">🏆</span>.
+                      </p>
+                    )}
+                    {activeType === 'event' && (
+                      <p className="text-stone-300 leading-relaxed text-xs">
+                        Events schedule calendar appointments and key milestones (e.g. <span className="text-amber-400 font-mono">"Keynote demo tomorrow from 2pm to 3:30pm"</span>). Use the pencil button on the left to write detailed notes.
+                      </p>
+                    )}
+                    {activeType === 'note' && (
+                      <p className="text-stone-300 leading-relaxed text-xs">
+                        Notes capture unstructured thoughts or meeting notes anchored to a timestamp (e.g. <span className="text-blue-400 font-mono">"Architecture reflections today at 4pm"</span>). Click the pencil button for rich markdown editing.
+                      </p>
+                    )}
+                    {activeType === 'time-block' && (
+                      <p className="text-stone-300 leading-relaxed text-xs">
+                        Time Blocks visually reserve deep-focus segments on the day timeline (e.g. <span className="text-indigo-400 font-mono">"Deep coding block from now to 5pm"</span> or <span className="text-indigo-400 font-mono">"at 9am 2h30"</span>).
+                      </p>
+                    )}
                   </div>
-                  {activeType === 'task' && (
-                    <p className="text-stone-300 leading-relaxed text-xs">
-                      Tasks are scheduled when a time/date token is typed (e.g. <span className="text-emerald-400 font-mono">"Review PR from now to 3pm"</span>). Completing tasks taking &ge; 15 min automatically displays a timeline span.
-                    </p>
-                  )}
-                  {activeType === 'log' && (
-                    <p className="text-stone-300 leading-relaxed text-xs">
-                      Logs capture real-time reflections or past completed work (e.g. <span className="text-stone-300 font-mono">"Debugged database from 10am to now"</span>). Easily starred <span className="text-amber-400 font-mono">⭐</span> to Highlights or marked as Accomplishment <span className="text-amber-400 font-mono">🏆</span>.
-                    </p>
-                  )}
-                  {activeType === 'event' && (
-                    <p className="text-stone-300 leading-relaxed text-xs">
-                      Events schedule calendar appointments and key milestones (e.g. <span className="text-amber-400 font-mono">"Keynote demo tomorrow from 2pm to 3:30pm"</span>). Use the pencil button on the left to write detailed notes.
-                    </p>
-                  )}
-                  {activeType === 'note' && (
-                    <p className="text-stone-300 leading-relaxed text-xs">
-                      Notes capture unstructured thoughts or meeting notes anchored to a timestamp (e.g. <span className="text-blue-400 font-mono">"Architecture reflections today at 4pm"</span>). Click the pencil button for rich markdown editing.
-                    </p>
-                  )}
-                  {activeType === 'time-block' && (
-                    <p className="text-stone-300 leading-relaxed text-xs">
-                      Time Blocks visually reserve deep-focus segments on the day timeline (e.g. <span className="text-indigo-400 font-mono">"Deep coding block from now to 5pm"</span> or <span className="text-indigo-400 font-mono">"at 9am 2h30"</span>).
-                    </p>
-                  )}
-                </div>
 
-                {/* 3. Global Shortcuts & Slash Commands */}
-                <div className="border-t border-stone-800/80 pt-3 flex flex-wrap items-center justify-between gap-3 text-[10px] font-mono text-stone-400">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-amber-400 font-bold uppercase tracking-wider">Slash Shortcuts:</span>
-                    <span className="bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded text-stone-300 font-bold">/t, /task</span>
-                    <span className="bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded text-stone-300 font-bold">/l, /log</span>
-                    <span className="bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded text-stone-300 font-bold">/e, /event</span>
-                    <span className="bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded text-stone-300 font-bold">/n, /note</span>
-                    <span className="bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded text-stone-300 font-bold">/b, /tb, /block</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1">
-                      <span className="text-emerald-400 font-bold bg-emerald-950/40 border border-emerald-800/60 px-1.5 py-0.5 rounded">[TAB]</span>
-                      <span>Cycle types</span>
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="text-stone-300 font-bold bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded">[ENTER]</span>
-                      <span>Save entry</span>
-                    </span>
+                  {/* 3. Global Shortcuts & Slash Commands */}
+                  <div className="border-t border-stone-800/80 pt-3 flex flex-wrap items-center justify-between gap-3 text-[10px] font-mono text-stone-400">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-amber-400 font-bold uppercase tracking-wider">Slash Shortcuts:</span>
+                      <span className="bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded text-stone-300 font-bold">/t, /task</span>
+                      <span className="bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded text-stone-300 font-bold">/l, /log</span>
+                      <span className="bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded text-stone-300 font-bold">/e, /event</span>
+                      <span className="bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded text-stone-300 font-bold">/n, /note</span>
+                      <span className="bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded text-stone-300 font-bold">/b, /tb, /block</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="flex items-center gap-1">
+                        <span className="text-emerald-400 font-bold bg-emerald-950/40 border border-emerald-800/60 px-1.5 py-0.5 rounded">[TAB]</span>
+                        <span>Cycle types</span>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="text-stone-300 font-bold bg-stone-900 border border-stone-800 px-1.5 py-0.5 rounded">[ENTER]</span>
+                        <span>Save entry</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </motion.div>
+              </motion.div>
+            </>
           )}
         </AnimatePresence>
 
@@ -880,7 +898,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
             <div className="flex items-center gap-2.5 w-full lg:w-auto">
               {/* Segmented Command Tab Selector */}
               <div
-                className="bg-stone-950 border border-stone-900 p-0.5 rounded-xl flex w-full lg:w-auto"
+                className="bg-stone-950 border border-stone-900 p-0.5 rounded-xl flex w-full lg:w-auto items-center overflow-x-auto [&::-webkit-scrollbar]:hidden"
                 id="input-type-chips"
               >
                 {/* TASK */}
@@ -888,7 +906,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                   type="button"
                   id="chip-task"
                   onClick={() => setActiveType('task')}
-                  className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`flex-1 lg:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
                     activeType === 'task'
                       ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-md font-extrabold'
                       : 'text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-transparent'
@@ -903,7 +921,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                   type="button"
                   id="chip-log"
                   onClick={() => setActiveType('log')}
-                  className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`flex-1 lg:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
                     activeType === 'log'
                       ? 'bg-stone-500/10 text-stone-400 border border-stone-500/20 shadow-md font-extrabold'
                       : 'text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-transparent'
@@ -918,7 +936,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                   type="button"
                   id="chip-event"
                   onClick={() => setActiveType('event')}
-                  className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`flex-1 lg:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
                     activeType === 'event'
                       ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-md font-extrabold'
                       : 'text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-transparent'
@@ -933,7 +951,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                   type="button"
                   id="chip-note"
                   onClick={() => setActiveType('note')}
-                  className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`flex-1 lg:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
                     activeType === 'note'
                       ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-md font-extrabold'
                       : 'text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-transparent'
@@ -948,7 +966,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                   type="button"
                   id="chip-time-block"
                   onClick={() => setActiveType('time-block')}
-                  className={`flex-1 lg:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`flex-1 lg:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
                     activeType === 'time-block'
                       ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-md font-extrabold'
                       : 'text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-transparent'
@@ -966,7 +984,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                   type="button"
                   id="chip-syntax-guide"
                   onClick={() => setShowHelp(!showHelp)}
-                  className={`flex-1 lg:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  className={`flex-initial flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0 ${
                     showHelp
                       ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-md font-extrabold'
                       : 'text-stone-400 hover:text-amber-300 hover:bg-stone-900/50 border border-transparent'
@@ -974,7 +992,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                   title="Open comprehensive Smart Syntax & Shortcut Guide"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Syntax Guide</span>
+                  <span className="hidden sm:inline">Syntax Guide</span>
                 </button>
               </div>
             </div>

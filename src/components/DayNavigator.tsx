@@ -601,7 +601,7 @@ export default function DayNavigator({
             setIsCalendarOpen(false);
             setIsMobileViewMenuOpen(false);
           }}
-          className={`h-full px-2 rounded-md active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
+          className={`h-full px-2 rounded-md active:scale-95 transition-all hidden md:flex items-center justify-center cursor-pointer ${
             isHabitDrawerOpen
               ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
               : 'text-stone-500 hover:text-emerald-400 hover:bg-stone-800/50'
@@ -679,7 +679,50 @@ export default function DayNavigator({
                   ) : viewMode === 'hub' ? (
                     <>
                       <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]" />
-                      System Hub
+                      <span className="hidden md:inline">System Hub</span>
+                      {/* Mobile Horizontal Sub-Tab Switcher */}
+                      <div className="flex md:hidden items-center gap-1 overflow-x-auto py-0.5 max-w-[calc(100vw-130px)] scrollbar-none">
+                        {[
+                          { id: 'focus', label: 'Focus' },
+                          { id: 'goals', label: 'Goals' },
+                          { id: 'objectives', label: 'Objectives' },
+                          { id: 'habits', label: 'Habits' },
+                        ].map((sub) => {
+                          const isSelected = (activeHubTab || 'goals') === sub.id;
+                          return (
+                            <button
+                              key={sub.id}
+                              type="button"
+                              onClick={() => setActiveHubTab?.(sub.id)}
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider font-bold transition-all cursor-pointer whitespace-nowrap ${
+                                isSelected
+                                  ? 'bg-amber-500 text-stone-950 shadow-sm'
+                                  : 'text-stone-400 hover:text-stone-200 bg-stone-900 border border-stone-800'
+                              }`}
+                            >
+                              {sub.label}
+                            </button>
+                          );
+                        })}
+                        {/* Dynamic Custom Entities Sub-tabs */}
+                        {customEntityTypes.map((t) => {
+                          const isSelected = activeHubTab === t.id;
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => setActiveHubTab?.(t.id)}
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider font-bold transition-all cursor-pointer whitespace-nowrap ${
+                                isSelected
+                                  ? 'bg-amber-500 text-stone-950 shadow-sm'
+                                  : 'text-stone-400 hover:text-stone-200 bg-stone-900 border border-stone-800'
+                              }`}
+                            >
+                              {t.name}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </>
                   ) : viewMode === 'focus' ? (
                     <>
@@ -1041,7 +1084,7 @@ export default function DayNavigator({
                     setIsCalendarOpen(false);
                     setIsMobileViewMenuOpen(false);
                   }}
-                  className={`shrink-0 flex items-center gap-1.5 font-mono text-[9px] px-2 py-1 rounded-lg border transition-all cursor-pointer active:scale-95 select-none ${
+                  className={`shrink-0 hidden md:flex items-center gap-1.5 font-mono text-[9px] px-2 py-1 rounded-lg border transition-all cursor-pointer active:scale-95 select-none ${
                     isHabitDrawerOpen
                       ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
                       : allDone

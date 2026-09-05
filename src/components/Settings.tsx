@@ -104,6 +104,23 @@ export default function Settings() {
     } catch {}
   };
 
+  const [desktopHubLayout, setDesktopHubLayout] = useState<'canvas' | 'classic'>(() => {
+    try {
+      const stored = localStorage.getItem('flowday_desktop_hub_layout');
+      return stored === 'classic' ? 'classic' : 'canvas';
+    } catch {
+      return 'canvas';
+    }
+  });
+
+  const handleSaveDesktopHubLayout = (val: 'canvas' | 'classic') => {
+    setDesktopHubLayout(val);
+    try {
+      localStorage.setItem('flowday_desktop_hub_layout', val);
+      window.dispatchEvent(new CustomEvent('flowday-settings-change'));
+    } catch {}
+  };
+
   const {
     pat,
     setPat,
@@ -345,6 +362,37 @@ export default function Settings() {
                       />
                       <div className="w-9 h-5 bg-stone-800 rounded-full peer peer-focus:outline-none peer-checked:bg-amber-500/80 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-stone-500 peer-checked:after:bg-stone-950 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
                     </label>
+                  </div>
+
+                  {/* Desktop Hub View Mode setting */}
+                  <div className="flex items-center justify-between p-3.5 bg-stone-900/40 border border-stone-850 rounded-xl">
+                    <div className="flex flex-col gap-1 pr-4">
+                      <span className="text-xs text-stone-200 font-semibold font-sans">
+                        Desktop Hub View
+                      </span>
+                      <span className="text-[10px] font-mono text-stone-500">
+                        Select interactive Mindmap canvas or original multi-column Hub on desktop.
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 bg-[#0a0a0a] border border-stone-800 p-1 rounded-xl shrink-0">
+                      {[
+                        { id: 'canvas', label: 'Mindmap' },
+                        { id: 'classic', label: 'Classic' },
+                      ].map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleSaveDesktopHubLayout(item.id as 'canvas' | 'classic')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                            desktopHubLayout === item.id
+                              ? 'bg-amber-500 text-stone-950 shadow-sm'
+                              : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
