@@ -416,7 +416,7 @@ export default function DayScratchpad({
         await db.entries.update(item.convertedTaskId, {
           status: nextCompleted ? 'done' : 'todo',
           completed_at: nextCompleted ? new Date() : undefined,
-        });
+        } as any);
       } catch (e) {
         console.error('Failed to update converted task status in DB:', e);
       }

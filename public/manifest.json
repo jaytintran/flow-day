@@ -3,6 +3,7 @@
   "short_name": "Flow Day",
   "description": "Flow Day - One Stop of Daily Personal Productivity",
   "start_url": "/",
+  "scope": "/",
   "id": "/",
   "display": "standalone",
   "background_color": "#121212",
