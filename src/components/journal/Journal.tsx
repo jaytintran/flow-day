@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../../db";
 import {

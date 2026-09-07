@@ -228,6 +228,15 @@ export default function TimelineView({
     return { map, validDays };
   }, [sortedTimelineDays, timelineDaysMap, getDayRenderItems, statusFilter, typeFilter, sortOrder]);
 
+  const [visibleDaysCount, setVisibleDaysCount] = useState(7);
+
+  const renderedDays = useMemo(() => {
+    return filteredDaysData.validDays.slice(0, visibleDaysCount);
+  }, [filteredDaysData.validDays, visibleDaysCount]);
+
+  const hasMoreDays = filteredDaysData.validDays.length > visibleDaysCount;
+  const remainingDaysCount = filteredDaysData.validDays.length - visibleDaysCount;
+
   return (
     <div className="space-y-3" ref={containerRef}>
       {/* ─── Timeline Top Filter & Sort Bar ───────────────────────────────── */}
@@ -333,7 +342,7 @@ export default function TimelineView({
       {/* ─── Timeline Days Content ────────────────────────────────────────── */}
       {filteredDaysData.validDays.length > 0 ? (
         <div className="space-y-0">
-          {filteredDaysData.validDays.map((dayStr) => {
+          {renderedDays.map((dayStr) => {
             const dayItems = filteredDaysData.map[dayStr];
             return (
               <DayTimeline
@@ -358,10 +367,31 @@ export default function TimelineView({
             );
           })}
 
+          {/* Load 1 More Week Button */}
+          {hasMoreDays && (
+            <div className="py-8 flex flex-col items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setVisibleDaysCount((prev) => prev + 7)}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-[#141414] hover:bg-stone-900 border border-stone-800 hover:border-amber-500/40 text-stone-300 hover:text-amber-300 text-xs font-mono font-bold uppercase tracking-wider transition-all duration-200 shadow-xl cursor-pointer active:scale-95 group"
+              >
+                <ChevronDown className="w-4 h-4 text-amber-400 group-hover:translate-y-0.5 transition-transform" />
+                <span>Load 1 More Week ({Math.min(7, remainingDaysCount)} earlier days)</span>
+              </button>
+              <span className="text-[10px] font-mono text-stone-500">
+                Showing {renderedDays.length} of {filteredDaysData.validDays.length} days in timeline
+              </span>
+            </div>
+          )}
+
           {/* Jump-to-today floating button */}
           {showJumpToday && (
             <button
               onClick={() => {
+                const todayIdx = filteredDaysData.validDays.indexOf(todayStr);
+                if (todayIdx !== -1 && todayIdx >= visibleDaysCount) {
+                  setVisibleDaysCount(Math.ceil((todayIdx + 1) / 7) * 7);
+                }
                 const todayEl = document.getElementById(`spine-day-${todayStr}`);
                 if (todayEl) {
                   todayEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
