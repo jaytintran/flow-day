@@ -12,13 +12,12 @@ import {
   Trophy,
   FileText,
   Calendar,
+  Clock,
   Play,
-  ListTodo,
-  FolderInput,
-  Trash2,
 } from 'lucide-react';
 import { db } from '../../../db';
 import { Task, Category, ListFolder, TimelineEntry } from '../../../types';
+import { formatDuration } from '../../../utils';
 import SortableRow from '../../SortableRow';
 import CategoryIcon from '../../CategoryIcon';
 import { CATEGORY_COLORS } from './TrophyView';
@@ -80,6 +79,9 @@ export default function DesktopTaskCard({
     .map((id) => taskLists.find((list) => list.id === id))
     .filter((list): list is Category => !!list && list.id !== selectedListId);
 
+  const hasTimeSpent = (task.time_spent ?? 0) > 0;
+  const achievementsCount = task.achievements?.length ?? 0;
+
   return (
     <SortableRow id={task.id} hideHandle>
       <div
@@ -94,57 +96,57 @@ export default function DesktopTaskCard({
           e.preventDefault();
           if (onContextMenu) onContextMenu(task, e);
         }}
-        className={`group relative flex flex-col justify-between gap-2.5 p-3 rounded-xl border transition-all cursor-pointer select-none min-h-[90px] ${
+        className={`group relative flex flex-col justify-between gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none min-h-[96px] ${
           isSelected
             ? 'bg-violet-500/15 border-violet-500/60 ring-2 ring-violet-500/40 shadow-[0_0_15px_rgba(139,92,246,0.15)]'
             : isActive
-              ? 'bg-amber-500/10 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]'
+              ? 'bg-[#18140a] border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/30'
               : isDone
                 ? isAccomplishment
-                  ? 'bg-[#161410] border-amber-500/30 hover:border-amber-500/50'
-                  : 'bg-[#111]/40 border-stone-850 opacity-70 hover:opacity-100 hover:border-stone-700'
+                  ? 'bg-[#14120e] border-amber-500/30 hover:border-amber-500/50'
+                  : 'bg-[#101010]/60 border-stone-850 opacity-65 hover:opacity-100 hover:border-stone-700'
                 : isDropped
                   ? 'bg-rose-950/10 border-rose-900/30 opacity-60'
                   : isMaybe
                     ? 'bg-indigo-950/10 border-indigo-900/30 opacity-80'
-                    : 'bg-[#131313] border-stone-800/80 hover:border-stone-700 hover:bg-[#161616]'
+                    : 'bg-[#141414] border-stone-800/80 hover:border-stone-700 hover:bg-[#181818]'
         }`}
       >
-        {/* Top Row: Checkbox + Title + Trophy */}
-        <div className="flex items-start gap-2.5">
+        {/* Top Row: Enlarged Status Checkbox + Title + Trophy */}
+        <div className="flex items-start gap-3">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onOpenStatusModal(task);
             }}
-            className={`w-4 h-4 mt-0.5 rounded border flex items-center justify-center shrink-0 transition-all cursor-pointer active:scale-95 ${
+            className={`w-5 h-5 mt-0.5 rounded-lg border flex items-center justify-center shrink-0 transition-all cursor-pointer active:scale-90 ${
               isDone
-                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.2)]'
+                ? 'bg-emerald-500/20 border-emerald-500/45 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.25)]'
                 : isInProgress
-                  ? 'border-amber-500/50 bg-amber-500/10 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.2)]'
+                  ? 'border-amber-500/60 bg-amber-500/15 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.25)] animate-pulse'
                   : isDropped
                     ? 'border-rose-500/40 bg-rose-500/10 text-rose-400'
                     : isMaybe
                       ? 'border-indigo-500/40 bg-indigo-500/10 text-indigo-400'
-                      : 'border-stone-700 hover:border-stone-500 bg-stone-900/80 text-stone-400 hover:text-stone-200'
+                      : 'border-stone-700 hover:border-stone-500 bg-stone-900/90 text-stone-400 hover:text-stone-200'
             }`}
             title="Click to change status"
           >
-            {isDone && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+            {isDone && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
             {isInProgress && (
-              <CircleDashed className="w-2.5 h-2.5 text-amber-400 stroke-[2.5]" />
+              <CircleDashed className="w-3.5 h-3.5 text-amber-400 stroke-[2.5]" />
             )}
-            {isDropped && <X className="w-2.5 h-2.5 stroke-[2.5]" />}
-            {isMaybe && <HelpCircle className="w-2.5 h-2.5 stroke-[2.5]" />}
+            {isDropped && <X className="w-3.5 h-3.5 stroke-[2.5]" />}
+            {isMaybe && <HelpCircle className="w-3.5 h-3.5 stroke-[2.5]" />}
           </button>
 
           <div className="flex-1 min-w-0">
             <span
-              className={`text-xs font-serif font-semibold leading-snug line-clamp-2 transition-colors ${
+              className={`text-[13px] font-serif font-medium leading-snug line-clamp-2 transition-colors ${
                 isDone
                   ? isAccomplishment
-                    ? 'text-stone-300'
+                    ? 'text-stone-300 font-medium'
                     : 'line-through text-stone-500'
                   : isDropped
                     ? 'line-through text-stone-500'
@@ -177,7 +179,7 @@ export default function DesktopTaskCard({
               title="Toggle Accomplishment"
             >
               <Trophy
-                className={`w-3 h-3 ${
+                className={`w-3.5 h-3.5 ${
                   task.is_accomplishment ? 'fill-amber-400' : ''
                 }`}
               />
@@ -185,21 +187,48 @@ export default function DesktopTaskCard({
           )}
         </div>
 
-        {/* Bottom Row: Badges on Left, Actions on Right */}
-        <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-stone-850/60 mt-auto min-h-[26px]">
-          {/* Badges on Left */}
-          <div className="flex items-center gap-1 flex-wrap min-w-0">
+        {/* Bottom Metadata Badges Row */}
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-stone-850/60 mt-auto min-h-[26px]">
+          {/* Metadata Badges on Left */}
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+            {/* Tracked Time Badge */}
+            {hasTimeSpent && (
+              <span
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-mono uppercase tracking-wider border shrink-0 ${
+                  isActive
+                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.2)] animate-pulse'
+                    : 'bg-stone-900/80 border-stone-800 text-stone-400'
+                }`}
+                title={`Total tracked time: ${formatDuration(task.time_spent)}`}
+              >
+                <Clock className="w-2.5 h-2.5 text-amber-400" />
+                <span>{formatDuration(task.time_spent)}</span>
+              </span>
+            )}
+
+            {/* Note indicator */}
             {task.content && task.content.trim() && (
               <span
-                className="inline-flex items-center justify-center p-0.5 rounded bg-stone-900/80 border border-stone-800 text-stone-400 hover:text-amber-300 transition-colors shrink-0"
-                title="Has description"
+                className="inline-flex items-center justify-center p-1 rounded-md bg-stone-900/80 border border-stone-800 text-stone-400 hover:text-amber-300 transition-colors shrink-0"
+                title="Has notes / description"
               >
                 <FileText className="w-2.5 h-2.5 text-stone-400" />
               </span>
             )}
 
+            {/* Achievements Pill */}
+            {achievementsCount > 0 && (
+              <span
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-mono uppercase tracking-wider bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0"
+                title={`${achievementsCount} logged achievements/wins`}
+              >
+                <span>🏆 {achievementsCount}</span>
+              </span>
+            )}
+
+            {/* Scheduled Date */}
             {task.scheduled_at && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-mono uppercase tracking-wider bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-mono uppercase tracking-wider bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
                 <Calendar className="w-2.5 h-2.5" />
                 {new Date(task.scheduled_at).toLocaleDateString('en-US', {
                   month: 'short',
@@ -208,10 +237,11 @@ export default function DesktopTaskCard({
               </span>
             )}
 
+            {/* Category Lists */}
             {taskCategories.map((cat) => (
               <span
                 key={cat.id}
-                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-mono uppercase tracking-wider border shrink-0 ${
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-mono uppercase tracking-wider border shrink-0 ${
                   CATEGORY_COLORS[cat.color] ?? CATEGORY_COLORS.violet
                 }`}
               >
@@ -226,97 +256,21 @@ export default function DesktopTaskCard({
             ))}
           </div>
 
-          {/* Quick Actions */}
-          <div className="flex items-center gap-0.5 shrink-0">
+          {/* Quick Timer Start Button (Discrete on Hover) */}
+          {!isDone && !isDropped && !isActive && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                onOpenStatusModal(task);
+                onActivateTask(task.id);
               }}
-              className="p-1 rounded text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer"
-              title="Change status"
+              className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-stone-900 border border-stone-800 hover:border-amber-500/40 text-stone-400 hover:text-amber-400 transition-all cursor-pointer text-[9px] font-mono shrink-0 active:scale-95"
+              title="Start Timer"
             >
-              <CircleDashed className="w-3 h-3" />
+              <Play className="w-2.5 h-2.5 fill-current" />
+              <span>Track</span>
             </button>
-
-            {!isDone && !isDropped && !isActive && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onActivateTask(task.id);
-                }}
-                className="p-1 rounded text-stone-400 hover:text-amber-400 hover:bg-stone-800 transition-colors cursor-pointer"
-                title="Activate timer"
-              >
-                <Play className="w-3 h-3 fill-current" />
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenScheduleModal(task);
-              }}
-              className="p-1 rounded text-stone-400 hover:text-amber-400 hover:bg-stone-800 transition-colors cursor-pointer"
-              title="Schedule date"
-            >
-              <Calendar className="w-3 h-3" />
-            </button>
-
-            {taskLists.length > 0 && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenListPicker(task);
-                }}
-                className="p-1 rounded text-stone-400 hover:text-violet-400 hover:bg-stone-800 transition-colors cursor-pointer"
-                title="Assign to list"
-              >
-                <ListTodo className="w-3 h-3" />
-              </button>
-            )}
-
-            {/* Move to Folder */}
-            {availableFolders && availableFolders.length > 0 && onOpenFolderPicker && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenFolderPicker(task);
-                }}
-                className="p-1 rounded text-stone-400 hover:text-amber-300 hover:bg-stone-800 transition-colors cursor-pointer"
-                title="Move to folder"
-              >
-                <FolderInput className="w-3 h-3" />
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeleteEntry(task.id);
-              }}
-              className={`p-1 rounded transition-colors cursor-pointer ${
-                deletingId === task.id
-                  ? 'text-red-400 bg-red-950/80 border border-red-800'
-                  : 'text-stone-400 hover:text-red-400 hover:bg-stone-800'
-              }`}
-              title={
-                deletingId === task.id ? 'Click again to confirm' : 'Delete'
-              }
-            >
-              {deletingId === task.id ? (
-                <span className="text-[8px] font-mono font-bold">Sure?</span>
-              ) : (
-                <Trash2 className="w-3 h-3" />
-              )}
-            </button>
-          </div>
+          )}
         </div>
       </div>
     </SortableRow>

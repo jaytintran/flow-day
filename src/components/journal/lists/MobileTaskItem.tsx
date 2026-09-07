@@ -17,9 +17,11 @@ import {
   HelpCircle,
   Trophy,
   FileText,
+  Clock,
 } from 'lucide-react';
 import { db } from '../../../db';
 import { Task, Category, ListFolder, TimelineEntry } from '../../../types';
+import { formatDuration } from '../../../utils';
 import SortableRow from '../../SortableRow';
 import CategoryIcon from '../../CategoryIcon';
 import { CATEGORY_COLORS } from './TrophyView';
@@ -109,7 +111,11 @@ export default function MobileTaskItem({
   if (hasFolders) buttonCount += 1; // Folder Picker
   const maxSwipeLeft = isSwipeDisabled ? 0 : -(buttonCount * 42 + 8);
 
+  const hasTimeSpent = (task.time_spent ?? 0) > 0;
+  const achievementsCount = task.achievements?.length ?? 0;
   const hasMetadata = !!(
+    hasTimeSpent ||
+    achievementsCount > 0 ||
     (task.content && task.content.trim()) ||
     task.scheduled_at ||
     taskCategories.length > 0
@@ -363,6 +369,29 @@ export default function MobileTaskItem({
           {/* Line 2: Indented Metadata Sub-line */}
           {hasMetadata && (
             <div className="flex items-center gap-1.5 flex-wrap pl-[30px] pt-0.5">
+              {/* Tracked Time Badge */}
+              {hasTimeSpent && (
+                <span
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-mono uppercase tracking-wider border shrink-0 ${
+                    isActive
+                      ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.2)] animate-pulse'
+                      : 'bg-stone-900/80 border-stone-800 text-stone-400'
+                  }`}
+                >
+                  <Clock className="w-2.5 h-2.5 text-amber-400" />
+                  <span>{formatDuration(task.time_spent)}</span>
+                </span>
+              )}
+
+              {/* Achievements Pill */}
+              {achievementsCount > 0 && (
+                <span
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-mono uppercase tracking-wider bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0"
+                >
+                  <span>🏆 {achievementsCount}</span>
+                </span>
+              )}
+
               {task.content && task.content.trim() && (
                 <span
                   className="inline-flex items-center justify-center p-0.5 rounded bg-stone-900/80 border border-stone-800 text-stone-400 shrink-0"
