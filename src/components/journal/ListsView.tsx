@@ -21,6 +21,10 @@ import {
 	Layers,
 	ListTodo,
 	Check,
+	CircleDashed,
+	Calendar,
+	Trash2,
+	CheckSquare,
 } from "lucide-react";
 import {
 	DndContext,
@@ -45,6 +49,7 @@ import {
 	Task,
 	Category,
 	ListFolder,
+	TaskStatus,
 } from "../../types";
 import { useLiveQuery } from "dexie-react-hooks";
 import TaskListManagerModal from "../TaskListManagerModal";
@@ -234,6 +239,25 @@ export default function ListsView({
 		};
 	}, [activeSwipedTaskId]);
 
+	// Multi-Selection State & Batch Modals
+	const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+	const [lastSelectedTaskId, setLastSelectedTaskId] = useState<string | null>(null);
+	const [batchScheduleModalOpen, setBatchScheduleModalOpen] = useState(false);
+	const [batchListPickerOpen, setBatchListPickerOpen] = useState(false);
+	const [batchFolderPickerOpen, setBatchFolderPickerOpen] = useState(false);
+	const [batchStatusPickerOpen, setBatchStatusPickerOpen] = useState(false);
+
+	// Clear selection on Escape key
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === "Escape" && selectedTaskIds.size > 0) {
+				setSelectedTaskIds(new Set());
+			}
+		};
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, [selectedTaskIds.size]);
+
 	// Modals state
 	const [statusPickerTask, setStatusPickerTask] = useState<Task | null>(null);
 	const [scheduleModalTask, setScheduleModalTask] = useState<Task | null>(null);
@@ -252,6 +276,128 @@ export default function ListsView({
 			x: e.clientX,
 			y: e.clientY,
 		});
+	};
+
+	const handleToggleSelect = (taskId: string) => {
+		setSelectedTaskIds((prev) => {
+			const next = new Set(prev);
+			if (next.has(taskId)) {
+				next.delete(taskId);
+			} else {
+				next.add(taskId);
+			}
+			return next;
+		});
+		setLastSelectedTaskId(taskId);
+	};
+
+	const handleTaskClick = (task: Task, e: React.MouseEvent) => {
+		if (e.ctrlKey || e.metaKey) {
+			e.preventDefault();
+			handleToggleSelect(task.id);
+			return;
+		}
+		if (e.shiftKey && lastSelectedTaskId) {
+			e.preventDefault();
+			const idx1 = displayedTasks.findIndex((t) => t.id === lastSelectedTaskId);
+			const idx2 = displayedTasks.findIndex((t) => t.id === task.id);
+			if (idx1 !== -1 && idx2 !== -1) {
+				const start = Math.min(idx1, idx2);
+				const end = Math.max(idx1, idx2);
+				const rangeIds = displayedTasks.slice(start, end + 1).map((t) => t.id);
+				setSelectedTaskIds((prev) => {
+					const next = new Set(prev);
+					rangeIds.forEach((id) => next.add(id));
+					return next;
+				});
+				return;
+			}
+		}
+		if (selectedTaskIds.size > 0) {
+			handleToggleSelect(task.id);
+			return;
+		}
+		onOpenDetail(task);
+	};
+
+	const handleBatchAssignLists = async (listId: string) => {
+		const ids = Array.from(selectedTaskIds);
+		if (ids.length === 0) return;
+		await db.transaction("rw", db.entries, async () => {
+			for (const id of ids) {
+				const item = await db.entries.get(id);
+				if (item && item.type === "task") {
+					const current = item.category_ids ?? [];
+					const updated = current.includes(listId)
+						? current.filter((cId) => cId !== listId)
+						: [...current, listId];
+					await db.entries.update(id, { category_ids: updated } as any);
+				}
+			}
+		});
+	};
+
+	const handleBatchMoveFolder = async (folderId: string | undefined) => {
+		const ids = Array.from(selectedTaskIds);
+		if (ids.length === 0) return;
+		await db.transaction("rw", db.entries, async () => {
+			for (const id of ids) {
+				await db.entries.update(id, { folder_id: folderId } as any);
+			}
+		});
+		setBatchFolderPickerOpen(false);
+	};
+
+	const handleBatchChangeStatus = async (status: TaskStatus) => {
+		const ids = Array.from(selectedTaskIds);
+		if (ids.length === 0) return;
+		await db.transaction("rw", db.entries, async () => {
+			for (const id of ids) {
+				if (status === "done") {
+					await db.entries.update(id, {
+						status: "done",
+						completed_at: new Date(),
+					} as any);
+				} else {
+					await db.entries.update(id, {
+						status,
+						completed_at: undefined,
+					} as any);
+				}
+			}
+		});
+		setBatchStatusPickerOpen(false);
+	};
+
+	const handleBatchSchedule = async (targetDate: Date | null) => {
+		const ids = Array.from(selectedTaskIds);
+		if (ids.length === 0) return;
+		await db.transaction("rw", db.entries, async () => {
+			for (const id of ids) {
+				if (targetDate === null) {
+					await db.entries.update(id, { scheduled_at: undefined } as any);
+				} else {
+					await db.entries.update(id, { scheduled_at: targetDate } as any);
+				}
+			}
+		});
+		setBatchScheduleModalOpen(false);
+	};
+
+	const handleBatchDelete = async () => {
+		const ids = Array.from(selectedTaskIds);
+		if (ids.length === 0) return;
+		await db.entries.bulkDelete(ids);
+		setSelectedTaskIds(new Set());
+	};
+
+	const handleSelectAll = () => {
+		const allIds = displayedTasks.map((t) => t.id);
+		setSelectedTaskIds(new Set(allIds));
+	};
+
+	const handleClearSelection = () => {
+		setSelectedTaskIds(new Set());
 	};
 
 	// Status groups collapsed state (when statusFilter === 'all')
@@ -727,6 +873,8 @@ export default function ListsView({
 							taskLists={taskLists}
 							selectedListId={selectedView}
 							availableFolders={availableFoldersForPicker}
+							selectedTaskIds={selectedTaskIds}
+							onClickCard={handleTaskClick}
 							activeSwipedTaskId={activeSwipedTaskId}
 							onSetSwipedTaskId={setActiveSwipedTaskId}
 							onDeleteEntry={onDeleteEntry}
@@ -821,6 +969,8 @@ export default function ListsView({
 																	taskLists={taskLists}
 																	selectedListId={selectedView}
 																	availableFolders={availableFoldersForPicker}
+																	isSelected={selectedTaskIds.has(task.id)}
+																	onClickCard={handleTaskClick}
 																	onDeleteEntry={onDeleteEntry}
 																	onOpenDetail={onOpenDetail}
 																	onToggleTaskStatus={onToggleTaskStatus}
@@ -850,6 +1000,8 @@ export default function ListsView({
 																	taskLists={taskLists}
 																	selectedListId={selectedView}
 																	availableFolders={availableFoldersForPicker}
+																	isSelected={selectedTaskIds.has(task.id)}
+																	onClickCard={handleTaskClick}
 																	isSwiped={activeSwipedTaskId === task.id}
 																	onSetSwiped={(swiped) =>
 																		setActiveSwipedTaskId(
@@ -897,6 +1049,8 @@ export default function ListsView({
 												taskLists={taskLists}
 												selectedListId={selectedView}
 												availableFolders={availableFoldersForPicker}
+												isSelected={selectedTaskIds.has(task.id)}
+												onClickCard={handleTaskClick}
 												onDeleteEntry={onDeleteEntry}
 												onOpenDetail={onOpenDetail}
 												onToggleTaskStatus={onToggleTaskStatus}
@@ -922,6 +1076,8 @@ export default function ListsView({
 												taskLists={taskLists}
 												selectedListId={selectedView}
 												availableFolders={availableFoldersForPicker}
+												isSelected={selectedTaskIds.has(task.id)}
+												onClickCard={handleTaskClick}
 												isSwiped={activeSwipedTaskId === task.id}
 												onSetSwiped={(swiped) =>
 													setActiveSwipedTaskId(
@@ -1407,6 +1563,251 @@ export default function ListsView({
 				/>
 			)}
 
+			{/* Batch Modals */}
+			{batchScheduleModalOpen && (
+				<ScheduleCalendarModal
+					task={
+						{
+							id: "batch",
+							title: `${selectedTaskIds.size} Tasks`,
+						} as Task
+					}
+					onClose={() => setBatchScheduleModalOpen(false)}
+					onSelectDate={(_, date) => handleBatchSchedule(date)}
+					onUnschedule={() => handleBatchSchedule(null)}
+				/>
+			)}
+
+			{batchFolderPickerOpen && (
+				<MoveToFolderModal
+					task={
+						{
+							id: "batch",
+							title: `${selectedTaskIds.size} Tasks`,
+						} as Task
+					}
+					folders={availableFoldersForPicker}
+					onClose={() => setBatchFolderPickerOpen(false)}
+					onSelectFolder={(_, folderId) => handleBatchMoveFolder(folderId)}
+				/>
+			)}
+
+			{batchListPickerOpen && (
+				<AnimatePresence>
+					<motion.div
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 1 }}
+						exit={{ opacity: 0 }}
+						onClick={() => setBatchListPickerOpen(false)}
+						className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1100] flex items-center justify-center p-4"
+					>
+						<motion.div
+							initial={{ opacity: 0, scale: 0.95, y: 8 }}
+							animate={{ opacity: 1, scale: 1, y: 0 }}
+							exit={{ opacity: 0, scale: 0.95, y: 8 }}
+							onClick={(e) => e.stopPropagation()}
+							className="w-full max-w-xs bg-[#141414] border border-stone-800 rounded-2xl shadow-2xl overflow-hidden font-sans"
+						>
+							<div className="flex items-center justify-between px-5 pt-4 pb-2 border-b border-stone-800/60">
+								<div>
+									<p className="text-[10px] font-mono font-bold uppercase tracking-widest text-stone-400">
+										Assign to Lists
+									</p>
+									<p className="text-xs font-serif font-semibold text-stone-200 line-clamp-1 mt-0.5">
+										{selectedTaskIds.size} Tasks Selected
+									</p>
+								</div>
+								<button
+									onClick={() => setBatchListPickerOpen(false)}
+									className="p-1 text-stone-500 hover:text-stone-300 rounded-lg transition-colors cursor-pointer"
+								>
+									<X className="w-4 h-4" />
+								</button>
+							</div>
+
+							<div className="p-3 flex flex-col gap-1 max-h-60 overflow-y-auto">
+								{taskLists.map((list) => {
+									return (
+										<button
+											key={list.id}
+											onClick={() => handleBatchAssignLists(list.id)}
+											className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-left transition-all cursor-pointer border border-transparent text-stone-300 hover:bg-stone-800/60 hover:text-white"
+										>
+											<CategoryIcon
+												name={list.icon}
+												color={list.color}
+												className="w-3.5 h-3.5"
+												fallback="ListTodo"
+											/>
+											<span className="flex-1 min-w-0 text-xs font-mono truncate">
+												{list.name}
+											</span>
+										</button>
+									);
+								})}
+							</div>
+						</motion.div>
+					</motion.div>
+				</AnimatePresence>
+			)}
+
+			{batchStatusPickerOpen && (
+				<AnimatePresence>
+					<motion.div
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 1 }}
+						exit={{ opacity: 0 }}
+						onClick={() => setBatchStatusPickerOpen(false)}
+						className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1100] flex items-center justify-center p-4"
+					>
+						<motion.div
+							initial={{ opacity: 0, scale: 0.95, y: 8 }}
+							animate={{ opacity: 1, scale: 1, y: 0 }}
+							exit={{ opacity: 0, scale: 0.95, y: 8 }}
+							onClick={(e) => e.stopPropagation()}
+							className="w-full max-w-xs bg-[#141414] border border-stone-800 rounded-2xl shadow-2xl overflow-hidden font-sans p-3 space-y-1"
+						>
+							<div className="flex items-center justify-between px-2 pt-1 pb-2 border-b border-stone-800/60">
+								<p className="text-[10px] font-mono font-bold uppercase tracking-widest text-stone-400">
+									Change Status ({selectedTaskIds.size} Tasks)
+								</p>
+								<button
+									onClick={() => setBatchStatusPickerOpen(false)}
+									className="p-1 text-stone-500 hover:text-stone-300 rounded-lg cursor-pointer"
+								>
+									<X className="w-4 h-4" />
+								</button>
+							</div>
+							{[
+								{
+									status: "todo",
+									label: "To-do",
+									icon: <CircleDashed className="w-3.5 h-3.5 text-stone-400" />,
+								},
+								{
+									status: "in_progress",
+									label: "In Progress",
+									icon: <CircleDashed className="w-3.5 h-3.5 text-amber-400" />,
+								},
+								{
+									status: "done",
+									label: "Completed",
+									icon: <Check className="w-3.5 h-3.5 text-emerald-400" />,
+								},
+								{
+									status: "maybe",
+									label: "Maybe / Later",
+									icon: <CircleDashed className="w-3.5 h-3.5 text-indigo-400" />,
+								},
+								{
+									status: "dropped",
+									label: "Dropped",
+									icon: <X className="w-3.5 h-3.5 text-rose-400" />,
+								},
+							].map((opt) => (
+								<button
+									key={opt.status}
+									onClick={() =>
+										handleBatchChangeStatus(opt.status as TaskStatus)
+									}
+									className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-left text-xs font-mono text-stone-300 hover:bg-stone-800 hover:text-white transition-colors cursor-pointer"
+								>
+									{opt.icon}
+									<span>{opt.label}</span>
+								</button>
+							))}
+						</motion.div>
+					</motion.div>
+				</AnimatePresence>
+			)}
+
+			{/* Floating Multi-Select Action Bar */}
+			<AnimatePresence>
+				{selectedTaskIds.size > 0 && (
+					<motion.div
+						initial={{ opacity: 0, y: 30, scale: 0.95 }}
+						animate={{ opacity: 1, y: 0, scale: 1 }}
+						exit={{ opacity: 0, y: 30, scale: 0.95 }}
+						transition={{ type: "spring", damping: 25, stiffness: 350 }}
+						className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-[#141414]/95 border border-stone-800/90 rounded-2xl shadow-2xl shadow-black/80 backdrop-blur-xl font-mono text-xs select-none max-w-[95vw] overflow-x-auto"
+					>
+						<div className="flex items-center gap-2 pr-2 border-r border-stone-800 shrink-0">
+							<span className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
+							<span className="text-stone-200 font-bold whitespace-nowrap">
+								{selectedTaskIds.size} selected
+							</span>
+							<button
+								onClick={
+									selectedTaskIds.size === displayedTasks.length
+										? handleClearSelection
+										: handleSelectAll
+								}
+								className="text-[10px] text-stone-400 hover:text-stone-200 underline cursor-pointer ml-1 whitespace-nowrap"
+							>
+								{selectedTaskIds.size === displayedTasks.length
+									? "Clear"
+									: "Select All"}
+							</button>
+						</div>
+
+						<button
+							onClick={() => setBatchStatusPickerOpen(true)}
+							className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-stone-900 border border-stone-800 text-stone-300 hover:text-white hover:border-stone-700 transition-all cursor-pointer whitespace-nowrap shrink-0"
+							title="Change status for selected tasks"
+						>
+							<CircleDashed className="w-3.5 h-3.5 text-stone-400" />
+							<span className="hidden sm:inline">Status</span>
+						</button>
+
+						<button
+							onClick={() => setBatchListPickerOpen(true)}
+							className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-stone-900 border border-stone-800 text-stone-300 hover:text-violet-300 hover:border-violet-500/40 transition-all cursor-pointer whitespace-nowrap shrink-0"
+							title="Assign selected tasks to lists"
+						>
+							<ListTodo className="w-3.5 h-3.5 text-violet-400" />
+							<span className="hidden sm:inline">Assign Lists</span>
+						</button>
+
+						{availableFoldersForPicker.length > 0 && (
+							<button
+								onClick={() => setBatchFolderPickerOpen(true)}
+								className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-stone-900 border border-stone-800 text-stone-300 hover:text-amber-300 hover:border-amber-500/40 transition-all cursor-pointer whitespace-nowrap shrink-0"
+								title="Move selected tasks to folder"
+							>
+								<Folder className="w-3.5 h-3.5 text-amber-400" />
+								<span className="hidden sm:inline">Folder</span>
+							</button>
+						)}
+
+						<button
+							onClick={() => setBatchScheduleModalOpen(true)}
+							className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-stone-900 border border-stone-800 text-stone-300 hover:text-sky-300 hover:border-sky-500/40 transition-all cursor-pointer whitespace-nowrap shrink-0"
+							title="Schedule selected tasks"
+						>
+							<Calendar className="w-3.5 h-3.5 text-sky-400" />
+							<span className="hidden sm:inline">Schedule</span>
+						</button>
+
+						<button
+							onClick={handleBatchDelete}
+							className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-red-950/40 border border-red-900/50 text-red-300 hover:bg-red-900/60 transition-all cursor-pointer whitespace-nowrap shrink-0"
+							title="Delete selected tasks"
+						>
+							<Trash2 className="w-3.5 h-3.5 text-red-400" />
+							<span className="hidden sm:inline">Delete</span>
+						</button>
+
+						<button
+							onClick={handleClearSelection}
+							className="p-1 rounded-lg text-stone-500 hover:text-stone-300 transition-colors cursor-pointer ml-1 shrink-0"
+							title="Clear selection (Esc)"
+						>
+							<X className="w-4 h-4" />
+						</button>
+					</motion.div>
+				)}
+			</AnimatePresence>
+
 			{isMobileViewSheetOpen && (
 				<AnimatePresence>
 					<motion.div
@@ -1658,6 +2059,13 @@ export default function ListsView({
 					onReschedule={async (targetEntry, targetDate) => {
 						onCarryTask(targetEntry.id, targetDate);
 					}}
+					isSelected={selectedTaskIds.has(contextMenu.entry.id)}
+					onToggleSelect={handleToggleSelect}
+					selectedTaskIds={Array.from(selectedTaskIds)}
+					onBatchDelete={handleBatchDelete}
+					onBatchUpdateStatus={(ids, st) => handleBatchChangeStatus(st)}
+					onBatchAssignList={(ids, lId) => handleBatchAssignLists(lId)}
+					onBatchReschedule={(ids, d) => handleBatchSchedule(d)}
 				/>
 			)}
 		</div>

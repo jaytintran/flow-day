@@ -1429,28 +1429,14 @@ export default function Journal({
 								)}
 
 								{/* Content */}
-
-								{isEditingContent ? (
-									<textarea
-										autoFocus
-										value={editContent}
-										onChange={(e) => setEditContent(e.target.value)}
-										onBlur={() => setIsEditingContent(false)}
+								<div className="flex-1 border-t border-stone-900/80 pt-2 flex flex-col min-h-[100px]">
+									<MarkdownPreview
+										text={editContent}
 										placeholder="Add context, links, notes about this task..."
-										className="w-full bg-transparent text-stone-300 font-serif text-sm focus:outline-none resize-none leading-relaxed placeholder-stone-700 flex-1 border-t border-stone-900 pt-3 min-h-[120px]"
+										editable={true}
+										onChange={setEditContent}
 									/>
-								) : (
-									<div className="flex-1 border-t border-stone-900 pt-1 flex flex-col">
-										<MarkdownPreview
-											text={editContent}
-											placeholder="Add context, links, notes about this task..."
-											onClick={() => setIsEditingContent(true)}
-										/>
-										<span className="text-[10px] text-stone-600 font-mono mt-1 select-none">
-											Click content to edit
-										</span>
-									</div>
-								)}
+								</div>
 							</div>
 						)}
 
@@ -1525,27 +1511,15 @@ export default function Journal({
 										{(selectedEntry as Note).starred ? "Highlight" : "Highlight"}
 									</button>
 								</div>
-								{isEditingContent ? (
-									<textarea
-										autoFocus
-										value={editContent}
-										onChange={(e) => setEditContent(e.target.value)}
-										onBlur={() => setIsEditingContent(false)}
+								{/* Content */}
+								<div className="flex-1 border-t border-stone-900/80 pt-2 flex flex-col min-h-[150px]">
+									<MarkdownPreview
+										text={editContent}
 										placeholder="Tap to start typing your thoughts..."
-										className="w-full bg-transparent text-stone-300 font-serif text-sm focus:outline-none resize-none leading-relaxed placeholder-stone-700 flex-1 min-h-[150px]"
+										editable={true}
+										onChange={setEditContent}
 									/>
-								) : (
-									<div className="flex-1 flex flex-col">
-										<MarkdownPreview
-											text={editContent}
-											placeholder="Tap to start typing your thoughts..."
-											onClick={() => setIsEditingContent(true)}
-										/>
-										<span className="text-[10px] text-stone-600 font-mono mt-1 select-none">
-											Click content to edit
-										</span>
-									</div>
-								)}
+								</div>
 							</div>
 						)}
 
@@ -1620,27 +1594,15 @@ export default function Journal({
 										{(selectedEntry as Event).starred ? "Highlight" : "Highlight"}
 									</button>
 								</div>
-								{isEditingContent ? (
-									<textarea
-										autoFocus
-										value={editContent}
-										onChange={(e) => setEditContent(e.target.value)}
-										onBlur={() => setIsEditingContent(false)}
+								{/* Content */}
+								<div className="flex-1 border-t border-stone-900/80 pt-2 flex flex-col min-h-[120px]">
+									<MarkdownPreview
+										text={editContent}
 										placeholder="Event description, notes, or details..."
-										className="w-full bg-transparent text-stone-300 font-serif text-sm focus:outline-none resize-none leading-relaxed placeholder-stone-700 flex-1 min-h-[120px]"
+										editable={true}
+										onChange={setEditContent}
 									/>
-								) : (
-									<div className="flex-1 flex flex-col">
-										<MarkdownPreview
-											text={editContent}
-											placeholder="Event description, notes, or details..."
-											onClick={() => setIsEditingContent(true)}
-										/>
-										<span className="text-[10px] text-stone-600 font-mono mt-1 select-none">
-											Click content to edit
-										</span>
-									</div>
-								)}
+								</div>
 							</div>
 						)}
 

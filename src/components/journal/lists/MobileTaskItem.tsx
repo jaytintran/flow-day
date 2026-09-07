@@ -32,6 +32,8 @@ interface MobileTaskItemProps {
   selectedListId?: string;
   availableFolders?: ListFolder[];
   isSwiped?: boolean;
+  isSelected?: boolean;
+  onClickCard?: (task: Task, e: React.MouseEvent) => void;
   onSetSwiped?: (swiped: boolean) => void;
   onDeleteEntry: (id: string) => void;
   onOpenDetail: (entry: TimelineEntry) => void;
@@ -54,6 +56,8 @@ export default function MobileTaskItem({
   selectedListId,
   availableFolders,
   isSwiped,
+  isSelected = false,
+  onClickCard,
   onSetSwiped,
   onDeleteEntry,
   onOpenDetail,
@@ -228,10 +232,12 @@ export default function MobileTaskItem({
               setIsMobileSwiped(false);
             }
           }}
-          onClick={() => {
+          onClick={(e) => {
             if (isDraggingSwipe.current) return;
             if (isMobileSwiped) {
               setIsMobileSwiped(false);
+            } else if (onClickCard) {
+              onClickCard(task, e);
             } else {
               onOpenDetail(task);
             }
@@ -243,17 +249,19 @@ export default function MobileTaskItem({
             }
           }}
           className={`relative z-10 flex flex-col gap-1 px-3 py-2.5 rounded-xl border transition-colors cursor-pointer select-none touch-pan-y ${
-            isActive
-              ? 'bg-[#1c1608] border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]'
-              : isDone
-                ? isAccomplishment
-                  ? 'bg-[#161410] border-amber-500/30 hover:border-amber-500/50'
-                  : 'bg-[#111111] border-stone-800/40 opacity-70 hover:opacity-100 hover:border-stone-700'
-                : isDropped
-                  ? 'bg-[#181111] border-rose-900/30 opacity-60'
-                  : isMaybe
-                    ? 'bg-[#141422] border-indigo-900/40 opacity-90 hover:opacity-100'
-                    : 'bg-[#131313] border-stone-800/80 hover:border-stone-700 hover:bg-[#171717]'
+            isSelected
+              ? 'bg-violet-500/15 border-violet-500/60 ring-2 ring-violet-500/40 shadow-[0_0_15px_rgba(139,92,246,0.15)]'
+              : isActive
+                ? 'bg-[#1c1608] border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]'
+                : isDone
+                  ? isAccomplishment
+                    ? 'bg-[#161410] border-amber-500/30 hover:border-amber-500/50'
+                    : 'bg-[#111111] border-stone-800/40 opacity-70 hover:opacity-100 hover:border-stone-700'
+                  : isDropped
+                    ? 'bg-[#181111] border-rose-900/30 opacity-60'
+                    : isMaybe
+                      ? 'bg-[#141422] border-indigo-900/40 opacity-90 hover:opacity-100'
+                      : 'bg-[#131313] border-stone-800/80 hover:border-stone-700 hover:bg-[#171717]'
           }`}
         >
           {/* Line 1: Checkbox + Full Width Title + Trophy */}

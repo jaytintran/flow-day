@@ -229,12 +229,32 @@ Synthesizes procedural sound effects using the Web Audio API without requiring a
 
 ### F. Node Card Markdown Inline Editing & Context Menu Status Controls
 * **Rendered Markdown & Click-to-Edit (`NodeMarkdownSection` / `CanvasNodes.tsx` / `GenericEntitySheet.tsx`)**:
-  * Notes/descriptions in node cards and detail inspectors are rendered as final formatted Markdown by default (no more separate `Write | Preview` tabs).
+  * Notes/descriptions in node cards and detail inspectors are rendered as final formatted Markdown by default.
   * Clicking directly on the rendered markdown text activates inline editing; blurring or tapping **Done** commits changes via `onQuickUpdateDescription` to IndexedDB.
   * Collapsible `> Notes` section on canvas node cards spans full card width (`w-full`) without character count clutter.
 * **Context Menu Status Switcher & Visual Reflection**:
   * Right-clicking any node on the canvas opens a contextual status switcher (`Active`, `Done / Achieved`, `Archived`).
   * Node card styling reacts immediately to reflect status (`isCompleted` with emerald glow and strikethrough, `isArchived` with dark slate muted palette and italicized title).
+
+### G. Line-by-Line Live Preview Markdown Engine (`src/components/MarkdownPreview.tsx`)
+* **Obsidian/Typora Style Live Editing**:
+  * Seamless inline editing where only the active line being typed flips into a raw input line (`<textarea>`), while all other lines remain fully formatted in rich Markdown.
+  * Preserves full visual context while editing without requiring mode toggling or jarring layout jumps.
+* **Auto-List Continuations & Keyboard Navigation**:
+  * Pressing `Enter` on bullet lists (`- `, `* `) or task checkboxes (`- [ ] `) automatically inserts the prefix on the next line. Pressing `Enter` on an empty prefixed line cancels the list item.
+  * Arrow keys (`ArrowUp` / `ArrowDown`) navigate smoothly between lines; `Backspace` on an empty line merges back to the previous line.
+* **Clickable Links & Interactive Checkboxes**:
+  * Formatted links (`[text](url)`) and bare URLs (`https://...`) automatically render as sky-blue clickable anchors (`text-sky-400 underline`) opening in a new tab with `target="_blank"` and `rel="noopener noreferrer"`.
+  * Interactive task checkboxes (`- [ ]` / `- [x]`) allow direct 1-tap toggling in preview mode without needing to enter edit mode.
+
+### H. Multi-Select Task Batch Operations & Boundary-Aware Context Menus (`ListsView.tsx` & `EntryContextMenu.tsx`)
+* **Card Multi-Selection & Range Selection**:
+  * Task cards in `ListsView` support single toggle (`Ctrl`/`Cmd` + Click), contiguous range selection (`Shift` + Click), context menu toggle ("Select Task" / "Deselect Task"), and batch select all.
+  * Selected cards display a distinct glowing violet ring (`ring-2 ring-violet-500/40 bg-violet-500/15`).
+* **Floating Batch Action Bar**:
+  * When one or more cards are selected, a floating pill toolbar appears with batch actions: **Status**, **Assign to Lists**, **Move to Folder**, **Schedule Date**, and **Delete**.
+* **Floating Portal Submenus**:
+  * Context menu submenus (such as "Assign to Lists" and "Batch Status") use React portals and viewport boundary detection to prevent modal clipping, dynamically flipping to open on the left when near the right screen edge.
 
 ---
 

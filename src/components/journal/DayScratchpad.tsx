@@ -121,6 +121,118 @@ function savePads(pads: Scratchpad[]) {
   } catch {}
 }
 
+interface PadTabProps {
+  pad: Scratchpad;
+  isActive: boolean;
+  editingPadId: string | null;
+  editingPadName: string;
+  deletingPadId: string | null;
+  canDelete: boolean;
+  onSelect: (id: string) => void;
+  onStartRename: (pad: Scratchpad, e?: React.MouseEvent) => void;
+  onRenameChange: (val: string) => void;
+  onSaveRename: () => void;
+  onCancelRename: () => void;
+  onDelete: (id: string, e: React.MouseEvent) => void;
+  isMobile?: boolean;
+}
+
+function PadTab({
+  pad,
+  isActive,
+  editingPadId,
+  editingPadName,
+  deletingPadId,
+  canDelete,
+  onSelect,
+  onStartRename,
+  onRenameChange,
+  onSaveRename,
+  onCancelRename,
+  onDelete,
+  isMobile,
+}: PadTabProps) {
+  const activeItemCount = pad.items.filter(
+    (i) => !i.isCompleted && !i.isConverted && i.text.trim().length > 0,
+  ).length;
+
+  return (
+    <Reorder.Item
+      key={pad.id}
+      value={pad}
+      onClick={() => onSelect(pad.id)}
+      className={`group flex items-center gap-1.5 ${
+        isMobile ? 'px-3 py-1' : 'px-2.5 py-1'
+      } rounded-lg text-xs font-mono transition-all cursor-pointer shrink-0 border select-none ${
+        isActive
+          ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 font-bold shadow-sm'
+          : isMobile
+          ? 'bg-stone-900/60 border-stone-850 text-stone-400 hover:text-stone-200'
+          : 'bg-stone-900/40 border-transparent text-stone-500 hover:text-stone-300 hover:bg-stone-900/80'
+      }`}
+    >
+      {editingPadId === pad.id ? (
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <input
+            autoFocus
+            type="text"
+            value={editingPadName}
+            onChange={(e) => onRenameChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onSaveRename();
+              if (e.key === 'Escape') onCancelRename();
+            }}
+            onBlur={onSaveRename}
+            className={`bg-stone-950 border border-amber-500/50 rounded px-1.5 py-0.5 text-xs text-amber-300 ${
+              isMobile ? 'w-20' : 'w-24'
+            } focus:outline-none`}
+          />
+          <button onClick={onSaveRename} className="text-emerald-400 p-0.5 cursor-pointer">
+            <Check className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : (
+        <>
+          <span
+            onClick={(e) => {
+              if (isActive) {
+                onStartRename(pad, e);
+              }
+            }}
+            className="cursor-pointer select-none"
+            title="Click to rename, drag to reorder"
+          >
+            {pad.name}
+          </span>
+          {activeItemCount > 0 && (
+            <span className="text-[9px] opacity-70 bg-stone-950/60 px-1 rounded-full">
+              {activeItemCount}
+            </span>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={(e) => onDelete(pad.id, e)}
+              className={`p-0.5 ml-0.5 rounded transition-colors cursor-pointer ${
+                deletingPadId === pad.id
+                  ? 'bg-rose-950/90 text-rose-300 border border-rose-800 animate-pulse px-1'
+                  : 'text-stone-500 hover:text-rose-400'
+              }`}
+              title={deletingPadId === pad.id ? 'Click again to confirm delete' : 'Delete Pad'}
+            >
+              {deletingPadId === pad.id ? (
+                <span className="text-[9px] font-mono font-bold leading-none">Sure?</span>
+              ) : (
+                <X className="w-3 h-3" />
+              )}
+            </button>
+          )}
+        </>
+      )}
+    </Reorder.Item>
+  );
+}
+
 interface MobileScratchpadItemProps {
   item: ScratchpadItem;
   index: number;
@@ -297,6 +409,11 @@ export default function DayScratchpad({
     setPads(updated);
     savePads(updated);
     setEditingPadId(null);
+  };
+
+  const handleReorderPads = (newPads: Scratchpad[]) => {
+    setPads(newPads);
+    savePads(newPads);
   };
 
   const handleDeletePad = (id: string, e: React.MouseEvent) => {
@@ -596,80 +713,31 @@ export default function DayScratchpad({
 
                   {/* Multi-Pad Tabs Row (Mobile) */}
                   <div className="w-full px-3 mt-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-                    {pads.map((pad) => {
-                      const isActive = pad.id === currentPad.id;
-                      const activeItemCount = pad.items.filter(
-                        (i) => !i.isCompleted && !i.isConverted && i.text.trim().length > 0,
-                      ).length;
-                      return (
-                        <div
+                    <Reorder.Group
+                      axis="x"
+                      values={pads}
+                      onReorder={handleReorderPads}
+                      className="flex items-center gap-1.5"
+                    >
+                      {pads.map((pad) => (
+                        <PadTab
                           key={pad.id}
-                          onClick={() => handleSelectPad(pad.id)}
-                          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer shrink-0 border ${
-                            isActive
-                              ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 font-bold'
-                              : 'bg-stone-900/60 border-stone-850 text-stone-400 hover:text-stone-200'
-                          }`}
-                        >
-                          {editingPadId === pad.id ? (
-                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                              <input
-                                autoFocus
-                                type="text"
-                                value={editingPadName}
-                                onChange={(e) => setEditingPadName(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') handleSaveRenamePad();
-                                  if (e.key === 'Escape') setEditingPadId(null);
-                                }}
-                                onBlur={handleSaveRenamePad}
-                                className="bg-stone-950 border border-amber-500/50 rounded px-1 text-xs text-amber-300 w-20 focus:outline-none"
-                              />
-                              <button onClick={handleSaveRenamePad} className="text-emerald-400 p-0.5">
-                                <Check className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ) : (
-                            <>
-                              <span
-                                onClick={(e) => {
-                                  if (isActive) {
-                                    handleStartRenamePad(pad, e);
-                                  }
-                                }}
-                                className="cursor-pointer select-none"
-                                title="Click to rename"
-                              >
-                                {pad.name}
-                              </span>
-                              {activeItemCount > 0 && (
-                                <span className="text-[9px] opacity-70 bg-stone-950/60 px-1 rounded-full">
-                                  {activeItemCount}
-                                </span>
-                              )}
-                              {pads.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleDeletePad(pad.id, e)}
-                                  className={`p-0.5 ml-0.5 rounded transition-colors cursor-pointer ${
-                                    deletingPadId === pad.id
-                                      ? 'bg-rose-950/90 text-rose-300 border border-rose-800 animate-pulse px-1'
-                                      : 'text-stone-500 hover:text-rose-400'
-                                  }`}
-                                  title={deletingPadId === pad.id ? 'Click again to confirm delete' : 'Delete Pad'}
-                                >
-                                  {deletingPadId === pad.id ? (
-                                    <span className="text-[9px] font-mono font-bold leading-none">Sure?</span>
-                                  ) : (
-                                    <X className="w-3 h-3" />
-                                  )}
-                                </button>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      );
-                    })}
+                          pad={pad}
+                          isActive={pad.id === currentPad.id}
+                          editingPadId={editingPadId}
+                          editingPadName={editingPadName}
+                          deletingPadId={deletingPadId}
+                          canDelete={pads.length > 1}
+                          onSelect={handleSelectPad}
+                          onStartRename={handleStartRenamePad}
+                          onRenameChange={setEditingPadName}
+                          onSaveRename={handleSaveRenamePad}
+                          onCancelRename={() => setEditingPadId(null)}
+                          onDelete={handleDeletePad}
+                          isMobile={true}
+                        />
+                      ))}
+                    </Reorder.Group>
 
                     <button
                       type="button"
@@ -861,81 +929,31 @@ export default function DayScratchpad({
 
               {/* Multi-Pad Tabs Row (Desktop) */}
               <div className="flex items-center gap-1 px-3 py-1.5 bg-[#121212] border-b border-stone-850/70 overflow-x-auto no-scrollbar">
-                {pads.map((pad) => {
-                  const isActive = pad.id === currentPad.id;
-                  const activeItemCount = pad.items.filter(
-                    (i) => !i.isCompleted && !i.isConverted && i.text.trim().length > 0,
-                  ).length;
-
-                  return (
-                    <div
+                <Reorder.Group
+                  axis="x"
+                  values={pads}
+                  onReorder={handleReorderPads}
+                  className="flex items-center gap-1"
+                >
+                  {pads.map((pad) => (
+                    <PadTab
                       key={pad.id}
-                      onClick={() => handleSelectPad(pad.id)}
-                      className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer shrink-0 border ${
-                        isActive
-                          ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 font-bold shadow-sm'
-                          : 'bg-stone-900/40 border-transparent text-stone-500 hover:text-stone-300 hover:bg-stone-900/80'
-                      }`}
-                    >
-                      {editingPadId === pad.id ? (
-                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            autoFocus
-                            type="text"
-                            value={editingPadName}
-                            onChange={(e) => setEditingPadName(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveRenamePad();
-                              if (e.key === 'Escape') setEditingPadId(null);
-                            }}
-                            onBlur={handleSaveRenamePad}
-                            className="bg-stone-950 border border-amber-500/50 rounded px-1.5 py-0.5 text-xs text-amber-300 w-24 focus:outline-none"
-                          />
-                          <button onClick={handleSaveRenamePad} className="text-emerald-400 p-0.5 cursor-pointer">
-                            <Check className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <span
-                            onClick={(e) => {
-                              if (isActive) {
-                                handleStartRenamePad(pad, e);
-                              }
-                            }}
-                            className="cursor-pointer select-none"
-                            title="Click to rename"
-                          >
-                            {pad.name}
-                          </span>
-                          {activeItemCount > 0 && (
-                            <span className="text-[9px] opacity-70 bg-stone-950/60 px-1 rounded-full">
-                              {activeItemCount}
-                            </span>
-                          )}
-                          {pads.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={(e) => handleDeletePad(pad.id, e)}
-                              className={`p-0.5 ml-0.5 rounded transition-colors cursor-pointer ${
-                                deletingPadId === pad.id
-                                  ? 'bg-rose-950/90 text-rose-300 border border-rose-800 animate-pulse px-1'
-                                  : 'text-stone-500 hover:text-rose-400'
-                              }`}
-                              title={deletingPadId === pad.id ? 'Click again to confirm delete' : 'Delete Pad'}
-                            >
-                              {deletingPadId === pad.id ? (
-                                <span className="text-[9px] font-mono font-bold leading-none">Sure?</span>
-                              ) : (
-                                <X className="w-3 h-3" />
-                              )}
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
+                      pad={pad}
+                      isActive={pad.id === currentPad.id}
+                      editingPadId={editingPadId}
+                      editingPadName={editingPadName}
+                      deletingPadId={deletingPadId}
+                      canDelete={pads.length > 1}
+                      onSelect={handleSelectPad}
+                      onStartRename={handleStartRenamePad}
+                      onRenameChange={setEditingPadName}
+                      onSaveRename={handleSaveRenamePad}
+                      onCancelRename={() => setEditingPadId(null)}
+                      onDelete={handleDeletePad}
+                      isMobile={false}
+                    />
+                  ))}
+                </Reorder.Group>
 
                 <button
                   type="button"

@@ -30,6 +30,8 @@ interface DesktopTaskCardProps {
   taskLists: Category[];
   selectedListId?: string;
   availableFolders?: ListFolder[];
+  isSelected?: boolean;
+  onClickCard?: (task: Task, e: React.MouseEvent) => void;
   onDeleteEntry: (id: string) => void;
   onOpenDetail: (entry: TimelineEntry) => void;
   onToggleTaskStatus: (task: Task) => void;
@@ -50,6 +52,8 @@ export default function DesktopTaskCard({
   taskLists,
   selectedListId,
   availableFolders,
+  isSelected = false,
+  onClickCard,
   onDeleteEntry,
   onOpenDetail,
   onToggleTaskStatus,
@@ -79,23 +83,31 @@ export default function DesktopTaskCard({
   return (
     <SortableRow id={task.id} hideHandle>
       <div
-        onClick={() => onOpenDetail(task)}
+        onClick={(e) => {
+          if (onClickCard) {
+            onClickCard(task, e);
+          } else {
+            onOpenDetail(task);
+          }
+        }}
         onContextMenu={(e) => {
           e.preventDefault();
           if (onContextMenu) onContextMenu(task, e);
         }}
         className={`group relative flex flex-col justify-between gap-2.5 p-3 rounded-xl border transition-all cursor-pointer select-none min-h-[90px] ${
-          isActive
-            ? 'bg-amber-500/10 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]'
-            : isDone
-              ? isAccomplishment
-                ? 'bg-[#161410] border-amber-500/30 hover:border-amber-500/50'
-                : 'bg-[#111]/40 border-stone-850 opacity-70 hover:opacity-100 hover:border-stone-700'
-              : isDropped
-                ? 'bg-rose-950/10 border-rose-900/30 opacity-60'
-                : isMaybe
-                  ? 'bg-indigo-950/10 border-indigo-900/30 opacity-80'
-                  : 'bg-[#131313] border-stone-800/80 hover:border-stone-700 hover:bg-[#161616]'
+          isSelected
+            ? 'bg-violet-500/15 border-violet-500/60 ring-2 ring-violet-500/40 shadow-[0_0_15px_rgba(139,92,246,0.15)]'
+            : isActive
+              ? 'bg-amber-500/10 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]'
+              : isDone
+                ? isAccomplishment
+                  ? 'bg-[#161410] border-amber-500/30 hover:border-amber-500/50'
+                  : 'bg-[#111]/40 border-stone-850 opacity-70 hover:opacity-100 hover:border-stone-700'
+                : isDropped
+                  ? 'bg-rose-950/10 border-rose-900/30 opacity-60'
+                  : isMaybe
+                    ? 'bg-indigo-950/10 border-indigo-900/30 opacity-80'
+                    : 'bg-[#131313] border-stone-800/80 hover:border-stone-700 hover:bg-[#161616]'
         }`}
       >
         {/* Top Row: Checkbox + Title + Trophy */}

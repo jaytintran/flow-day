@@ -29,6 +29,8 @@ interface FolderCardProps {
   taskLists: Category[];
   selectedListId?: string;
   availableFolders?: ListFolder[];
+  selectedTaskIds?: Set<string>;
+  onClickCard?: (task: Task, e: React.MouseEvent) => void;
   activeSwipedTaskId?: string | null;
   onSetSwipedTaskId?: (taskId: string | null) => void;
   onDeleteEntry: (id: string) => void;
@@ -59,6 +61,8 @@ export default function FolderCard({
   taskLists,
   selectedListId,
   availableFolders,
+  selectedTaskIds,
+  onClickCard,
   activeSwipedTaskId,
   onSetSwipedTaskId,
   onDeleteEntry,
@@ -228,6 +232,8 @@ export default function FolderCard({
                     taskLists={taskLists}
                     selectedListId={selectedListId}
                     availableFolders={availableFolders}
+                    isSelected={selectedTaskIds?.has(task.id)}
+                    onClickCard={onClickCard}
                     onDeleteEntry={onDeleteEntry}
                     onOpenDetail={onOpenDetail}
                     onToggleTaskStatus={onToggleTaskStatus}
@@ -253,6 +259,8 @@ export default function FolderCard({
                     taskLists={taskLists}
                     selectedListId={selectedListId}
                     availableFolders={availableFolders}
+                    isSelected={selectedTaskIds?.has(task.id)}
+                    onClickCard={onClickCard}
                     isSwiped={activeSwipedTaskId === task.id}
                     onSetSwiped={(swiped) =>
                       onSetSwipedTaskId?.(swiped ? task.id : null)
