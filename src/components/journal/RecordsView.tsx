@@ -15,6 +15,12 @@ import {
   Layers,
   Inbox,
   Plus,
+  Pencil,
+  Star,
+  X,
+  Maximize2,
+  Minimize2,
+  Send,
 } from 'lucide-react';
 import {
   DndContext,
@@ -31,6 +37,7 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from '@dnd-kit/sortable';
+import { AnimatePresence, motion } from 'motion/react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { TimelineEntry, Event, Note, Category } from '../../types';
 import { db } from '../../db';
@@ -45,6 +52,7 @@ import RecordCategoryPickerModal from './RecordCategoryPickerModal';
 import CategoryIcon from '../CategoryIcon';
 import InlineIconColorPopover from '../InlineIconColorPopover';
 import SortableCategorySidebarItem from './lists/SortableCategorySidebarItem';
+import MarkdownPreview from '../MarkdownPreview';
 
 interface RecordsViewProps {
   entries: TimelineEntry[];
@@ -124,6 +132,22 @@ export default function RecordsView({
   // Sidebar Direct Category Inline Rename State
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState('');
+
+  // Quick Record Input Bar State
+  const [quickRecordTitle, setQuickRecordTitle] = useState('');
+  const [quickRecordType, setQuickRecordType] = useState<'note' | 'event'>('note');
+  const [quickRecordPinned, setQuickRecordPinned] = useState(false);
+  const quickRecordInputRef = useRef<HTMLInputElement>(null);
+
+  // Open Details Modal for Rich Note/Event Creation
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [modalType, setModalType] = useState<'note' | 'event'>('note');
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalContent, setModalContent] = useState('');
+  const [modalPinned, setModalPinned] = useState(false);
+  const [modalStarred, setModalStarred] = useState(false);
+  const [modalCategoryIds, setModalCategoryIds] = useState<string[]>([]);
+  const [isModalMaximized, setIsModalMaximized] = useState(false);
 
   // Dedicated Drag Sensor for Custom Categories in Sidebar
   const categorySensors = useSensors(
@@ -291,6 +315,95 @@ export default function RecordsView({
   }, [regularRecordsGrouped]);
 
   const activeCategory = categories.find((c) => c.id === selectedCategoryId);
+
+  // Quick Record Creation Handler
+  const handleQuickCreateRecord = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = quickRecordTitle.trim();
+    if (!trimmed) return;
+
+    const targetCatIds: string[] = [];
+    if (
+      selectedCategoryId &&
+      selectedCategoryId !== 'all' &&
+      selectedCategoryId !== 'none' &&
+      selectedCategoryId !== 'events' &&
+      selectedCategoryId !== 'notes'
+    ) {
+      targetCatIds.push(selectedCategoryId);
+    }
+
+    const entryId = crypto.randomUUID();
+    const now = new Date();
+    const newEntry: TimelineEntry = {
+      id: entryId,
+      type: quickRecordType,
+      title: trimmed,
+      content: '',
+      timestamp: now,
+      created_at: now,
+      scheduled_at: now,
+      pinned: quickRecordPinned,
+      ...(targetCatIds.length > 0 ? { category_ids: targetCatIds } : {}),
+    };
+
+    await db.entries.add(newEntry);
+    setQuickRecordTitle('');
+    quickRecordInputRef.current?.focus();
+  };
+
+  // Open Details Modal for Rich Note/Event Creation
+  const handleOpenDetailModal = (typeToUse?: 'note' | 'event') => {
+    const t = typeToUse || (selectedCategoryId === 'events' ? 'event' : selectedCategoryId === 'notes' ? 'note' : quickRecordType);
+    setModalType(t);
+    setModalTitle(quickRecordTitle.trim());
+    setModalContent('');
+    setModalPinned(quickRecordPinned);
+    setModalStarred(false);
+
+    const initialCats: string[] = [];
+    if (
+      selectedCategoryId &&
+      selectedCategoryId !== 'all' &&
+      selectedCategoryId !== 'none' &&
+      selectedCategoryId !== 'events' &&
+      selectedCategoryId !== 'notes'
+    ) {
+      initialCats.push(selectedCategoryId);
+    }
+    setModalCategoryIds(initialCats);
+    setIsDetailModalOpen(true);
+  };
+
+  // Save from Detail Modal
+  const handleSaveDetailRecord = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = modalTitle.trim();
+    if (!trimmed) return;
+
+    const entryId = crypto.randomUUID();
+    const now = new Date();
+    const newEntry: TimelineEntry = {
+      id: entryId,
+      type: modalType,
+      title: trimmed,
+      content: modalContent.trim(),
+      timestamp: now,
+      created_at: now,
+      scheduled_at: now,
+      pinned: modalPinned,
+      starred: modalStarred,
+      ...(modalCategoryIds.length > 0 ? { category_ids: modalCategoryIds } : {}),
+    };
+
+    await db.entries.add(newEntry);
+    setIsDetailModalOpen(false);
+    setModalTitle('');
+    setModalContent('');
+    setModalPinned(false);
+    setModalStarred(false);
+    setQuickRecordTitle('');
+  };
 
   // Render an individual card
   const renderCard = (record: Event | Note, isPinnedShelfItem = false) => {
@@ -490,155 +603,258 @@ export default function RecordsView({
     };
   }, [categories]);
 
+  // Active Category helper for input bar
+  const activeCategoryForInput = categories.find((c) => c.id === selectedCategoryId);
+
+  // Dedicated Quick Record Input Bar
+  const quickRecordInputBar = (
+    <div className="pt-2 pb-1 shrink-0">
+      <form
+        onSubmit={handleQuickCreateRecord}
+        className="flex items-center gap-2 bg-[#121212]/95 backdrop-blur-md border border-stone-800 hover:border-stone-700 focus-within:border-amber-500/50 focus-within:ring-1 focus-within:ring-amber-500/20 rounded-2xl px-3 py-2 shadow-xl transition-all"
+      >
+        {/* Type selector toggle (Note / Event) */}
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              setQuickRecordType((prev) => (prev === 'note' ? 'event' : 'note'));
+            }}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              quickRecordType === 'event'
+                ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                : 'bg-stone-900 border-stone-800 text-stone-300 hover:text-stone-100 hover:border-stone-700'
+            }`}
+            title="Click to toggle type (Note / Event)"
+          >
+            {quickRecordType === 'event' ? (
+              <Calendar className="w-3 h-3 text-indigo-400" />
+            ) : (
+              <FileText className="w-3 h-3 text-stone-400" />
+            )}
+            <span>{quickRecordType === 'event' ? 'Event' : 'Note'}</span>
+          </button>
+        </div>
+
+        {/* Target category badge if custom category is selected */}
+        {activeCategoryForInput && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-stone-900 border border-stone-800 text-stone-300 text-[10px] font-mono font-semibold shrink-0">
+            <CategoryIcon
+              name={activeCategoryForInput.icon}
+              color={activeCategoryForInput.color}
+              className="w-3 h-3"
+              fallback="Tag"
+            />
+            <span className="truncate max-w-[90px]">{activeCategoryForInput.name}</span>
+          </span>
+        )}
+
+        {/* Text input */}
+        <input
+          ref={quickRecordInputRef}
+          id="quick-record-input"
+          type="text"
+          value={quickRecordTitle}
+          onChange={(e) => setQuickRecordTitle(e.target.value)}
+          placeholder={
+            activeCategoryForInput
+              ? `Add ${quickRecordType === 'event' ? 'event' : 'note'} to "${activeCategoryForInput.name}"... (Enter to add)`
+              : `Add ${quickRecordType === 'event' ? 'event' : 'note'}... (Enter to add)`
+          }
+          className="flex-1 min-w-0 bg-transparent text-[13px] text-stone-100 placeholder-stone-500 focus:outline-none"
+        />
+
+        {/* Pin toggle */}
+        <button
+          type="button"
+          onClick={() => setQuickRecordPinned(!quickRecordPinned)}
+          className={`p-1.5 rounded-lg border transition-all cursor-pointer shrink-0 ${
+            quickRecordPinned
+              ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+              : 'bg-transparent border-transparent text-stone-500 hover:text-stone-300 hover:bg-stone-800'
+          }`}
+          title={quickRecordPinned ? 'Pinned to top' : 'Pin record'}
+        >
+          <Pin className={`w-3.5 h-3.5 ${quickRecordPinned ? 'fill-current' : ''}`} />
+        </button>
+
+        {/* Open Details Modal (Pencil / Rich Editor) button */}
+        <button
+          type="button"
+          onClick={() => handleOpenDetailModal()}
+          className="p-1.5 rounded-lg border border-stone-800 hover:border-stone-700 bg-stone-900/80 text-stone-400 hover:text-amber-300 transition-all cursor-pointer shrink-0 flex items-center justify-center"
+          title="Open rich details modal to write markdown description and assign categories"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Add button */}
+        <button
+          type="submit"
+          disabled={!quickRecordTitle.trim()}
+          className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-30 disabled:hover:bg-amber-500 text-stone-950 text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5 shadow-sm active:scale-95 shrink-0"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Add</span>
+        </button>
+      </form>
+    </div>
+  );
+
   return (
     <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden" id="records-view-root">
-      {/* ─── MOBILE ONLY (< md): Strip Pattern ─── */}
-      <div className="md:hidden flex flex-col gap-2 pb-2 shrink-0">
-        {/* Mobile Search + Type Filter row */}
-        <div className="z-20 bg-[#0a0a0a] py-0 flex items-center justify-between gap-2">
-          <div className="relative flex items-center flex-1 max-w-[200px] sm:max-w-xs">
-            <Search className="absolute left-2.5 w-3.5 h-3.5 text-stone-500 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search records..."
-              className="w-full sm:w-64 pl-7 pr-2.5 py-1.5 text-[11px] font-mono bg-[#0a0a0a] border border-stone-800 rounded-lg text-stone-300 placeholder-stone-600 focus:outline-none focus:border-stone-600 transition-colors"
-            />
+      {/* ─── MOBILE ONLY (< md): Full Height Flex with Sticky Docked Input ─── */}
+      <div className="md:hidden flex flex-col flex-1 h-full min-h-0 overflow-hidden">
+        {/* Top Search + Type Filter row */}
+        <div className="shrink-0 flex flex-col gap-2 pb-1">
+          <div className="z-20 bg-[#0a0a0a] py-0 flex items-center justify-between gap-2">
+            <div className="relative flex items-center flex-1 max-w-[200px] sm:max-w-xs">
+              <Search className="absolute left-2.5 w-3.5 h-3.5 text-stone-500 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search records..."
+                className="w-full sm:w-64 pl-7 pr-2.5 py-1.5 text-[11px] font-mono bg-[#0a0a0a] border border-stone-800 rounded-lg text-stone-300 placeholder-stone-600 focus:outline-none focus:border-stone-600 transition-colors"
+              />
+            </div>
+
+            {/* Type Filter pills */}
+            <div className="flex items-center gap-1 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 w-fit">
+              <button
+                onClick={() => setFilterType('all')}
+                className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
+                  filterType === 'all'
+                    ? 'bg-stone-800 text-stone-200 shadow-sm'
+                    : 'text-stone-500 hover:text-stone-300'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setFilterType('event')}
+                className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
+                  filterType === 'event'
+                    ? 'bg-indigo-900/60 text-indigo-300 shadow-sm'
+                    : 'text-stone-500 hover:text-stone-300'
+                }`}
+              >
+                Events
+              </button>
+              <button
+                onClick={() => setFilterType('note')}
+                className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
+                  filterType === 'note'
+                    ? 'bg-blue-900/60 text-blue-300 shadow-sm'
+                    : 'text-stone-500 hover:text-stone-300'
+                }`}
+              >
+                Notes
+              </button>
+            </div>
           </div>
 
-          {/* Type Filter pills */}
-          <div className="flex items-center gap-1 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 w-fit">
-            <button
-              onClick={() => setFilterType('all')}
-              className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-                filterType === 'all'
-                  ? 'bg-stone-800 text-stone-200 shadow-sm'
-                  : 'text-stone-500 hover:text-stone-300'
-              }`}
+          {/* Category strip */}
+          <div className="relative flex items-center gap-1">
+            {/* Pinned left: Smart views */}
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedCategoryId('all')}
+                className={`shrink-0 p-1.5 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  selectedCategoryId === 'all'
+                    ? 'bg-stone-700 border-stone-600 text-stone-100'
+                    : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800'
+                }`}
+                title="All Records"
+              >
+                <Layers className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCategoryId('none')}
+                className={`shrink-0 p-1.5 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  selectedCategoryId === 'none'
+                    ? 'bg-stone-700 border-stone-600 text-stone-100'
+                    : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800'
+                }`}
+                title="Uncategorized"
+              >
+                <Inbox className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCategoryId('events')}
+                className={`shrink-0 p-1.5 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  selectedCategoryId === 'events'
+                    ? 'bg-indigo-900/60 border-indigo-500/50 text-indigo-300'
+                    : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800'
+                }`}
+                title="Events"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCategoryId('notes')}
+                className={`shrink-0 p-1.5 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  selectedCategoryId === 'notes'
+                    ? 'bg-stone-700 border-stone-600 text-stone-100'
+                    : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800'
+                }`}
+                title="Notes"
+              >
+                <FileText className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Divider */}
+              {categories.length > 0 && <div className="w-px h-4 bg-stone-800 mx-0.5 shrink-0" />}
+            </div>
+
+            {/* Scrollable category pills */}
+            <div
+              ref={stripScrollRef}
+              className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0 pr-1 scrollbar-none"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
-              All
-            </button>
-            <button
-              onClick={() => setFilterType('event')}
-              className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-                filterType === 'event'
-                  ? 'bg-indigo-900/60 text-indigo-300 shadow-sm'
-                  : 'text-stone-500 hover:text-stone-300'
-              }`}
-            >
-              Events
-            </button>
-            <button
-              onClick={() => setFilterType('note')}
-              className={`px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-md transition-colors cursor-pointer ${
-                filterType === 'note'
-                  ? 'bg-blue-900/60 text-blue-300 shadow-sm'
-                  : 'text-stone-500 hover:text-stone-300'
-              }`}
-            >
-              Notes
-            </button>
+              {categories.map((cat) => {
+                const cs = CAT_COLORS[cat.color] ?? CAT_COLORS['violet'];
+                const isActive = selectedCategoryId === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedCategoryId(cat.id)}
+                    className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                      isActive
+                        ? `${cs.active} !border-amber-500 !text-stone-100`
+                        : `${cs.active} border-stone-800 !text-stone-100 hover:text-stone-300 hover:border-stone-700`
+                    }`}
+                  >
+                    <CategoryIcon
+                      name={cat.icon}
+                      color={cat.color}
+                      className="w-3 h-3"
+                      fallback="Tag"
+                    />
+                    {cat.name}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Right fade overlay */}
+            {showStripFade && (
+              <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0a0a0a] to-transparent pointer-events-none" />
+            )}
           </div>
         </div>
 
-        {/* Category strip */}
-        <div className="relative flex items-center gap-1">
-          {/* Pinned left: Smart views */}
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={() => setSelectedCategoryId('all')}
-              className={`shrink-0 p-1.5 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                selectedCategoryId === 'all'
-                  ? 'bg-stone-700 border-stone-600 text-stone-100'
-                  : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800'
-              }`}
-              title="All Records"
-            >
-              <Layers className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedCategoryId('none')}
-              className={`shrink-0 p-1.5 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                selectedCategoryId === 'none'
-                  ? 'bg-stone-700 border-stone-600 text-stone-100'
-                  : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800'
-              }`}
-              title="Uncategorized"
-            >
-              <Inbox className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedCategoryId('events')}
-              className={`shrink-0 p-1.5 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                selectedCategoryId === 'events'
-                  ? 'bg-indigo-900/60 border-indigo-500/50 text-indigo-300'
-                  : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800'
-              }`}
-              title="Events"
-            >
-              <Calendar className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedCategoryId('notes')}
-              className={`shrink-0 p-1.5 rounded-lg border text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                selectedCategoryId === 'notes'
-                  ? 'bg-stone-700 border-stone-600 text-stone-100'
-                  : 'bg-transparent border-stone-800 text-stone-500 hover:text-stone-300 hover:bg-stone-800'
-              }`}
-              title="Notes"
-            >
-              <FileText className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Divider */}
-            {categories.length > 0 && <div className="w-px h-4 bg-stone-800 mx-0.5 shrink-0" />}
-          </div>
-
-          {/* Scrollable category pills */}
-          <div
-            ref={stripScrollRef}
-            className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0 pr-1 scrollbar-none"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-          >
-            {categories.map((cat) => {
-              const cs = CAT_COLORS[cat.color] ?? CAT_COLORS['violet'];
-              const isActive = selectedCategoryId === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setSelectedCategoryId(cat.id)}
-                  className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                    isActive
-                      ? `${cs.active} !border-amber-500 !text-stone-100`
-                      : `${cs.active} border-stone-800 !text-stone-100 hover:text-stone-300 hover:border-stone-700`
-                  }`}
-                >
-                  <CategoryIcon
-                    name={cat.icon}
-                    color={cat.color}
-                    className="w-3 h-3"
-                    fallback="Tag"
-                  />
-                  {cat.name}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Right fade overlay */}
-          {showStripFade && (
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0a0a0a] to-transparent pointer-events-none" />
-          )}
-        </div>
-
-        {/* Mobile Content Feed */}
-        <div className="flex-1 overflow-y-auto space-y-6 pt-2">
+        {/* Mobile Content Feed (Independently Scrollable) */}
+        <div
+          className="flex-1 min-h-0 overflow-y-auto space-y-6 pt-2 pb-2 pr-0.5"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
           {/* Pinned shelf */}
           {pinnedRecords.length > 0 && (
             <div className="space-y-3 pb-2 border-b border-stone-900/80">
@@ -687,6 +903,11 @@ export default function RecordsView({
               <p className="text-xs font-sans font-medium text-stone-400">No records found</p>
             </div>
           ) : null}
+        </div>
+
+        {/* Sticky Bottom Docked Quick Record Input on Mobile */}
+        <div className="shrink-0 bg-[#0a0a0a]/95 backdrop-blur-md pt-1.5 pb-[max(env(safe-area-inset-bottom),8px)] border-t border-stone-850/80">
+          {quickRecordInputBar}
         </div>
       </div>
 
@@ -1065,6 +1286,9 @@ export default function RecordsView({
               </div>
             ) : null}
           </div>
+
+          {/* Docked Quick Record Input for Records View */}
+          {quickRecordInputBar}
         </div>
       </div>
 
@@ -1077,6 +1301,235 @@ export default function RecordsView({
           onClose={() => setPickerRecord(null)}
         />
       )}
+
+      {/* ─── RICH DETAIL CREATION MODAL ─── */}
+      <AnimatePresence>
+        {isDetailModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 md:p-8">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsDetailModalOpen(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            />
+
+            {/* Modal Dialog */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className={`relative z-10 w-full ${
+                isModalMaximized ? 'max-w-6xl h-[92vh]' : 'max-w-4xl max-h-[88vh]'
+              } bg-[#141414] border border-stone-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 font-sans`}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-stone-850/80 bg-stone-950/50 shrink-0">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  {/* Type Selector (Note vs Event) */}
+                  <div className="flex items-center gap-1 bg-[#1c1c1c] border border-stone-800 rounded-xl p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setModalType('note')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                        modalType === 'note'
+                          ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30 shadow-sm'
+                          : 'text-stone-400 hover:text-stone-200'
+                      }`}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Note</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModalType('event')}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                        modalType === 'event'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm'
+                          : 'text-stone-400 hover:text-stone-200'
+                      }`}
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>Event</span>
+                    </button>
+                  </div>
+
+                  {/* Pin Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setModalPinned(!modalPinned)}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer border ${
+                      modalPinned
+                        ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                        : 'bg-stone-900 border-stone-800 text-stone-500 hover:text-stone-300'
+                    }`}
+                  >
+                    <Pin className={`w-3 h-3 ${modalPinned ? 'fill-current' : ''}`} />
+                    <span>Pin</span>
+                  </button>
+
+                  {/* Star / Highlight Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setModalStarred(!modalStarred)}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer border ${
+                      modalStarred
+                        ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                        : 'bg-stone-900 border-stone-800 text-stone-500 hover:text-stone-300'
+                    }`}
+                  >
+                    <Star className={`w-3 h-3 ${modalStarred ? 'fill-current' : ''}`} />
+                    <span>Highlight</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {/* Maximize / Restore Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setIsModalMaximized(!isModalMaximized)}
+                    className="p-1.5 text-stone-500 hover:text-stone-300 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
+                    title={isModalMaximized ? 'Restore window size' : 'Maximize editor'}
+                  >
+                    {isModalMaximized ? (
+                      <Minimize2 className="w-4 h-4" />
+                    ) : (
+                      <Maximize2 className="w-4 h-4" />
+                    )}
+                  </button>
+
+                  {/* Close button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsDetailModalOpen(false)}
+                    className="p-1.5 text-stone-500 hover:text-stone-300 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Form body */}
+              <form
+                onSubmit={handleSaveDetailRecord}
+                className="px-6 sm:px-8 py-5 flex flex-col flex-1 min-h-0 space-y-4 overflow-hidden"
+              >
+                {/* Title */}
+                <div className="space-y-1 border-b border-stone-850/80 pb-3 shrink-0">
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={modalTitle}
+                    onChange={(e) => setModalTitle(e.target.value)}
+                    className={`w-full bg-transparent text-stone-100 text-2xl font-serif font-bold tracking-tight focus:outline-none placeholder-stone-700 py-1 ${
+                      modalType === 'event'
+                        ? 'focus:border-amber-500/50'
+                        : 'focus:border-blue-500/50'
+                    }`}
+                    placeholder={
+                      modalType === 'event'
+                        ? 'Event title (e.g. Project briefing presentation tomorrow at 10am)...'
+                        : 'Note title (e.g. Weekly reflections, ideas & brainstorming)...'
+                    }
+                  />
+                </div>
+
+                {/* Categories Selector Strip */}
+                {categories.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                    <span className="text-[10px] uppercase tracking-wider font-mono text-stone-500 font-bold mr-1">
+                      Categories:
+                    </span>
+                    {categories.map((cat) => {
+                      const isAssigned = modalCategoryIds.includes(cat.id);
+                      const cs = CAT_COLORS[cat.color] ?? CAT_COLORS['violet'];
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            setModalCategoryIds((prev) =>
+                              prev.includes(cat.id)
+                                ? prev.filter((id) => id !== cat.id)
+                                : [...prev, cat.id],
+                            );
+                          }}
+                          className={`inline-flex items-center gap-1 text-[10px] font-mono px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
+                            isAssigned
+                              ? `${cs.active} font-semibold`
+                              : 'bg-stone-900/60 border-stone-800 text-stone-400 hover:text-stone-200 hover:border-stone-700'
+                          }`}
+                        >
+                          <CategoryIcon
+                            name={cat.icon}
+                            color={cat.color}
+                            className="w-3 h-3"
+                            fallback="Tag"
+                          />
+                          <span>{cat.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Markdown Description */}
+                <div className="flex-1 flex flex-col min-h-[260px] max-h-[55vh] overflow-y-auto pr-1 space-y-2">
+                  <span className="text-[10px] uppercase tracking-wider font-mono text-stone-500 font-bold block">
+                    {modalType === 'event'
+                      ? 'Event Description / Agenda'
+                      : 'Content & Markdown Notes'}
+                  </span>
+                  <div className="flex-1 flex flex-col min-h-[220px]">
+                    <MarkdownPreview
+                      text={modalContent}
+                      value={modalContent}
+                      placeholder={
+                        modalType === 'event'
+                          ? 'Write event description, agenda, location, or notes...'
+                          : 'Write structured thoughts, reflections, details, checklists, or markdown...'
+                      }
+                      editable={true}
+                      onChange={setModalContent}
+                    />
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="pt-3 border-t border-stone-850/80 flex items-center justify-between shrink-0">
+                  <span className="text-[10px] text-stone-600 font-mono hidden sm:inline">
+                    Ctrl+Enter or Esc to save/cancel
+                  </span>
+                  <div className="flex items-center gap-2.5 ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => setIsDetailModalOpen(false)}
+                      className="px-4 py-2 bg-stone-900 hover:bg-stone-850 text-stone-300 text-xs font-mono uppercase tracking-wider rounded-xl border border-stone-800 transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!modalTitle.trim()}
+                      className={`px-5 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded-xl border transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${
+                        modalType === 'event'
+                          ? 'bg-amber-500 hover:bg-amber-400 text-[#0e0c08] border-amber-400'
+                          : 'bg-blue-500 hover:bg-blue-400 text-[#070a0e] border-blue-400'
+                      }`}
+                    >
+                      <span>{modalType === 'event' ? 'Save Event' : 'Save Note'}</span>
+                      <Send className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

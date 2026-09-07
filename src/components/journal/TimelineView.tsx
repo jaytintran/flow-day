@@ -19,6 +19,7 @@ import {
   Activity,
   CalendarDays,
   Clock3,
+  ChevronDown,
 } from 'lucide-react';
 import { toLocalDateString } from '../../utils';
 

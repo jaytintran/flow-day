@@ -1388,101 +1388,105 @@ export default function ListsView({
 	);
 
 	return (
-		<div className="space-y-0 md:flex md:flex-col md:flex-1 md:h-full md:min-h-0" id="tasks-view-dashboard">
-			{/* ── MOBILE: Row 1 & Row 2 Layout ── */}
-			<div className="md:hidden">
-				{isMobileSearchOpen ? (
-					<div className="flex items-center gap-2 py-1 mb-2">
-						<div className="relative flex items-center flex-1">
-							<Search className="absolute left-3 w-3.5 h-3.5 text-stone-400 pointer-events-none" />
-							<input
-								autoFocus
-								type="text"
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-								placeholder="Search tasks..."
-								className="w-full pl-8 pr-3 py-1.5 text-xs font-mono bg-white/[0.05] border border-white/20 rounded-xl text-stone-200 placeholder-stone-500 focus:outline-none focus:border-indigo-400/60 transition-all"
-							/>
-						</div>
-						<button
-							onClick={() => {
-								setSearchQuery("");
-								setIsMobileSearchOpen(false);
-							}}
-							className="p-1.5 rounded-xl border border-stone-800 text-stone-400 hover:text-stone-200 bg-stone-900 transition-colors cursor-pointer"
-							title="Close search"
-						>
-							<X className="w-4 h-4" />
-						</button>
-					</div>
-				) : (
-					<div className="flex items-center justify-between gap-2 py-1 mb-2">
-						<div className="flex items-center gap-1.5 min-w-0">
-							<button
-								onClick={() => setIsMobileViewSheetOpen(true)}
-								className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.05] border border-white/[0.1] text-stone-200 text-xs font-mono font-bold uppercase tracking-wider hover:bg-white/[0.08] transition-all cursor-pointer truncate active:scale-95"
-							>
-								{activeViewInfo.icon}
-								<span className="truncate max-w-[130px]">{activeViewInfo.name}</span>
-								<ChevronDown className="w-3.5 h-3.5 text-stone-500 shrink-0 ml-0.5" />
-							</button>
-
-							<button
-								onClick={() => setIsMobileSearchOpen(true)}
-								className="p-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-stone-400 hover:text-stone-200 hover:bg-white/[0.08] transition-all cursor-pointer shrink-0"
-								title="Search tasks"
-							>
-								<Search className="w-3.5 h-3.5" />
-							</button>
-						</div>
-
-						{selectedView !== "paper" && selectedView !== "trophy" && (
-							<button
-								onClick={() => setIsMobileStatusSheetOpen(true)}
-								className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-stone-300 text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-white/[0.08] transition-all cursor-pointer shrink-0"
-							>
-								<span
-									className={`w-2 h-2 rounded-full ${
-										statusFilter === "in_progress"
-											? "bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.5)]"
-											: statusFilter === "done"
-												? "bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.5)]"
-												: statusFilter === "dropped"
-													? "bg-rose-400"
-													: statusFilter === "maybe"
-														? "bg-indigo-400"
-														: "bg-stone-400"
-									}`}
+		<div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden" id="tasks-view-dashboard">
+			{/* ── MOBILE: Full Height Flex with Sticky Docked Input ── */}
+			<div className="md:hidden flex flex-col flex-1 h-full min-h-0 overflow-hidden">
+				{/* Top Controls (Search / View Switcher / Status) */}
+				<div className="shrink-0">
+					{isMobileSearchOpen ? (
+						<div className="flex items-center gap-2 py-1 mb-2">
+							<div className="relative flex items-center flex-1">
+								<Search className="absolute left-3 w-3.5 h-3.5 text-stone-400 pointer-events-none" />
+								<input
+									autoFocus
+									type="text"
+									value={searchQuery}
+									onChange={(e) => setSearchQuery(e.target.value)}
+									placeholder="Search tasks..."
+									className="w-full pl-8 pr-3 py-1.5 text-xs font-mono bg-white/[0.05] border border-white/20 rounded-xl text-stone-200 placeholder-stone-500 focus:outline-none focus:border-indigo-400/60 transition-all"
 								/>
-								<span>
-									{statusFilter === "all"
-										? "All"
-										: statusFilter === "todo"
-											? "To Do"
-											: statusFilter === "in_progress"
-												? "Active"
-												: statusFilter === "done"
-													? "Done"
-													: statusFilter === "dropped"
-														? "Dropped"
-														: "Maybe"}
-								</span>
-								<ChevronDown className="w-3 h-3 text-stone-500" />
+							</div>
+							<button
+								onClick={() => {
+									setSearchQuery("");
+									setIsMobileSearchOpen(false);
+								}}
+								className="p-1.5 rounded-xl border border-stone-800 text-stone-400 hover:text-stone-200 bg-stone-900 transition-colors cursor-pointer"
+								title="Close search"
+							>
+								<X className="w-4 h-4" />
 							</button>
-						)}
-					</div>
-				)}
+						</div>
+					) : (
+						<div className="flex items-center justify-between gap-2 py-1 mb-2">
+							<div className="flex items-center gap-1.5 min-w-0">
+								<button
+									onClick={() => setIsMobileViewSheetOpen(true)}
+									className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.05] border border-white/[0.1] text-stone-200 text-xs font-mono font-bold uppercase tracking-wider hover:bg-white/[0.08] transition-all cursor-pointer truncate active:scale-95"
+								>
+									{activeViewInfo.icon}
+									<span className="truncate max-w-[130px]">{activeViewInfo.name}</span>
+									<ChevronDown className="w-3.5 h-3.5 text-stone-500 shrink-0 ml-0.5" />
+								</button>
 
-				{/* Row 2: Folder Strip Panel */}
-				{folderStripPanel}
+								<button
+									onClick={() => setIsMobileSearchOpen(true)}
+									className="p-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-stone-400 hover:text-stone-200 hover:bg-white/[0.08] transition-all cursor-pointer shrink-0"
+									title="Search tasks"
+								>
+									<Search className="w-3.5 h-3.5" />
+								</button>
+							</div>
 
-				{/* Quick Task Input on Mobile */}
-				{selectedView !== "trophy" && (
-					<div className="mb-2">{quickTaskInputBar}</div>
-				)}
+							{selectedView !== "paper" && selectedView !== "trophy" && (
+								<button
+									onClick={() => setIsMobileStatusSheetOpen(true)}
+									className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-stone-300 text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-white/[0.08] transition-all cursor-pointer shrink-0"
+								>
+									<span
+										className={`w-2 h-2 rounded-full ${
+											statusFilter === "in_progress"
+												? "bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.5)]"
+												: statusFilter === "done"
+													? "bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.5)]"
+													: statusFilter === "dropped"
+														? "bg-rose-400"
+														: statusFilter === "maybe"
+															? "bg-indigo-400"
+															: "bg-stone-400"
+										}`}
+									/>
+									<span>
+										{statusFilter === "all"
+											? "All"
+											: statusFilter === "todo"
+												? "To Do"
+												: statusFilter === "in_progress"
+													? "Active"
+													: statusFilter === "done"
+														? "Done"
+														: statusFilter === "dropped"
+															? "Dropped"
+															: "Maybe"}
+									</span>
+									<ChevronDown className="w-3 h-3 text-stone-500" />
+								</button>
+							)}
+						</div>
+					)}
 
-				{/* Content */}
-				<div className="my-1">
+					{/* Row 2: Folder Strip Panel */}
+					{folderStripPanel}
+				</div>
+
+				{/* Scrollable Content */}
+				<div
+					className="flex-1 min-h-0 overflow-y-auto pr-0.5 my-1"
+					style={{
+						scrollbarWidth: "none",
+						msOverflowStyle: "none",
+					}}
+				>
 					{selectedView === "trophy" ? (
 						<TrophyView
 							tasks={accomplishmentTasks}
@@ -1502,6 +1506,13 @@ export default function ListsView({
 						renderTaskContent(false)
 					)}
 				</div>
+
+				{/* Sticky Bottom Docked Quick Task Input on Mobile */}
+				{selectedView !== "trophy" && (
+					<div className="shrink-0 bg-[#0a0a0a]/95 backdrop-blur-md pt-1.5 pb-[max(env(safe-area-inset-bottom),8px)] border-t border-stone-850/80">
+						{quickTaskInputBar}
+					</div>
+				)}
 			</div>
 
 			{/* ── DESKTOP: Two-column layout with Redesigned Sidebar ── */}

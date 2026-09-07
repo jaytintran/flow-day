@@ -914,27 +914,33 @@ export default function Journal({
 	});
 	const dayRenderItems = getDayRenderItems(activeDayEntries);
 
-	// Timeline View data: grouped by local day strings, sorted chronologically oldest-to-newest
-	const timelineDaysMap: { [key: string]: TimelineEntry[] } = {};
-	entries.forEach((e) => {
-		if (e.type === "task" && !e.scheduled_at) {
-			// Include completed dateless tasks, bucketed by their completion date
-			if (e.status !== "done" || !e.completed_at) return;
-			const dayStr = toLocalDateString(new Date(e.completed_at));
-			if (!timelineDaysMap[dayStr]) timelineDaysMap[dayStr] = [];
-			timelineDaysMap[dayStr].push(e);
-			return;
+	// Timeline View data: grouped by local day strings, sorted chronologically oldest-to-newest (computed only in timeline mode)
+	const { timelineDaysMap, sortedTimelineDays } = useMemo(() => {
+		if (viewMode !== "timeline") {
+			return { timelineDaysMap: {}, sortedTimelineDays: [] };
 		}
-		const dayStr = toLocalDateString(getEffectiveDate(e));
-		if (!timelineDaysMap[dayStr]) {
-			timelineDaysMap[dayStr] = [];
-		}
-		timelineDaysMap[dayStr].push(e);
-	});
+		const map: { [key: string]: TimelineEntry[] } = {};
+		entries.forEach((e) => {
+			if (e.type === "task" && !e.scheduled_at) {
+				// Include completed dateless tasks, bucketed by their completion date
+				if (e.status !== "done" || !e.completed_at) return;
+				const dayStr = toLocalDateString(new Date(e.completed_at));
+				if (!map[dayStr]) map[dayStr] = [];
+				map[dayStr].push(e);
+				return;
+			}
+			const dayStr = toLocalDateString(getEffectiveDate(e));
+			if (!map[dayStr]) {
+				map[dayStr] = [];
+			}
+			map[dayStr].push(e);
+		});
 
-	const sortedTimelineDays = Object.keys(timelineDaysMap).sort(
-		(a, b) => new Date(b).getTime() - new Date(a).getTime(),
-	);
+		const sorted = Object.keys(map).sort(
+			(a, b) => new Date(b).getTime() - new Date(a).getTime(),
+		);
+		return { timelineDaysMap: map, sortedTimelineDays: sorted };
+	}, [viewMode, entries]);
 
 	// Scrolling into selected day separator in Timeline mode
 	useEffect(() => {
@@ -1008,13 +1014,11 @@ export default function Journal({
 			className={`flex-1 px-2 md:px-6 ${
 				viewMode === "hub" || viewMode === "habits"
 					? "overflow-hidden pt-1 pb-1 px-1 md:px-4 flex flex-col h-full"
-					: viewMode === "lists"
-						? "overflow-y-auto md:overflow-hidden pt-3 md:pt-3 pb-2 md:pb-3 flex flex-col md:h-full"
-						: viewMode === "records"
-							? "overflow-y-auto md:overflow-hidden pt-4 md:pt-4 pb-4 md:pb-6 flex flex-col md:h-full"
-							: viewMode === "timeline"
-								? "overflow-y-auto pt-0 pb-4 md:pb-6"
-								: "overflow-y-auto pt-4 md:pt-6 pb-4 md:pb-6"
+					: viewMode === "lists" || viewMode === "records"
+						? "overflow-hidden pt-2 md:pt-3 pb-0 md:pb-3 flex flex-col h-full"
+						: viewMode === "timeline"
+							? "overflow-y-auto pt-0 pb-4 md:pb-6"
+							: "overflow-y-auto pt-4 md:pt-6 pb-4 md:pb-6"
 			}`}
 			id="timeline-journal-scrollable"
 			ref={containerRef}
@@ -1024,7 +1028,7 @@ export default function Journal({
 					viewMode === "hub" || viewMode === "habits"
 						? "h-full md:max-w-none flex flex-col"
 						: viewMode === "lists" || viewMode === "records"
-							? "md:max-w-9xl md:h-full flex flex-col flex-1 min-h-0"
+							? "h-full md:max-w-9xl flex flex-col flex-1 min-h-0"
 							: viewMode === "timeline"
 								? "md:max-w-4xl space-y-0"
 								: dayRange !== "1D"
