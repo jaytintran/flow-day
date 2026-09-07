@@ -219,11 +219,26 @@ export default function HabitsSheet({
   const activeHabits = habits.filter((h) => h.status === 'active');
   const archivedHabits = habits.filter((h) => h.status === 'archived');
 
-  // Load ALL habit-logs for mini strip & check button (scoped to habit later)
+  // Load habit-logs within a 60-day sliding window for mini strip & check button
   const allLogs =
-    useLiveQuery(
-      () => db.entries.where('type').equals('habit-log').toArray() as Promise<HabitLog[]>,
-    ) || [];
+    useLiveQuery(async () => {
+      const windowStart = new Date(activeDate);
+      windowStart.setDate(windowStart.getDate() - 45);
+      windowStart.setHours(0, 0, 0, 0);
+
+      const windowEnd = new Date(activeDate);
+      windowEnd.setDate(windowEnd.getDate() + 15);
+      windowEnd.setHours(23, 59, 59, 999);
+
+      return (await db.entries
+        .where('type')
+        .equals('habit-log')
+        .filter((e) => {
+          const t = new Date(e.timestamp || e.created_at).getTime();
+          return t >= windowStart.getTime() && t <= windowEnd.getTime();
+        })
+        .toArray()) as HabitLog[];
+    }, [activeDate]) || [];
 
   const activeDateStr = toLocalDateString(activeDate);
 

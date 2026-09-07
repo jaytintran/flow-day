@@ -67,10 +67,27 @@ export default function HabitsView({
     } catch {}
   };
 
-  // Queries
+  // Queries: Window habit-logs to 90-day range around activeDate for matrix/routines/analytics
   const allHabits = useLiveQuery(() => db.habits.toArray()) || [];
-  const allLogs = (useLiveQuery(() => db.entries.where('type').equals('habit-log').toArray()) ||
-    []) as HabitLog[];
+  const allLogs =
+    (useLiveQuery(async () => {
+      const windowStart = new Date(activeDate);
+      windowStart.setDate(windowStart.getDate() - 75);
+      windowStart.setHours(0, 0, 0, 0);
+
+      const windowEnd = new Date(activeDate);
+      windowEnd.setDate(windowEnd.getDate() + 15);
+      windowEnd.setHours(23, 59, 59, 999);
+
+      return (await db.entries
+        .where('type')
+        .equals('habit-log')
+        .filter((e) => {
+          const t = new Date(e.timestamp || e.created_at).getTime();
+          return t >= windowStart.getTime() && t <= windowEnd.getTime();
+        })
+        .toArray()) as HabitLog[];
+    }, [activeDate]) || []) as HabitLog[];
   const purposes = (useLiveQuery(() => db.purposes.toArray()) || []) as Purpose[];
   const domains = (useLiveQuery(() => db.domains.toArray()) || []) as Domain[];
 

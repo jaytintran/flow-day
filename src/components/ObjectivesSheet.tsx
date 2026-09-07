@@ -115,17 +115,22 @@ export default function ObjectivesSheet({
     useLiveQuery(() => db.entries.where('type').equals('objective').toArray()) || [];
   const typedObjectives = objectives as Objective[];
 
-  // Count linked tasks per objective
-  const allTasks = useLiveQuery(() => db.entries.where('type').equals('task').toArray()) || [];
-  const taskCountByObjective = React.useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const t of allTasks as any[]) {
-      if (t.objective_id) {
-        counts[t.objective_id] = (counts[t.objective_id] || 0) + 1;
+  // Pre-index task count per objective without fetching entire task rows
+  const taskCountByObjective =
+    useLiveQuery(async () => {
+      const tasksWithObj = await db.entries
+        .where('type')
+        .equals('task')
+        .filter((t: any) => Boolean(t.objective_id))
+        .toArray();
+      const counts: Record<string, number> = {};
+      for (const t of tasksWithObj as any[]) {
+        if (t.objective_id) {
+          counts[t.objective_id] = (counts[t.objective_id] || 0) + 1;
+        }
       }
-    }
-    return counts;
-  }, [allTasks]);
+      return counts;
+    }) || {};
 
   const todoObjectives = typedObjectives.filter((o) => o.status === 'todo');
   const doneObjectives = typedObjectives.filter((o) => o.status === 'done');

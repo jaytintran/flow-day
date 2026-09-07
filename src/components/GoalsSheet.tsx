@@ -255,27 +255,41 @@ export default function GoalsSheet({
     await db.entries.update(goal.id, { domain_ids: next } as any);
   };
 
-  // Count linked objectives and tasks for display
-  const allObjs = useLiveQuery(() => db.entries.where('type').equals('objective').toArray()) || [];
-  const allTasks = useLiveQuery(() => db.entries.where('type').equals('task').toArray()) || [];
-  const { objectiveCounts, taskCounts } = React.useMemo(() => {
-    const objCounts: Record<string, number> = {};
-    const tCounts: Record<string, number> = {};
-    for (const o of allObjs as any[]) {
-      if (o.goal_id) {
-        objCounts[o.goal_id] = (objCounts[o.goal_id] || 0) + 1;
-      }
-    }
-    for (const t of allTasks as any[]) {
-      if (t.objective_id) {
-        const obj = (allObjs as any[]).find((o) => o.id === t.objective_id);
-        if (obj?.goal_id) {
-          tCounts[obj.goal_id] = (tCounts[obj.goal_id] || 0) + 1;
+  // Count linked objectives and tasks for display efficiently
+  const countsData =
+    useLiveQuery(async () => {
+      const objsWithGoal = await db.entries
+        .where('type')
+        .equals('objective')
+        .toArray();
+
+      const objToGoalMap: Record<string, string> = {};
+      const objCounts: Record<string, number> = {};
+      for (const o of objsWithGoal as any[]) {
+        if (o.goal_id) {
+          objCounts[o.goal_id] = (objCounts[o.goal_id] || 0) + 1;
+          objToGoalMap[o.id] = o.goal_id;
         }
       }
-    }
-    return { objectiveCounts: objCounts, taskCounts: tCounts };
-  }, [allObjs, allTasks]);
+
+      const tasksWithObj = await db.entries
+        .where('type')
+        .equals('task')
+        .filter((t: any) => Boolean(t.objective_id && objToGoalMap[t.objective_id]))
+        .toArray();
+
+      const tCounts: Record<string, number> = {};
+      for (const t of tasksWithObj as any[]) {
+        const goalId = objToGoalMap[t.objective_id];
+        if (goalId) {
+          tCounts[goalId] = (tCounts[goalId] || 0) + 1;
+        }
+      }
+
+      return { objectiveCounts: objCounts, taskCounts: tCounts };
+    }) || { objectiveCounts: {}, taskCounts: {} };
+
+  const { objectiveCounts, taskCounts } = countsData;
 
   const assignedCategories = (obj: Goal) =>
     (obj.category_ids ?? []).map((id) => categoryMap[id]).filter(Boolean) as Category[];

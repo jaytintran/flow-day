@@ -265,12 +265,9 @@ export function SkillTreeCanvas({ onSwitchToMindmap }: SkillTreeCanvasProps) {
   const [newSkillParentId, setNewSkillParentId] = useState<string>('');
   const [newSkillColor, setNewSkillColor] = useState<string>('sky');
 
-  // Live query for entities
-  const allEntities = useLiveQuery(() => db.entities.toArray()) || [];
-
-  const rawSkills = useMemo(() => {
-    return allEntities.filter((e) => e.entity_type === 'skill');
-  }, [allEntities]);
+  // Live query for skill entities (indexed)
+  const rawSkills =
+    useLiveQuery(() => db.entities.where('entity_type').equals('skill').toArray()) || [];
 
   // Load SP spent map from localStorage
   const [spMap, setSpMap] = useState<Record<string, number>>(() => {

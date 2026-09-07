@@ -189,32 +189,44 @@ export default function TimerBar({
     setAchievementInput('');
   };
 
-  // Fetch active task and all incomplete tasks
-  const tasks = useLiveQuery(() => db.entries.where('type').equals('task').toArray()) || [];
-  const todoTasks = tasks.filter(
-    (t) =>
-      t.type === 'task' && t.status !== 'done' && t.status !== 'dropped' && t.status !== 'maybe',
-  ) as Task[];
-  const activeTask = tasks.find((t) => t.id === activeTaskId) as Task | undefined;
+  // Fetch active task directly by ID (fast indexed lookup)
+  const activeTask = useLiveQuery(
+    () => (activeTaskId ? (db.entries.get(activeTaskId) as Promise<Task | undefined>) : undefined),
+    [activeTaskId],
+  );
 
-  // Fetch objectives separately for linked-objective display
-  const allObjectives =
-    useLiveQuery(() => db.entries.where('type').equals('objective').toArray()) || [];
-  const typedObjectives = allObjectives as Objective[];
+  // Fetch only incomplete tasks for the search dropdown
+  const todoTasks =
+    (useLiveQuery(() =>
+      db.entries
+        .where('type')
+        .equals('task')
+        .filter(
+          (t) =>
+            t.status !== 'done' &&
+            t.status !== 'dropped' &&
+            t.status !== 'maybe',
+        )
+        .toArray() as Promise<Task[]>,
+    ) || []) as Task[];
 
-  // Fetch goals for linked-goal display
-  const allGoals = useLiveQuery(() => db.entries.where('type').equals('goal').toArray()) || [];
-  const typedGoals = allGoals as Goal[];
+  // Fetch linked objective (if any) directly by ID
+  const linkedObjective = useLiveQuery(
+    () =>
+      activeTask?.objective_id
+        ? (db.entries.get(activeTask.objective_id) as Promise<Objective | undefined>)
+        : undefined,
+    [activeTask?.objective_id],
+  );
 
-  // Find the linked objective (if any) for the active task
-  const linkedObjective = activeTask?.objective_id
-    ? typedObjectives.find((o) => o.id === activeTask.objective_id)
-    : undefined;
-
-  // Find the linked goal (if any) for the linked objective
-  const linkedGoal = linkedObjective?.goal_id
-    ? typedGoals.find((g) => g.id === linkedObjective.goal_id)
-    : undefined;
+  // Fetch linked goal (if any) directly by ID
+  const linkedGoal = useLiveQuery(
+    () =>
+      linkedObjective?.goal_id
+        ? (db.entries.get(linkedObjective.goal_id) as Promise<Goal | undefined>)
+        : undefined,
+    [linkedObjective?.goal_id],
+  );
 
   // Track clicks outside dropdown to close it
   useEffect(() => {
