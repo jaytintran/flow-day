@@ -1008,13 +1008,11 @@ export default function Journal({
 			className={`flex-1 px-2 md:px-6 pb-4 md:pb-6 ${
 				viewMode === "hub" || viewMode === "habits"
 					? "overflow-hidden pt-1 pb-1 px-1 md:px-4 flex flex-col h-full"
-					: viewMode === "lists"
+					: viewMode === "lists" || viewMode === "records"
 						? "overflow-y-auto md:overflow-hidden pt-4 md:pt-4 flex flex-col md:h-full"
-						: viewMode === "records"
-							? "overflow-y-auto pt-4 md:pt-6"
-							: viewMode === "timeline"
-								? "overflow-y-auto pt-0"
-								: "overflow-y-auto pt-4 md:pt-6"
+						: viewMode === "timeline"
+							? "overflow-y-auto pt-0"
+							: "overflow-y-auto pt-4 md:pt-6"
 			}`}
 			id="timeline-journal-scrollable"
 			ref={containerRef}
@@ -1023,15 +1021,13 @@ export default function Journal({
 				className={`w-full md:mx-auto ${
 					viewMode === "hub" || viewMode === "habits"
 						? "h-full md:max-w-none flex flex-col"
-						: viewMode === "lists"
+						: viewMode === "lists" || viewMode === "records"
 							? "md:max-w-9xl md:h-full flex flex-col flex-1 min-h-0"
-							: viewMode === "records"
-								? "md:max-w-9xl "
-								: viewMode === "timeline"
-									? "md:max-w-4xl space-y-0"
-									: dayRange !== "1D"
-										? "w-full px-4 sm:px-6 md:px-8 space-y-8"
-										: "md:max-w-4xl space-y-8"
+							: viewMode === "timeline"
+								? "md:max-w-4xl space-y-0"
+								: dayRange !== "1D"
+									? "w-full px-4 sm:px-6 md:px-8 space-y-8"
+									: "md:max-w-4xl space-y-8"
 				}`}
 			>
 				{viewMode === "records" ? (
