@@ -67,17 +67,6 @@ export default function DayNavigator({
 }: DayNavigatorProps) {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isHabitDrawerOpen, setIsHabitDrawerOpen] = useState(false);
-  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
-  const [newAchievementText, setNewAchievementText] = useState<Record<string, string>>({});
-  const [logWinText, setLogWinText] = useState('');
-  const [editingAchievementId, setEditingAchievementId] = useState<string | null>(null);
-  const [editingAchievementText, setEditingAchievementText] = useState('');
-  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [editingTaskTitle, setEditingTaskTitle] = useState('');
-  const [editingDateTaskId, setEditingDateTaskId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterYear, setFilterYear] = useState<string>('All');
-  const [filterMonth, setFilterMonth] = useState<string>('All');
   const [displayedMonth, setDisplayedMonth] = useState<Date>(new Date(activeDate));
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -112,134 +101,12 @@ export default function DayNavigator({
     };
   }, [isMobileViewMenuOpen, isDayRangeDropdownOpen]);
 
-  // Load entries reactively
-  const entries = useLiveQuery(() => db.entries.toArray()) || [];
-
   // Load custom entity types reactively
   const allEntityTypes = useLiveQuery(() => db.entity_types.toArray()) || [];
   const customEntityTypes = React.useMemo(
     () => allEntityTypes.filter((t) => !t.is_system),
     [allEntityTypes],
   );
-
-  // Load achievements / starred tasks reactively
-  const starredTasks = (useLiveQuery(() => db.entries.where('type').equals('task').toArray()) ||
-    []) as Task[];
-
-  const availableYears = React.useMemo(() => {
-    const yearsSet = new Set<string>();
-    starredTasks.forEach((t) => {
-      if (t.status === 'done' && (t.starred || (t.achievements && t.achievements.length > 0))) {
-        const d = t.completed_at ? new Date(t.completed_at) : new Date(t.created_at);
-        yearsSet.add(d.getFullYear().toString());
-      }
-    });
-    return Array.from(yearsSet).sort((a, b) => b.localeCompare(a));
-  }, [starredTasks]);
-
-  const availableMonths = React.useMemo(() => {
-    const monthsSet = new Set<number>();
-    starredTasks.forEach((t) => {
-      if (t.status === 'done' && (t.starred || (t.achievements && t.achievements.length > 0))) {
-        const d = t.completed_at ? new Date(t.completed_at) : new Date(t.created_at);
-        if (filterYear === 'All' || d.getFullYear().toString() === filterYear) {
-          monthsSet.add(d.getMonth());
-        }
-      }
-    });
-    return Array.from(monthsSet).sort((a, b) => a - b);
-  }, [starredTasks, filterYear]);
-
-  const totalStats = React.useMemo(() => {
-    const completedStarred = starredTasks.filter(
-      (t) => t.status === 'done' && (t.starred || (t.achievements && t.achievements.length > 0)),
-    );
-    const totalWins = completedStarred.length;
-
-    const now = new Date();
-    const currentMonthWins = completedStarred.filter((t) => {
-      const d = t.completed_at ? new Date(t.completed_at) : new Date(t.created_at);
-      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-    }).length;
-
-    const totalSubAchievements = completedStarred.reduce(
-      (sum, t) => sum + (t.achievements?.length ?? 0),
-      0,
-    );
-
-    let badge = 'Novice';
-    let badgeColor = 'text-stone-400 border-stone-850 bg-stone-900/40';
-    if (totalWins >= 30) {
-      badge = 'Grandmaster';
-      badgeColor = 'text-amber-400 border-amber-500/30 bg-amber-500/10';
-    } else if (totalWins >= 15) {
-      badge = 'Champion';
-      badgeColor = 'text-yellow-500 border-yellow-550/20 bg-yellow-550/5';
-    } else if (totalWins >= 5) {
-      badge = 'Rising Star';
-      badgeColor = 'text-orange-400 border-orange-550/20 bg-orange-550/5';
-    }
-
-    return { totalWins, currentMonthWins, totalSubAchievements, badge, badgeColor };
-  }, [starredTasks]);
-
-  const groupedAchievementsList = React.useMemo(() => {
-    const completedStarred = starredTasks
-      .filter(
-        (t) => t.status === 'done' && (t.starred || (t.achievements && t.achievements.length > 0)),
-      )
-      .filter((t) => {
-        if (!searchQuery.trim()) return true;
-        const query = searchQuery.toLowerCase();
-        const matchesTitle = t.title.toLowerCase().includes(query);
-        const matchesAchievements =
-          t.achievements?.some((a) => a.text.toLowerCase().includes(query)) ?? false;
-        return matchesTitle || matchesAchievements;
-      })
-      .filter((t) => {
-        if (filterYear === 'All') return true;
-        const d = t.completed_at ? new Date(t.completed_at) : new Date(t.created_at);
-        return d.getFullYear().toString() === filterYear;
-      })
-      .filter((t) => {
-        if (filterMonth === 'All') return true;
-        const d = t.completed_at ? new Date(t.completed_at) : new Date(t.created_at);
-        return d.getMonth().toString() === filterMonth;
-      })
-      .sort((a, b) => {
-        const dateA = a.completed_at
-          ? new Date(a.completed_at).getTime()
-          : new Date(a.created_at).getTime();
-        const dateB = b.completed_at
-          ? new Date(b.completed_at).getTime()
-          : new Date(b.created_at).getTime();
-        return dateB - dateA;
-      });
-
-    const groupsMap: {
-      [key: string]: { label: string; year: number; month: number; tasks: Task[] };
-    } = {};
-    completedStarred.forEach((task) => {
-      const date = task.completed_at ? new Date(task.completed_at) : new Date(task.created_at);
-      const year = date.getFullYear();
-      const month = date.getMonth();
-      const monthName = date.toLocaleString('en-US', { month: 'long' });
-      const key = `${year}-${String(month).padStart(2, '0')}`;
-      if (!groupsMap[key]) {
-        groupsMap[key] = {
-          label: `${monthName} ${year}`,
-          year,
-          month,
-          tasks: [],
-        };
-      }
-      groupsMap[key].tasks.push(task);
-    });
-
-    return Object.keys(groupsMap)
-      .sort((a, b) => b.localeCompare(a))
-      .map((key) => groupsMap[key]);
-  }, [starredTasks, searchQuery, filterYear, filterMonth]);
 
   // Habits for quick-tick strip (sorted by circadian routine slot and sort_order)
   const activeHabits = (useLiveQuery(() => db.habits.where('status').equals('active').toArray()) ||
@@ -258,9 +125,32 @@ export default function DayNavigator({
       );
     });
   }, [activeHabits]);
-  const habitLogs = (useLiveQuery(
-    () => db.entries.where('type').equals('habit-log').toArray() as Promise<HabitLog[]>,
-  ) || []) as HabitLog[];
+
+  // Load habit logs scoped to a sliding 60-day window (sufficient for week view & streak tracking)
+  const habitLogs = (useLiveQuery(async () => {
+    const windowStart = new Date();
+    windowStart.setDate(windowStart.getDate() - 60);
+    return db.entries
+      .where('type')
+      .equals('habit-log')
+      .filter((l: any) => new Date(l.timestamp) >= windowStart)
+      .toArray() as Promise<HabitLog[]>;
+  }) || []) as HabitLog[];
+
+  // O(1) fast lookup Map for habit logs: Map<habitId, Set<dateStr>>
+  const habitLogsByHabitMap = React.useMemo(() => {
+    const map = new Map<string, { dateStrings: Set<string>; logs: HabitLog[] }>();
+    for (const log of habitLogs) {
+      let entry = map.get(log.habit_id);
+      if (!entry) {
+        entry = { dateStrings: new Set<string>(), logs: [] };
+        map.set(log.habit_id, entry);
+      }
+      entry.dateStrings.add(toLocalDateString(new Date(log.timestamp)));
+      entry.logs.push(log);
+    }
+    return map;
+  }, [habitLogs]);
 
   const activeDateStr = toLocalDateString(activeDate);
 
@@ -306,9 +196,10 @@ export default function DayNavigator({
 
   const handleQuickTick = async (habit: Habit, targetDate: Date = activeDate) => {
     const targetDateStr = toLocalDateString(targetDate);
-    const targetLogs = habitLogs.filter(
-      (l) => l.habit_id === habit.id && toLocalDateString(new Date(l.timestamp)) === targetDateStr,
-    );
+    const habitData = habitLogsByHabitMap.get(habit.id);
+    const targetLogs = habitData
+      ? habitData.logs.filter((l) => toLocalDateString(new Date(l.timestamp)) === targetDateStr)
+      : [];
     if (targetLogs.length > 0) {
       await db.entries.delete(targetLogs[targetLogs.length - 1].id);
     } else {
@@ -361,7 +252,83 @@ export default function DayNavigator({
     return days;
   }, [activeDate]);
 
+  // Pre-calculate habit stats (streaks, weekly rate, ticked today) in a single memoized pass
+  const habitStatsMap = React.useMemo(() => {
+    const stats = new Map<
+      string,
+      {
+        loggedDayStrings: Set<string>;
+        isTickedToday: boolean;
+        streak: number;
+        completedThisWeek: number;
+        weeklyRate: number;
+      }
+    >();
+
+    for (const habit of sortedActiveHabits) {
+      const loggedDayStrings = habitLogsByHabitMap.get(habit.id)?.dateStrings || new Set<string>();
+      const isTickedToday = loggedDayStrings.has(activeDateStr);
+
+      // Calculate current consecutive streak
+      let streak = 0;
+      const checkDate = new Date();
+      if (!loggedDayStrings.has(toLocalDateString(checkDate))) {
+        checkDate.setDate(checkDate.getDate() - 1);
+      }
+      while (loggedDayStrings.has(toLocalDateString(checkDate))) {
+        streak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      }
+
+      // Count completed days this week
+      const completedThisWeek = habitWeekDays.filter((d) =>
+        loggedDayStrings.has(d.dateStr),
+      ).length;
+      const weeklyRate = Math.round((completedThisWeek / 7) * 100);
+
+      stats.set(habit.id, {
+        loggedDayStrings,
+        isTickedToday,
+        streak,
+        completedThisWeek,
+        weeklyRate,
+      });
+    }
+
+    return stats;
+  }, [sortedActiveHabits, habitLogsByHabitMap, activeDateStr, habitWeekDays]);
+
+  // Lazy-load calendar entries ONLY when calendar drawer is open, scoped to the displayed month
+  const displayedYear = displayedMonth.getFullYear();
+  const displayedMonthIndex = displayedMonth.getMonth(); // 0-11
+
+  const calendarEntries = useLiveQuery(
+    async () => {
+      if (!isCalendarOpen) return [];
+      // Pull entries for the visible month +/- 1 week buffer
+      const monthStart = new Date(displayedYear, displayedMonthIndex, 1);
+      monthStart.setDate(monthStart.getDate() - 7);
+      const monthEnd = new Date(displayedYear, displayedMonthIndex + 1, 0, 23, 59, 59);
+      monthEnd.setDate(monthEnd.getDate() + 7);
+
+      const all = await db.entries.toArray();
+      return all.filter((e) => {
+        const d =
+          e.type === 'time-block'
+            ? e.start_at
+            : e.type === 'event' || e.type === 'note'
+              ? e.timestamp
+              : (e as any).scheduled_at || e.created_at;
+        if (!d) return false;
+        const entryDate = new Date(d);
+        return entryDate >= monthStart && entryDate <= monthEnd;
+      });
+    },
+    [isCalendarOpen, displayedYear, displayedMonthIndex],
+  ) || [];
+
   const dayStatsMap = React.useMemo(() => {
+    if (!isCalendarOpen) return {};
     const map: {
       [dayStr: string]: {
         completedTasks: number;
@@ -370,13 +337,14 @@ export default function DayNavigator({
       };
     } = {};
 
-    entries.forEach((e) => {
+    calendarEntries.forEach((e) => {
       const d =
         e.type === 'time-block'
           ? e.start_at
           : e.type === 'event' || e.type === 'note'
             ? e.timestamp
-            : e.created_at;
+            : (e as any).scheduled_at || e.created_at;
+      if (!d) return;
       const dayStr = toLocalDateString(new Date(d));
 
       if (!map[dayStr]) {
@@ -399,7 +367,7 @@ export default function DayNavigator({
     });
 
     return map;
-  }, [entries]);
+  }, [calendarEntries, isCalendarOpen]);
 
   const activeDayStr = toLocalDateString(activeDate);
 
@@ -912,12 +880,10 @@ export default function DayNavigator({
         {sortedActiveHabits.length > 0 &&
           (() => {
             const totalHabits = sortedActiveHabits.length;
-            const tickedCount = sortedActiveHabits.filter((h) =>
-              habitLogs.some(
-                (l) =>
-                  l.habit_id === h.id && toLocalDateString(new Date(l.timestamp)) === activeDateStr,
-              ),
-            ).length;
+            const tickedCount = sortedActiveHabits.filter((h) => {
+              const stats = habitStatsMap.get(h.id);
+              return stats ? stats.isTickedToday : false;
+            }).length;
             const allDone = tickedCount === totalHabits;
 
             return (
@@ -938,11 +904,9 @@ export default function DayNavigator({
                     className="flex items-center gap-2 overflow-x-auto pb-0.5 md:flex-wrap md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                   >
                     {sortedActiveHabits.map((habit) => {
-                      const allHabitLogs = habitLogs.filter((l) => l.habit_id === habit.id);
-                      const loggedDayStrings = new Set(
-                        allHabitLogs.map((l) => toLocalDateString(new Date(l.timestamp))),
-                      );
-                      const isTickedToday = loggedDayStrings.has(activeDateStr);
+                      const stats = habitStatsMap.get(habit.id);
+                      const loggedDayStrings = stats?.loggedDayStrings || new Set<string>();
+                      const isTickedToday = stats?.isTickedToday ?? false;
 
                       // Color themes
                       const themeMap: Record<
@@ -1155,11 +1119,7 @@ export default function DayNavigator({
               }}
             >
               <Check className="w-3.5 h-3.5 text-stone-400" />
-              {habitLogs.some(
-                (l) =>
-                  l.habit_id === contextHabit.id &&
-                  toLocalDateString(new Date(l.timestamp)) === activeDateStr,
-              )
+              {habitLogsByHabitMap.get(contextHabit.id)?.dateStrings.has(activeDateStr)
                 ? 'Uncheck for today'
                 : 'Check for today'}
             </button>
@@ -1182,11 +1142,15 @@ export default function DayNavigator({
           <motion.div
             id="habit-drawer"
             key="habit-drawer"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
-            style={{ overflow: 'hidden' }}
+            initial={{ height: 0, opacity: 0, scaleY: 0.98 }}
+            animate={{ height: 'auto', opacity: 1, scaleY: 1 }}
+            exit={{ height: 0, opacity: 0, scaleY: 0.98 }}
+            transition={{
+              height: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
+              opacity: { duration: 0.2, ease: 'easeOut' },
+              scaleY: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
+            }}
+            style={{ overflow: 'hidden', transformOrigin: 'top' }}
             className="border-t border-emerald-950/40 bg-[#0c0c0c] shadow-2xl relative z-20"
           >
             <div className="max-w-6xl mx-auto px-5 md:px-6 py-5">
@@ -1221,28 +1185,12 @@ export default function DayNavigator({
               {/* Habit Cards Grid (Spacious 2-Row Design with Large Tappable Day Circles) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                 {sortedActiveHabits.map((habit) => {
-                  const allHabitLogs = habitLogs.filter((l) => l.habit_id === habit.id);
-                  const loggedDayStrings = new Set(
-                    allHabitLogs.map((l) => toLocalDateString(new Date(l.timestamp))),
-                  );
-                  const isTickedToday = loggedDayStrings.has(activeDateStr);
-
-                  // Calculate current consecutive streak
-                  let streak = 0;
-                  const checkDate = new Date();
-                  if (!loggedDayStrings.has(toLocalDateString(checkDate))) {
-                    checkDate.setDate(checkDate.getDate() - 1);
-                  }
-                  while (loggedDayStrings.has(toLocalDateString(checkDate))) {
-                    streak++;
-                    checkDate.setDate(checkDate.getDate() - 1);
-                  }
-
-                  // Count completed days this week
-                  const completedThisWeek = habitWeekDays.filter((d) =>
-                    loggedDayStrings.has(d.dateStr),
-                  ).length;
-                  const weeklyRate = Math.round((completedThisWeek / 7) * 100);
+                  const stats = habitStatsMap.get(habit.id);
+                  const loggedDayStrings = stats?.loggedDayStrings || new Set<string>();
+                  const isTickedToday = stats?.isTickedToday ?? false;
+                  const streak = stats?.streak ?? 0;
+                  const completedThisWeek = stats?.completedThisWeek ?? 0;
+                  const weeklyRate = stats?.weeklyRate ?? 0;
 
                   const themeMap: Record<
                     string,
@@ -1388,11 +1336,15 @@ export default function DayNavigator({
           <motion.div
             id="calendar-drawer"
             key="calendar-drawer"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
-            style={{ overflow: 'hidden' }}
+            initial={{ height: 0, opacity: 0, scaleY: 0.98 }}
+            animate={{ height: 'auto', opacity: 1, scaleY: 1 }}
+            exit={{ height: 0, opacity: 0, scaleY: 0.98 }}
+            transition={{
+              height: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
+              opacity: { duration: 0.2, ease: 'easeOut' },
+              scaleY: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
+            }}
+            style={{ overflow: 'hidden', transformOrigin: 'top' }}
             className="border-t border-stone-800/60 bg-[#0e0e0e]"
           >
             <div className="max-w-4xl mx-auto px-5 md:px-6 py-4">
