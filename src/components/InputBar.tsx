@@ -22,9 +22,12 @@ import {
   Info,
   Layers,
   ArrowRight,
+  Pin,
+  Star,
 } from 'lucide-react';
 import { toLocalDateString, formatDuration } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
+import MarkdownPreview from './MarkdownPreview';
 
 function formatTime(date: Date): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -134,6 +137,8 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
   const [modalContent, setModalContent] = useState('');
+  const [modalPinned, setModalPinned] = useState(false);
+  const [modalStarred, setModalStarred] = useState(false);
 
   // Timestamps (defaults populated based on activeDate)
   const [timestampStr, setTimestampStr] = useState('');
@@ -1307,32 +1312,66 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
       {/* DEDICATED DETAILED NOTE CREATION MODAL */}
       <AnimatePresence>
         {isNoteModalOpen && (
-          <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-[999] p-4 font-sans">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[999] p-4 font-sans">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-              className="bg-[#121212] border border-stone-800 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl relative flex flex-col"
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ duration: 0.16, ease: 'easeOut' }}
+              className="bg-[#111111] border border-stone-800 rounded-2xl max-w-4xl w-full max-h-[88vh] overflow-hidden shadow-2xl relative flex flex-col"
             >
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-stone-850 p-4">
-                <span
-                  className={`text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border ${
-                    activeType === 'event'
-                      ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-                      : 'text-blue-400 bg-blue-500/10 border-blue-500/20'
-                  }`}
-                >
-                  {activeType === 'event' ? 'New detailed event' : 'New detailed note'}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setIsNoteModalOpen(false)}
-                  className="p-1 text-stone-500 hover:text-stone-300 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+              <div className="flex items-center justify-between border-b border-stone-850/80 px-6 sm:px-8 py-3.5 bg-stone-950/50 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className={`text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border ${
+                      activeType === 'event'
+                        ? 'text-amber-400 bg-amber-500/10 border-amber-500/25'
+                        : 'text-blue-400 bg-blue-500/10 border-blue-500/25'
+                    }`}
+                  >
+                    {activeType === 'event' ? 'New Event' : 'New Note'}
+                  </span>
+                  <span className="text-xs font-mono text-stone-500">
+                    {toLocalDateString(activeDate)}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalPinned(!modalPinned)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-mono font-bold uppercase tracking-wider cursor-pointer transition-all active:scale-95 ${
+                      modalPinned
+                        ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                        : 'bg-stone-900 border-stone-800 text-stone-500 hover:text-stone-300'
+                    }`}
+                  >
+                    <Pin className={`w-3 h-3 ${modalPinned ? 'fill-current' : ''}`} />
+                    <span>{modalPinned ? 'Pinned' : 'Pin'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setModalStarred(!modalStarred)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-mono font-bold uppercase tracking-wider cursor-pointer transition-all active:scale-95 ${
+                      modalStarred
+                        ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                        : 'bg-stone-900 border-stone-800 text-stone-500 hover:text-stone-300'
+                    }`}
+                  >
+                    <Star className={`w-3 h-3 ${modalStarred ? 'fill-current' : ''}`} />
+                    <span>Highlight</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsNoteModalOpen(false)}
+                    className="p-1.5 text-stone-500 hover:text-stone-300 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer ml-1"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               {/* Form body */}
@@ -1372,6 +1411,8 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                     timestamp: parsedStart,
                     created_at: getBaseCompletedDate(),
                     scheduled_at: parsedStart,
+                    pinned: modalPinned,
+                    starred: modalStarred,
                     ...(activeType === 'event' && hasSpan && parsedEnd
                       ? { end_timestamp: parsedEnd }
                       : {}),
@@ -1383,73 +1424,76 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                   setIsNoteModalOpen(false);
                   setModalTitle('');
                   setModalContent('');
+                  setModalPinned(false);
+                  setModalStarred(false);
                   setTitle('');
                   setContent('');
                 }}
-                className="p-5 space-y-4"
+                className="px-6 sm:px-8 py-5 flex flex-col flex-1 min-h-0 space-y-4 overflow-hidden"
               >
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-wider font-mono text-stone-500 font-bold block">
-                    {activeType === 'event' ? 'Event Title' : 'Note Title'}
-                  </label>
+                <div className="space-y-1 border-b border-stone-850/80 pb-3">
                   <input
                     type="text"
                     required
+                    autoFocus
                     value={modalTitle}
                     onChange={(e) => setModalTitle(e.target.value)}
-                    className={`w-full bg-[#0a0a0a] text-stone-100 border border-stone-850 rounded-xl px-4 py-3 text-sm focus:outline-none placeholder-stone-700 font-serif ${
+                    className={`w-full bg-transparent text-stone-100 text-2xl font-serif font-bold tracking-tight focus:outline-none placeholder-stone-700 py-1 ${
                       activeType === 'event'
                         ? 'focus:border-amber-500/50'
                         : 'focus:border-blue-500/50'
                     }`}
                     placeholder={
                       activeType === 'event'
-                        ? 'Enter event summary/title (e.g. Project briefing presentation tomorrow at 10am)...'
-                        : 'Enter short summary/title (e.g. Brainstorming session today at 2pm)...'
+                        ? 'Event title (e.g. Project briefing presentation tomorrow at 10am)...'
+                        : 'Note title (e.g. Weekly reflections, ideas & brainstorming)...'
                     }
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase tracking-wider font-mono text-stone-500 font-bold block">
-                    {activeType === 'event' ? 'Event Content / Description' : 'Note Content / Body'}
-                  </label>
-                  <textarea
-                    value={modalContent}
-                    rows={6}
-                    onChange={(e) => setModalContent(e.target.value)}
-                    className={`w-full bg-[#0a0a0a] text-stone-100 border border-stone-850 rounded-xl px-4 py-3 text-sm focus:outline-none font-sans leading-relaxed resize-none ${
-                      activeType === 'event'
-                        ? 'focus:border-amber-500/50'
-                        : 'focus:border-blue-500/50'
-                    }`}
-                    placeholder={
-                      activeType === 'event'
-                        ? 'Write event details, description, location, or agenda...'
-                        : 'Write structured thoughts, reflections, details, or markdown formatting...'
-                    }
-                  />
+                <div className="flex-1 flex flex-col min-h-[260px] max-h-[55vh] overflow-y-auto pr-1 space-y-2">
+                  <span className="text-[10px] uppercase tracking-wider font-mono text-stone-500 font-bold block">
+                    {activeType === 'event' ? 'Event Description / Notes' : 'Content & Markdown Notes'}
+                  </span>
+                  <div className="flex-1 flex flex-col min-h-[220px]">
+                    <MarkdownPreview
+                      text={modalContent}
+                      value={modalContent}
+                      placeholder={
+                        activeType === 'event'
+                          ? 'Write event description, agenda, location, or notes...'
+                          : 'Write structured thoughts, reflections, details, checklists, or markdown...'
+                      }
+                      editable={true}
+                      onChange={setModalContent}
+                    />
+                  </div>
                 </div>
 
-                <div className="pt-2 flex justify-end gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setIsNoteModalOpen(false)}
-                    className="px-4 py-2 bg-stone-900 hover:bg-stone-850 text-stone-300 text-xs font-mono uppercase tracking-wider rounded-xl border border-stone-800 transition-all cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className={`px-5 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded-xl border transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-1.5 ${
-                      activeType === 'event'
-                        ? 'bg-amber-500 hover:bg-amber-400 text-[#0e0c08] border-amber-400'
-                        : 'bg-blue-500 hover:bg-blue-400 text-[#070a0e] border-blue-400'
-                    }`}
-                  >
-                    <span>{activeType === 'event' ? 'Save Event' : 'Save Note'}</span>
-                    <Send className="w-3.5 h-3.5" />
-                  </button>
+                <div className="pt-3 border-t border-stone-850/80 flex items-center justify-between shrink-0">
+                  <span className="text-[10px] text-stone-600 font-mono hidden sm:inline">
+                    Ctrl+Enter or Esc to save/cancel
+                  </span>
+                  <div className="flex items-center gap-2.5 ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => setIsNoteModalOpen(false)}
+                      className="px-4 py-2 bg-stone-900 hover:bg-stone-850 text-stone-300 text-xs font-mono uppercase tracking-wider rounded-xl border border-stone-800 transition-all cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className={`px-5 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded-xl border transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-1.5 ${
+                        activeType === 'event'
+                          ? 'bg-amber-500 hover:bg-amber-400 text-[#0e0c08] border-amber-400'
+                          : 'bg-blue-500 hover:bg-blue-400 text-[#070a0e] border-blue-400'
+                      }`}
+                    >
+                      <span>{activeType === 'event' ? 'Save Event' : 'Save Note'}</span>
+                      <Send className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </form>
             </motion.div>

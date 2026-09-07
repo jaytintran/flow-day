@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { ReactNode } from 'react';
+import React, { useState, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Check } from 'lucide-react';
+import { X, Maximize2, Minimize2 } from 'lucide-react';
 
 export type LabelColor = 'blue' | 'indigo' | 'amber' | 'emerald' | 'stone';
 
@@ -39,8 +39,7 @@ export default function DetailSheet({
   children,
 }: DetailSheetProps) {
   const chipClass = colorClasses[labelColor];
-  const handleAccept = onAccept || onClose;
-  const handleCancel = onCancel || onClose;
+  const [isMaximized, setIsMaximized] = useState(false);
 
   return (
     <AnimatePresence>
@@ -55,7 +54,7 @@ export default function DetailSheet({
               exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
               onClick={onClose}
-              className="absolute inset-0 bg-black/70"
+              className="absolute inset-0 bg-black/75 backdrop-blur-[2px]"
             />
             {/* Sheet container */}
             <motion.div
@@ -72,10 +71,10 @@ export default function DetailSheet({
               }}
               transition={{ type: 'spring', damping: 32, stiffness: 340, mass: 0.7 }}
               style={{ willChange: 'transform' }}
-              className="relative w-full h-[85vh] bg-[#121212] border-t border-stone-850 rounded-t-2xl shadow-2xl z-10 flex flex-col overflow-hidden pb-6"
+              className="relative w-full h-[90vh] bg-[#121212] border-t border-stone-800 rounded-t-3xl shadow-2xl z-10 flex flex-col overflow-hidden pb-6"
             >
               {/* Drag Handle & Header */}
-              <div className="flex-none flex flex-col items-center pt-3 pb-2 border-b border-stone-850/60 relative">
+              <div className="flex-none flex flex-col items-center pt-3 pb-2.5 border-b border-stone-850/70 relative bg-stone-950/40">
                 {/* Drag Handle Pill with accessible touch padding & click-to-close */}
                 <button
                   type="button"
@@ -85,9 +84,9 @@ export default function DetailSheet({
                 >
                   <div className="w-12 h-1.5 bg-stone-700 group-hover:bg-stone-500 rounded-full transition-colors" />
                 </button>
-                <div className="w-full px-5 flex justify-between items-center mt-1">
+                <div className="w-full px-5 flex justify-between items-center mt-1.5">
                   <span
-                    className={`text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border ${chipClass}`}
+                    className={`text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border ${chipClass}`}
                   >
                     {label}
                   </span>
@@ -96,7 +95,7 @@ export default function DetailSheet({
                     onClick={onClose}
                     title="Close"
                     aria-label="Close"
-                    className="p-1 text-stone-400 hover:text-stone-200 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
+                    className="p-1.5 text-stone-400 hover:text-stone-200 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -104,43 +103,65 @@ export default function DetailSheet({
               </div>
 
               {/* Sheet content area */}
-              <div className="flex-1 overflow-y-auto p-5 flex flex-col">{children}</div>
+              <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col">{children}</div>
             </motion.div>
           </div>
         ) : (
           /* MODAL FOR DESKTOP */
           <div
-            className="fixed inset-0 bg-black/75 backdrop-blur-sm flex flex-1 overflow-y-auto items-center justify-center z-[999] p-4 font-sans"
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex flex-1 overflow-y-auto items-center justify-center z-[999] p-4 font-sans"
             onClick={onClose}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-[#121212] border border-stone-800 rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl relative flex flex-col h-full max-h-[85vh]"
+              className={`bg-[#121212] border border-stone-800 rounded-2xl w-full overflow-hidden shadow-2xl relative flex flex-col transition-all duration-200 ${
+                isMaximized
+                  ? 'max-w-6xl w-[95vw] h-[92vh] max-h-[95vh]'
+                  : 'max-w-4xl h-full max-h-[88vh]'
+              }`}
             >
               {/* Header section */}
-              <div className="flex items-center justify-between border-b border-stone-850 p-4 relative">
+              <div className="flex items-center justify-between border-b border-stone-850/80 px-6 sm:px-8 py-3.5 relative bg-stone-950/40 shrink-0">
                 <span
-                  className={`text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border ${chipClass}`}
+                  className={`text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border ${chipClass}`}
                 >
                   {label}
                 </span>
 
-                <button
-                  type="button"
-                  onClick={onClose}
-                  title="Close"
-                  aria-label="Close"
-                  className="p-1 text-stone-400 hover:text-stone-200 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsMaximized(!isMaximized)}
+                    title={isMaximized ? 'Restore normal view' : 'Maximize to full view'}
+                    aria-label={isMaximized ? 'Restore normal view' : 'Maximize to full view'}
+                    className="p-1.5 text-stone-400 hover:text-stone-200 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
+                  >
+                    {isMaximized ? (
+                      <Minimize2 className="w-4 h-4" />
+                    ) : (
+                      <Maximize2 className="w-4 h-4" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    title="Close"
+                    aria-label="Close"
+                    className="p-1.5 text-stone-400 hover:text-stone-200 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               {/* Content area */}
-              <div className="p-5 overflow-y-auto flex-1 flex flex-col">{children}</div>
+              <div className="px-6 sm:px-10 py-6 sm:py-8 overflow-y-auto flex-1 flex flex-col">
+                {children}
+              </div>
             </motion.div>
           </div>
         ))}

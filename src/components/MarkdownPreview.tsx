@@ -78,13 +78,13 @@ export function parseMarkdown(text: string): string {
 
     if (trimmed.startsWith('# ')) {
       if (inList) { result.push('</ul>'); inList = false; }
-      result.push(`<h1 class="text-lg font-bold text-stone-100 mt-3 mb-1 first:mt-0">${parseInlineMarkdown(line.substring(2))}</h1>`);
+      result.push(`<h1 class="text-xl font-bold text-stone-100 mt-4 mb-1.5 first:mt-0 tracking-tight">${parseInlineMarkdown(line.substring(2))}</h1>`);
     } else if (trimmed.startsWith('## ')) {
       if (inList) { result.push('</ul>'); inList = false; }
-      result.push(`<h2 class="text-base font-bold text-stone-200 mt-2.5 mb-1 first:mt-0">${parseInlineMarkdown(line.substring(3))}</h2>`);
+      result.push(`<h2 class="text-lg font-bold text-stone-200 mt-3 mb-1 first:mt-0 tracking-tight">${parseInlineMarkdown(line.substring(3))}</h2>`);
     } else if (trimmed.startsWith('### ')) {
       if (inList) { result.push('</ul>'); inList = false; }
-      result.push(`<h3 class="text-sm font-bold text-stone-300 mt-2 mb-0.5 first:mt-0">${parseInlineMarkdown(line.substring(4))}</h3>`);
+      result.push(`<h3 class="text-base font-semibold text-stone-300 mt-2.5 mb-1 first:mt-0">${parseInlineMarkdown(line.substring(4))}</h3>`);
     } else if (trimmed.startsWith('- [x] ') || trimmed.startsWith('* [x] ')) {
       if (inList) { result.push('</ul>'); inList = false; }
       result.push(`<div class="flex items-start gap-2 my-1 text-stone-400 line-through opacity-70"><span class="text-emerald-400 mt-0.5 select-none">☑</span><span>${parseInlineMarkdown(line.substring(6))}</span></div>`);
@@ -93,22 +93,22 @@ export function parseMarkdown(text: string): string {
       result.push(`<div class="flex items-start gap-2 my-1 text-stone-300"><span class="text-stone-500 mt-0.5 select-none">☐</span><span>${parseInlineMarkdown(line.substring(6))}</span></div>`);
     } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
       if (!inList) {
-        result.push('<ul class="list-disc pl-5 space-y-0.5 my-1 text-stone-300">');
+        result.push('<ul class="list-disc pl-5 space-y-1 my-1.5 text-stone-300 text-[15px]">');
         inList = true;
       }
       result.push(`<li class="leading-relaxed">${parseInlineMarkdown(line.substring(2))}</li>`);
     } else if (trimmed.startsWith('> ')) {
       if (inList) { result.push('</ul>'); inList = false; }
-      result.push(`<blockquote class="border-l-2 border-stone-700 pl-3 my-1.5 text-stone-400 italic">${parseInlineMarkdown(line.substring(2))}</blockquote>`);
-    } else if (trimmed === '---' || trimmed === '***') {
+      result.push(`<blockquote class="border-l-2 border-stone-700 pl-3.5 my-2 text-stone-400 italic text-[15px]">${parseInlineMarkdown(line.substring(2))}</blockquote>`);
+    } else if (/^\s*([-*_]\s*){3,}$/.test(trimmed)) {
       if (inList) { result.push('</ul>'); inList = false; }
-      result.push('<hr class="border-stone-800 my-2" />');
+      result.push('<div class="w-full py-2.5 my-1.5 select-none"><div class="w-full h-px bg-stone-800 border-t border-stone-800/80"></div></div>');
     } else if (trimmed === '') {
       if (inList) { result.push('</ul>'); inList = false; }
       result.push('<div class="h-3"></div>');
     } else {
       if (inList) { result.push('</ul>'); inList = false; }
-      result.push(`<p class="text-stone-300 leading-relaxed mb-1.5 last:mb-0">${parseInlineMarkdown(line)}</p>`);
+      result.push(`<p class="text-stone-300 text-[15px] leading-relaxed mb-2 last:mb-0">${parseInlineMarkdown(line)}</p>`);
     }
   }
 
@@ -381,12 +381,12 @@ export default function MarkdownPreview({
     );
   }
 
-  // EDIT MODE: Full Multi-line Textarea + Quick Formatting Toolbar
+  // EDIT MODE: Seamless Multi-line Textarea + Quick Formatting Toolbar
   if (isEditing) {
     return (
       <div
         ref={containerRef}
-        className={`w-full flex flex-col rounded-xl bg-[#111111] border border-stone-800/90 shadow-lg p-2.5 space-y-2 transition-all ${className}`}
+        className={`w-full flex-1 flex flex-col space-y-3 bg-transparent transition-all ${className}`}
       >
         <textarea
           ref={textareaRef}
@@ -394,11 +394,11 @@ export default function MarkdownPreview({
           onChange={handleTextChange}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="w-full bg-transparent text-stone-200 font-mono text-xs sm:text-sm focus:outline-none resize-none leading-relaxed placeholder-stone-600 min-h-[120px]"
+          className="w-full bg-transparent text-stone-200 font-serif text-[15px] focus:outline-none resize-none leading-relaxed placeholder-stone-600 min-h-[140px] p-0 border-none"
         />
 
         {/* Floating Quick Action Toolbar */}
-        <div className="flex items-center justify-between pt-2 border-t border-stone-850 gap-1 flex-wrap select-none">
+        <div className="flex items-center justify-between pt-2.5 border-t border-stone-850/60 gap-1 flex-wrap select-none">
           <div className="flex items-center gap-0.5">
             <button
               type="button"
@@ -476,7 +476,7 @@ export default function MarkdownPreview({
       <div
         ref={containerRef}
         onClick={() => setIsEditing(true)}
-        className={`w-full min-h-[60px] text-stone-600 font-serif text-sm italic cursor-text py-2 select-none hover:text-stone-400 transition-colors ${className}`}
+        className={`w-full min-h-[60px] text-stone-600 font-serif text-[15px] italic cursor-text py-1 select-none ${className}`}
       >
         {placeholder}
       </div>
@@ -487,8 +487,7 @@ export default function MarkdownPreview({
     <div
       ref={containerRef}
       onClick={() => setIsEditing(true)}
-      className={`group relative w-full flex-1 flex flex-col font-serif text-sm leading-relaxed text-stone-300 space-y-1 cursor-text py-1 rounded-lg hover:bg-white/[0.02] px-1.5 -mx-1.5 transition-colors ${className}`}
-      title="Click to edit description"
+      className={`w-full flex-1 flex flex-col font-serif text-[15px] leading-relaxed text-stone-300 space-y-1.5 cursor-text py-1 ${className}`}
     >
       {lines.map((line, idx) => {
         const trimmed = line.trim();
@@ -513,7 +512,15 @@ export default function MarkdownPreview({
         const quoteContent = isQuote ? line.replace(/^(\s*>\s*)/, '') : '';
 
         // Divider
-        const isDivider = trimmed === '---' || trimmed === '***';
+        const isDivider = /^\s*([-*_]\s*){3,}$/.test(trimmed);
+
+        if (isDivider) {
+          return (
+            <div key={idx} className="w-full py-2.5 my-1.5 select-none">
+              <div className="w-full h-px bg-stone-800 border-t border-stone-800/80" />
+            </div>
+          );
+        }
 
         if (isCheckbox) {
           return (
@@ -534,7 +541,7 @@ export default function MarkdownPreview({
                 {isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
               </button>
               <span
-                className={`flex-1 ${
+                className={`flex-1 text-[15px] ${
                   isChecked ? 'line-through text-stone-500 opacity-70' : 'text-stone-300'
                 }`}
                 dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(checkboxLabel) }}
@@ -547,7 +554,7 @@ export default function MarkdownPreview({
           return (
             <h1
               key={idx}
-              className="text-lg font-bold text-stone-100 mt-2 mb-0.5 first:mt-0"
+              className="text-xl font-bold text-stone-100 mt-3 mb-1 first:mt-0 tracking-tight"
               dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(line.substring(2)) }}
             />
           );
@@ -557,7 +564,7 @@ export default function MarkdownPreview({
           return (
             <h2
               key={idx}
-              className="text-base font-bold text-stone-200 mt-1.5 mb-0.5 first:mt-0"
+              className="text-lg font-bold text-stone-200 mt-2.5 mb-1 first:mt-0 tracking-tight"
               dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(line.substring(3)) }}
             />
           );
@@ -567,7 +574,7 @@ export default function MarkdownPreview({
           return (
             <h3
               key={idx}
-              className="text-sm font-bold text-stone-300 mt-1 mb-0.5 first:mt-0"
+              className="text-base font-semibold text-stone-300 mt-2 mb-0.5 first:mt-0"
               dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(line.substring(4)) }}
             />
           );
@@ -575,7 +582,7 @@ export default function MarkdownPreview({
 
         if (isBullet) {
           return (
-            <div key={idx} className="flex items-start gap-2 w-full pl-2">
+            <div key={idx} className="flex items-start gap-2 w-full pl-2 text-[15px]">
               <span className="text-stone-500 select-none">•</span>
               <span
                 className="flex-1"
@@ -589,14 +596,10 @@ export default function MarkdownPreview({
           return (
             <blockquote
               key={idx}
-              className="border-l-2 border-stone-700 pl-3 my-0.5 text-stone-400 italic"
+              className="border-l-2 border-stone-700 pl-3.5 my-1 text-stone-400 italic text-[15px]"
               dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(quoteContent) }}
             />
           );
-        }
-
-        if (isDivider) {
-          return <hr key={idx} className="border-stone-800 my-1 w-full" />;
         }
 
         if (line === '') {
@@ -606,16 +609,11 @@ export default function MarkdownPreview({
         return (
           <p
             key={idx}
-            className="text-stone-300 leading-relaxed"
+            className="text-stone-300 text-[15px] leading-relaxed"
             dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(line) }}
           />
         );
       })}
-
-      {/* Subtle hover edit cue */}
-      <span className="text-[10px] text-stone-600 font-mono opacity-0 group-hover:opacity-100 transition-opacity select-none pt-1">
-        Click to edit
-      </span>
     </div>
   );
 }

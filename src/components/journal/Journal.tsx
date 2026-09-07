@@ -1237,11 +1237,11 @@ export default function Journal({
 				{selectedEntry && (
 					<>
 						{/* Title Header Container */}
-						<div className="border-b border-stone-900/60 pb-2 mb-3">
+						<div className="border-b border-stone-850/80 pb-3 mb-4">
 							{!isEditingTitle ? (
 								<div
 									onClick={() => setIsEditingTitle(true)}
-									className="w-full text-stone-100 font-serif font-bold text-xl cursor-pointer hover:text-stone-300 transition-colors break-words py-0.5"
+									className="w-full text-stone-100 font-serif font-bold text-2xl sm:text-3xl tracking-tight cursor-pointer hover:text-stone-300 transition-colors break-words py-1"
 								>
 									{editTitle.trim() || (
 										<span className="text-stone-700 italic">
@@ -1276,15 +1276,15 @@ export default function Journal({
 													? "Time Block Title"
 													: "Note Title"
 									}
-									className="w-full bg-transparent text-stone-100 font-serif font-bold text-xl focus:outline-none placeholder-stone-700 py-0.5 border-none"
+									className="w-full bg-transparent text-stone-100 font-serif font-bold text-2xl sm:text-3xl tracking-tight focus:outline-none placeholder-stone-700 py-1 border-none"
 								/>
 							)}
 						</div>
 
 						{/* ── TASK ── */}
 						{selectedEntry.type === "task" && (
-							<div className="flex flex-col flex-1 space-y-3">
-								<div className="flex items-center gap-1.5 flex-wrap">
+							<div className="flex flex-col flex-1 space-y-4">
+								<div className="flex items-center gap-2 flex-wrap">
 									<EditableChip
 										label="Created"
 										value={new Date((selectedEntry as Task).created_at)}
@@ -1349,7 +1349,7 @@ export default function Journal({
 								</div>
 
 								{(selectedEntry as Task).completed_at && (
-									<div className="flex items-center gap-1.5 flex-wrap">
+									<div className="flex items-center gap-2 flex-wrap">
 										<EditableChip
 											label="Completed"
 											value={new Date((selectedEntry as Task).completed_at!)}
@@ -1431,7 +1431,7 @@ export default function Journal({
 								)}
 
 								{/* Content */}
-								<div className="flex-1 border-t border-stone-900/80 pt-2 flex flex-col min-h-[100px]">
+								<div className="flex-1 border-t border-stone-850/70 pt-3 flex flex-col min-h-[160px]">
 									<MarkdownPreview
 										text={editContent}
 										placeholder="Add context, links, notes about this task..."
@@ -1444,8 +1444,8 @@ export default function Journal({
 
 						{/* ── NOTE ── */}
 						{selectedEntry.type === "note" && (
-							<div className="flex flex-col flex-1 space-y-3">
-								<div className="flex items-center gap-1.5 flex-wrap">
+							<div className="flex flex-col flex-1 space-y-4">
+								<div className="flex items-center gap-2 flex-wrap">
 									<EditableChip
 										label="Logged"
 										value={new Date((selectedEntry as Note).timestamp)}
@@ -1514,7 +1514,7 @@ export default function Journal({
 									</button>
 								</div>
 								{/* Content */}
-								<div className="flex-1 border-t border-stone-900/80 pt-2 flex flex-col min-h-[150px]">
+								<div className="flex-1 border-t border-stone-850/70 pt-3 flex flex-col min-h-[240px]">
 									<MarkdownPreview
 										text={editContent}
 										placeholder="Tap to start typing your thoughts..."
@@ -1527,8 +1527,8 @@ export default function Journal({
 
 						{/* ── EVENT ── */}
 						{selectedEntry.type === "event" && (
-							<div className="flex flex-col flex-1 space-y-3">
-								<div className="flex items-center gap-1.5 flex-wrap">
+							<div className="flex flex-col flex-1 space-y-4">
+								<div className="flex items-center gap-2 flex-wrap">
 									<EditableChip
 										label="At"
 										value={new Date((selectedEntry as Event).timestamp)}
@@ -1597,7 +1597,7 @@ export default function Journal({
 									</button>
 								</div>
 								{/* Content */}
-								<div className="flex-1 border-t border-stone-900/80 pt-2 flex flex-col min-h-[120px]">
+								<div className="flex-1 border-t border-stone-850/70 pt-3 flex flex-col min-h-[180px]">
 									<MarkdownPreview
 										text={editContent}
 										placeholder="Event description, notes, or details..."
