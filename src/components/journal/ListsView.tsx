@@ -25,6 +25,9 @@ import {
 	Calendar,
 	Trash2,
 	CheckSquare,
+	Plus,
+	Palette,
+	Edit2,
 } from "lucide-react";
 import {
 	DndContext,
@@ -52,10 +55,14 @@ import {
 	TaskStatus,
 } from "../../types";
 import { useLiveQuery } from "dexie-react-hooks";
-import TaskListManagerModal from "../TaskListManagerModal";
 import CategoryIcon from "../CategoryIcon";
 import EntryContextMenu from "../EntryContextMenu";
-import { TASK_LIST_SCOPE } from "../../utils";
+import InlineIconColorPopover from "../InlineIconColorPopover";
+import {
+	createTaskList,
+	migrateTasksOnListDelete,
+	TASK_LIST_SCOPE,
+} from "../../utils";
 
 // Subcomponents
 import TaskStatusPickerPopover from "./lists/TaskStatusPickerPopover";
@@ -67,6 +74,7 @@ import DesktopTaskCard from "./lists/DesktopTaskCard";
 import FolderCard from "./lists/FolderCard";
 import TrophyView from "./lists/TrophyView";
 import PaperListView from "./lists/PaperListView";
+import SortableSidebarListItem from "./lists/SortableSidebarListItem";
 
 interface ListsViewProps {
 	entries: TimelineEntry[];
@@ -212,7 +220,63 @@ export default function ListsView({
 		return localStorage.getItem("flowday-tasks-selected-list") ?? "all";
 	});
 
-	const [isListManagerOpen, setIsListManagerOpen] = useState(false);
+	// Sidebar Direct List Creation State
+	const [isCreatingList, setIsCreatingList] = useState(false);
+	const [newListName, setNewListName] = useState("");
+	const [newListColor, setNewListColor] = useState<Category["color"]>("violet");
+	const [newListIcon, setNewListIcon] = useState("ListTodo");
+	const [isNewListPopoverOpen, setIsNewListPopoverOpen] = useState(false);
+
+	// Sidebar Direct List Inline Rename State
+	const [editingListId, setEditingListId] = useState<string | null>(null);
+	const [editingListName, setEditingListName] = useState("");
+
+	// Dedicated Drag Sensor for Custom Lists in Sidebar
+	const listSensors = useSensors(
+		useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+		useSensor(KeyboardSensor, {
+			coordinateGetter: sortableKeyboardCoordinates,
+		}),
+	);
+
+	const handleListDragEnd = async (event: DragEndEvent) => {
+		const { active, over } = event;
+		if (!over || active.id === over.id) return;
+		const oldIdx = taskLists.findIndex((l) => l.id === active.id);
+		const newIdx = taskLists.findIndex((l) => l.id === over.id);
+		if (oldIdx !== -1 && newIdx !== -1) {
+			const reordered = arrayMove(taskLists, oldIdx, newIdx);
+			await db.transaction("rw", db.categories, async () => {
+				for (let i = 0; i < reordered.length; i++) {
+					await db.categories.update(reordered[i].id, {
+						sort_order: i,
+					} as any);
+				}
+			});
+		}
+	};
+
+	const handleCommitCreateList = async () => {
+		const trimmed = newListName.trim();
+		if (!trimmed) {
+			setIsCreatingList(false);
+			return;
+		}
+		const created = await createTaskList(trimmed, newListColor, newListIcon);
+		setIsCreatingList(false);
+		setNewListName("");
+		setSelectedView(created.id);
+		localStorage.setItem("flowday-tasks-selected-list", created.id);
+	};
+
+	const handleDeleteList = async (listId: string) => {
+		await migrateTasksOnListDelete(listId);
+		await db.categories.delete(listId);
+		if (selectedView === listId) {
+			setSelectedView("all");
+			localStorage.setItem("flowday-tasks-selected-list", "all");
+		}
+	};
 
 	// Mobile UI States
 	const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
@@ -1287,57 +1351,57 @@ export default function ListsView({
 			{/* ── DESKTOP: Two-column layout with Redesigned Sidebar ── */}
 			<div className="hidden md:flex gap-0 flex-1 h-full min-h-0 overflow-hidden">
 				{/* LEFT COLUMN — Sidebar */}
-				<div className="w-[210px] lg:w-[270px] h-full overflow-y-auto shrink-0 flex flex-col min-h-0 border-r border-stone-800/60 pr-3 mr-3 font-sans">
+				<div className="w-[220px] lg:w-[270px] h-full overflow-y-auto shrink-0 flex flex-col min-h-0 border-r border-stone-800/60 pr-3 mr-3 font-sans">
 					{/* Smart Views */}
 					<div className="flex flex-col gap-1 pb-3 shrink-0">
-						<span className="text-[9px] font-mono font-bold uppercase tracking-widest text-stone-500 px-2 py-0.5">
+						<span className="text-[11px] font-mono font-bold uppercase tracking-wider text-stone-500 px-2 py-0.5">
 							Smart Views
 						</span>
 
 						<button
 							onClick={() => handleSelectView("all")}
-							className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-all duration-150 cursor-pointer border ${
+							className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-all duration-150 cursor-pointer border ${
 								selectedView === "all"
-									? "bg-white/[0.08] border-white/20 text-white shadow-sm"
+									? "bg-white/[0.08] border-white/20 text-white shadow-sm font-semibold"
 									: "bg-transparent border-transparent text-stone-400 hover:bg-stone-900 hover:text-stone-200"
 							}`}
 						>
-							<Layers className="w-3.5 h-3.5 text-stone-300" />
-							<span className="flex-1 min-w-0 text-xs font-mono font-semibold truncate">
+							<Layers className="w-4 h-4 text-stone-300 shrink-0" />
+							<span className="flex-1 min-w-0 text-[13px] font-medium truncate">
 								All Tasks
 							</span>
-							<span className="text-[10px] font-mono text-stone-500 font-bold tabular-nums">
+							<span className="text-[11px] font-mono text-stone-500 font-semibold tabular-nums">
 								{listTaskCounts["all"]?.active ?? 0}
 							</span>
 						</button>
 
 						<button
 							onClick={() => handleSelectView("unassigned")}
-							className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-all duration-150 cursor-pointer border ${
+							className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-all duration-150 cursor-pointer border ${
 								selectedView === "unassigned"
-									? "bg-white/[0.08] border-white/20 text-white shadow-sm"
+									? "bg-white/[0.08] border-white/20 text-white shadow-sm font-semibold"
 									: "bg-transparent border-transparent text-stone-400 hover:bg-stone-900 hover:text-stone-200"
 							}`}
 						>
-							<Inbox className="w-3.5 h-3.5 text-stone-300" />
-							<span className="flex-1 min-w-0 text-xs font-mono font-semibold truncate">
+							<Inbox className="w-4 h-4 text-stone-300 shrink-0" />
+							<span className="flex-1 min-w-0 text-[13px] font-medium truncate">
 								Unassigned
 							</span>
-							<span className="text-[10px] font-mono text-stone-500 font-bold tabular-nums">
+							<span className="text-[11px] font-mono text-stone-500 font-semibold tabular-nums">
 								{listTaskCounts["unassigned"]?.active ?? 0}
 							</span>
 						</button>
 
 						<button
 							onClick={() => handleSelectView("paper")}
-							className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-all duration-150 cursor-pointer border ${
+							className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-all duration-150 cursor-pointer border ${
 								selectedView === "paper"
-									? "bg-amber-500/15 border-amber-500/30 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+									? "bg-amber-500/15 border-amber-500/30 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.15)] font-semibold"
 									: "bg-transparent border-transparent text-stone-400 hover:bg-stone-900 hover:text-amber-300"
 							}`}
 						>
-							<ClipboardList className="w-3.5 h-3.5 text-amber-400" />
-							<span className="flex-1 min-w-0 text-xs font-mono font-semibold truncate">
+							<ClipboardList className="w-4 h-4 text-amber-400 shrink-0" />
+							<span className="flex-1 min-w-0 text-[13px] font-medium truncate">
 								Paper List
 							</span>
 							<span className="text-[9px] font-mono uppercase tracking-wider text-amber-500/80 font-bold">
@@ -1347,123 +1411,169 @@ export default function ListsView({
 
 						<button
 							onClick={() => handleSelectView("trophy")}
-							className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-all duration-150 cursor-pointer border ${
+							className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-all duration-150 cursor-pointer border ${
 								selectedView === "trophy"
-									? "bg-amber-500/20 border-amber-500/40 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+									? "bg-amber-500/20 border-amber-500/40 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.2)] font-semibold"
 									: "bg-transparent border-transparent text-stone-400 hover:bg-stone-900 hover:text-amber-300"
 							}`}
 						>
-							<Trophy className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-							<span className="flex-1 min-w-0 text-xs font-mono font-semibold truncate">
+							<Trophy className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" />
+							<span className="flex-1 min-w-0 text-[13px] font-medium truncate">
 								Accomplishments
 							</span>
-							<span className="text-[10px] font-mono text-amber-400 font-bold tabular-nums">
+							<span className="text-[11px] font-mono text-amber-400 font-semibold tabular-nums">
 								{listTaskCounts["trophy"]?.active ?? 0}
 							</span>
 						</button>
 					</div>
 
 					{/* Custom Lists Header */}
-					<div className="pt-2 border-t border-stone-800/80 flex items-center justify-between px-2 mb-1 shrink-0">
-						<span className="text-[9px] font-mono font-bold uppercase tracking-widest text-stone-500">
+					<div className="pt-2.5 border-t border-stone-800/80 flex items-center justify-between px-2 mb-1.5 shrink-0">
+						<span className="text-[11px] font-mono font-bold uppercase tracking-wider text-stone-500">
 							Custom Lists
 						</span>
 						<button
-							onClick={() => setIsListManagerOpen(true)}
-							className="p-1 rounded-md text-stone-500 hover:text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer"
-							title="Manage lists"
+							type="button"
+							onClick={() => setIsCreatingList(true)}
+							className="p-1 rounded-md text-stone-500 hover:text-amber-400 hover:bg-stone-800 transition-colors cursor-pointer"
+							title="Add new list"
 						>
-							<MoreHorizontal className="w-3.5 h-3.5" />
+							<Plus className="w-3.5 h-3.5" />
 						</button>
 					</div>
 
-					{/* Custom Lists & Sub-Folders */}
-					<div
-						className="flex flex-col gap-0.5 overflow-y-auto flex-1 min-h-0"
-						style={{ scrollbarWidth: "none" }}
+					{/* Custom Lists Sortable Reordering & Sub-Folders */}
+					<DndContext
+						sensors={listSensors}
+						collisionDetection={closestCenter}
+						onDragEnd={handleListDragEnd}
 					>
-						{taskLists.map((list) => {
-							const cs = LIST_COLORS[list.color] ?? LIST_COLORS["violet"];
-							const isActive = selectedView === list.id;
-							const counts = listTaskCounts[list.id] ?? {
-								active: 0,
-								done: 0,
-							};
-							const listFolders = allFolders.filter((f) => f.list_id === list.id);
+						<SortableContext
+							items={taskLists.map((l) => l.id)}
+							strategy={verticalListSortingStrategy}
+						>
+							<div
+								className="flex flex-col gap-0.5 overflow-y-auto flex-1 min-h-0"
+								style={{ scrollbarWidth: "none" }}
+							>
+								{taskLists.map((list) => {
+									const cs = LIST_COLORS[list.color] ?? LIST_COLORS["violet"];
+									const isActive = selectedView === list.id;
+									const counts = listTaskCounts[list.id] ?? {
+										active: 0,
+										done: 0,
+									};
+									const listFolders = allFolders.filter(
+										(f) => f.list_id === list.id,
+									);
 
-							return (
-								<div key={list.id} className="flex flex-col">
-									<button
-										onClick={() => handleSelectView(list.id)}
-										className={`group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl border text-left transition-all duration-150 cursor-pointer ${
-											isActive
-												? cs.active
-												: "bg-transparent border-transparent text-stone-400 hover:bg-stone-900 hover:border-stone-800 hover:text-stone-200"
-										}`}
-									>
-										<CategoryIcon
-											name={list.icon}
-											color={list.color}
-											className="w-3.5 h-3.5"
-											fallback="ListTodo"
+									return (
+										<SortableSidebarListItem
+											key={list.id}
+											list={list}
+											isActive={isActive}
+											colorStyle={cs}
+											counts={counts}
+											listFolders={listFolders}
+											isEditing={editingListId === list.id}
+											editingName={editingListName}
+											onStartRename={() => {
+												setEditingListId(list.id);
+												setEditingListName(list.name);
+											}}
+											onRenameChange={setEditingListName}
+											onCommitRename={async () => {
+												const trimmed = editingListName.trim();
+												if (trimmed && trimmed !== list.name) {
+													await db.categories.update(list.id, {
+														name: trimmed,
+													});
+												}
+												setEditingListId(null);
+											}}
+											onCancelRename={() => setEditingListId(null)}
+											onSelect={() => handleSelectView(list.id)}
+											onUpdateIcon={async (icon) => {
+												await db.categories.update(list.id, { icon });
+											}}
+											onUpdateColor={async (color) => {
+												await db.categories.update(list.id, { color });
+											}}
+											onDelete={() => handleDeleteList(list.id)}
+											onFolderClick={(folderId) => {
+												const el = document.getElementById(
+													`folder-${folderId}`,
+												);
+												if (el) {
+													el.scrollIntoView({
+														behavior: "smooth",
+														block: "start",
+													});
+												}
+											}}
 										/>
-										<span className="flex-1 min-w-0 text-xs font-mono font-semibold truncate">
-											{list.name}
-										</span>
-										<span className="flex items-center gap-1.5 shrink-0">
-											{counts.active > 0 && (
-												<span
-													className={`text-[9px] font-mono font-bold tabular-nums min-w-[14px] text-center ${
-														isActive
-															? "text-current opacity-90"
-															: "text-stone-500 group-hover:text-stone-400"
-													}`}
-												>
-													{counts.active}
-												</span>
-											)}
-											{counts.done > 0 && (
-												<span
-													className={`text-[9px] font-mono font-bold tabular-nums min-w-[14px] text-center opacity-50 ${
-														isActive
-															? "text-current"
-															: "text-stone-600 group-hover:text-stone-500"
-													}`}
-												>
-													✓{counts.done}
-												</span>
-											)}
-										</span>
-									</button>
+									);
+								})}
 
-									{isActive && listFolders.length > 0 && (
-										<div className="pl-6 pr-1 py-1 space-y-0.5 border-l border-stone-800/80 ml-4 my-0.5">
-											{listFolders.map((f) => (
-												<button
-													key={f.id}
-													onClick={() => {
-														const el = document.getElementById(
-															`folder-${f.id}`,
-														);
-														if (el) {
-															el.scrollIntoView({
-																behavior: "smooth",
-																block: "start",
-															});
-														}
-													}}
-													className="w-full flex items-center gap-1.5 px-2 py-1 rounded-lg text-left text-[11px] font-mono text-stone-400 hover:text-amber-300 hover:bg-stone-900/60 transition-colors cursor-pointer"
-												>
-													<Folder className="w-3 h-3 text-amber-400/80 shrink-0" />
-													<span className="flex-1 truncate">{f.name}</span>
-												</button>
-											))}
+								{/* Inline New List Creator */}
+								{isCreatingList && (
+									<div className="flex items-center gap-2 px-2.5 py-1.5 bg-[#141414] border border-amber-500/40 rounded-xl shadow-lg my-1">
+										<div className="relative shrink-0">
+											<button
+												type="button"
+												onClick={() =>
+													setIsNewListPopoverOpen(!isNewListPopoverOpen)
+												}
+												className="p-1 rounded-lg bg-stone-900 border border-stone-800 hover:border-stone-700 cursor-pointer flex items-center justify-center"
+												title="Change icon & color"
+											>
+												<CategoryIcon
+													name={newListIcon}
+													color={newListColor}
+													className="w-4 h-4"
+													fallback="ListTodo"
+												/>
+											</button>
+											<InlineIconColorPopover
+												isOpen={isNewListPopoverOpen}
+												onClose={() => setIsNewListPopoverOpen(false)}
+												currentIcon={newListIcon}
+												currentColor={newListColor}
+												fallbackIcon="ListTodo"
+												onSelectIcon={setNewListIcon}
+												onSelectColor={setNewListColor}
+											/>
 										</div>
-									)}
-								</div>
-							);
-						})}
-					</div>
+										<input
+											type="text"
+											autoFocus
+											placeholder="List name..."
+											value={newListName}
+											onChange={(e) => setNewListName(e.target.value)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") handleCommitCreateList();
+												if (e.key === "Escape") setIsCreatingList(false);
+											}}
+											onBlur={handleCommitCreateList}
+											className="flex-1 min-w-0 bg-transparent text-[13px] font-medium text-stone-100 placeholder-stone-600 focus:outline-none"
+										/>
+									</div>
+								)}
+
+								{/* Ghost "+ New List" Button */}
+								{!isCreatingList && (
+									<button
+										type="button"
+										onClick={() => setIsCreatingList(true)}
+										className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-mono text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-dashed border-stone-800/80 hover:border-stone-700 transition-all cursor-pointer mt-1"
+									>
+										<Plus className="w-3.5 h-3.5 text-stone-500" />
+										<span>New List</span>
+									</button>
+								)}
+							</div>
+						</SortableContext>
+					</DndContext>
 				</div>
 
 				{/* RIGHT COLUMN — Active Panel */}
@@ -1916,9 +2026,20 @@ export default function ListsView({
 								</div>
 
 								<div className="space-y-1 pt-2 border-t border-stone-800/80">
-									<span className="text-[9px] uppercase font-bold tracking-widest text-stone-500 px-2">
-										Custom Lists
-									</span>
+									<div className="flex items-center justify-between px-2 pb-1">
+										<span className="text-[10px] uppercase font-bold tracking-widest text-stone-500">
+											Custom Lists
+										</span>
+										<button
+											type="button"
+											onClick={() => setIsCreatingList(true)}
+											className="p-1 rounded-md text-stone-400 hover:text-amber-400 hover:bg-stone-800 transition-colors"
+											title="Add new list"
+										>
+											<Plus className="w-3.5 h-3.5" />
+										</button>
+									</div>
+
 									{taskLists.map((list) => {
 										const isSelected = selectedView === list.id;
 										const counts = listTaskCounts[list.id] ?? {
@@ -1951,19 +2072,48 @@ export default function ListsView({
 											</button>
 										);
 									})}
-								</div>
-							</div>
 
-							<div className="p-3 border-t border-stone-800/80 shrink-0 bg-[#101010]">
-								<button
-									onClick={() => {
-										setIsMobileViewSheetOpen(false);
-										setIsListManagerOpen(true);
-									}}
-									className="w-full py-2.5 rounded-xl bg-stone-800 text-stone-300 hover:text-white hover:bg-stone-700 text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer"
-								>
-									⚙️ Manage Lists
-								</button>
+									{/* Mobile Inline List Creator */}
+									{isCreatingList ? (
+										<div className="flex items-center gap-2 px-3 py-2 bg-[#141414] border border-amber-500/40 rounded-xl my-1">
+											<input
+												type="text"
+												autoFocus
+												placeholder="List name..."
+												value={newListName}
+												onChange={(e) => setNewListName(e.target.value)}
+												onKeyDown={(e) => {
+													if (e.key === "Enter") handleCommitCreateList();
+													if (e.key === "Escape") setIsCreatingList(false);
+												}}
+												className="flex-1 min-w-0 bg-transparent text-xs text-stone-100 placeholder-stone-600 focus:outline-none"
+											/>
+											<button
+												type="button"
+												onClick={handleCommitCreateList}
+												className="px-2.5 py-1 bg-amber-500 text-stone-950 rounded-lg text-[10px] font-bold uppercase"
+											>
+												Add
+											</button>
+											<button
+												type="button"
+												onClick={() => setIsCreatingList(false)}
+												className="p-1 text-stone-500 hover:text-stone-300"
+											>
+												<X className="w-3.5 h-3.5" />
+											</button>
+										</div>
+									) : (
+										<button
+											type="button"
+											onClick={() => setIsCreatingList(true)}
+											className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-dashed border-stone-800/80 transition-all cursor-pointer mt-1"
+										>
+											<Plus className="w-3.5 h-3.5" />
+											<span>New List</span>
+										</button>
+									)}
+								</div>
 							</div>
 						</motion.div>
 					</motion.div>
@@ -2039,10 +2189,6 @@ export default function ListsView({
 						</motion.div>
 					</motion.div>
 				</AnimatePresence>
-			)}
-
-			{isListManagerOpen && (
-				<TaskListManagerModal onClose={() => setIsListManagerOpen(false)} />
 			)}
 
 			{contextMenu && (
