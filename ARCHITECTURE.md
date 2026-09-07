@@ -236,16 +236,16 @@ Synthesizes procedural sound effects using the Web Audio API without requiring a
   * Right-clicking any node on the canvas opens a contextual status switcher (`Active`, `Done / Achieved`, `Archived`).
   * Node card styling reacts immediately to reflect status (`isCompleted` with emerald glow and strikethrough, `isArchived` with dark slate muted palette and italicized title).
 
-### G. Line-by-Line Live Preview Markdown Engine (`src/components/MarkdownPreview.tsx`)
-* **Obsidian/Typora Style Live Editing**:
-  * Seamless inline editing where only the active line being typed flips into a raw input line (`<textarea>`), while all other lines remain fully formatted in rich Markdown.
-  * Preserves full visual context while editing without requiring mode toggling or jarring layout jumps.
-* **Auto-List Continuations & Keyboard Navigation**:
-  * Pressing `Enter` on bullet lists (`- `, `* `) or task checkboxes (`- [ ] `) automatically inserts the prefix on the next line. Pressing `Enter` on an empty prefixed line cancels the list item.
-  * Arrow keys (`ArrowUp` / `ArrowDown`) navigate smoothly between lines; `Backspace` on an empty line merges back to the previous line.
-* **Clickable Links & Interactive Checkboxes**:
-  * Formatted links (`[text](url)`) and bare URLs (`https://...`) automatically render as sky-blue clickable anchors (`text-sky-400 underline`) opening in a new tab with `target="_blank"` and `rel="noopener noreferrer"`.
-  * Interactive task checkboxes (`- [ ]` / `- [x]`) allow direct 1-tap toggling in preview mode without needing to enter edit mode.
+### G. Seamless Block Markdown Editor & Formatting Toolbar (`src/components/MarkdownPreview.tsx`)
+* **Interactive Rich Preview (Default)**:
+  * Notes and task descriptions render in rich formatted Markdown with sky-blue clickable hyperlinks (`[text](url)` and bare URLs) opening in external tabs with `stopPropagation()`.
+  * Task checkboxes (`- [ ]` / `- [x]`) feature **1-tap interactive checkboxes** directly in preview mode that toggle state without opening the editor.
+* **Full Multi-Line Edit Mode (Notion / Linear Style)**:
+  * Clicking anywhere on the preview block smoothly expands into a dedicated auto-growing `<textarea>` with full multi-line cursor navigation, standard text selection, and copy-pasting.
+  * **Auto-List Continuations & Indentation**: Pressing `Enter` automatically continues bullet lists (`- `, `* `) and task checkboxes (`- [ ] `), or clears empty prefixes on a second `Enter`. Pressing `Tab` inserts 2 spaces cleanly.
+  * **Keyboard Shortcuts**: Supports `Ctrl/Cmd + B` (Bold), `Ctrl/Cmd + I` (Italic), `Ctrl/Cmd + K` (Link), `Ctrl/Cmd + Enter` (Save/Done), and `Escape` (Save/Done).
+* **Quick Action Formatting Toolbar**:
+  * An integrated toolbar provides 1-tap shortcut buttons for Bold, Italic, Link, Checklist, Bullet List, and Inline Code, alongside a `Done` commit button and click-outside dismissal.
 
 ### H. Multi-Select Task Batch Operations & Boundary-Aware Context Menus (`ListsView.tsx` & `EntryContextMenu.tsx`)
 * **Card Multi-Selection & Range Selection**:

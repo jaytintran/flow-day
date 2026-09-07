@@ -4,7 +4,15 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { CheckSquare, Square, Check } from 'lucide-react';
+import {
+  Bold,
+  Italic,
+  Link2,
+  CheckSquare,
+  List,
+  Code,
+  Check,
+} from 'lucide-react';
 
 export interface MarkdownPreviewProps {
   text?: string;
@@ -121,56 +129,134 @@ export default function MarkdownPreview({
   className = '',
 }: MarkdownPreviewProps) {
   const content = (value !== undefined ? value : text) || '';
-  const [activeLineIndex, setActiveLineIndex] = useState<number | null>(null);
-  const activeInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const lines = content.length > 0 ? content.split('\n') : [''];
-
-  // Focus and auto-resize active line input
+  // Focus and auto-resize textarea when entering edit mode
   useEffect(() => {
-    if (activeLineIndex !== null && activeInputRef.current) {
-      activeInputRef.current.focus();
-      activeInputRef.current.style.height = 'auto';
-      activeInputRef.current.style.height = `${activeInputRef.current.scrollHeight}px`;
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.max(120, textareaRef.current.scrollHeight)}px`;
     }
-  }, [activeLineIndex]);
+  }, [isEditing]);
 
-  // Click outside listener to exit line edit mode
+  // Click outside listener to exit edit mode
   useEffect(() => {
+    if (!isEditing) return;
+
     const handlePointerDown = (e: PointerEvent) => {
       if (!containerRef.current) return;
       const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
       if (path.length > 0) {
         if (!path.includes(containerRef.current)) {
-          setActiveLineIndex(null);
+          setIsEditing(false);
         }
       } else if (!containerRef.current.contains(e.target as Node)) {
-        setActiveLineIndex(null);
+        setIsEditing(false);
       }
     };
+
     window.addEventListener('pointerdown', handlePointerDown);
     return () => window.removeEventListener('pointerdown', handlePointerDown);
-  }, []);
+  }, [isEditing]);
 
-  const handleLineChange = (idx: number, newText: string) => {
-    const newLines = [...lines];
-    newLines[idx] = newText;
+  // Handle textarea text change & auto-resize
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
     if (onChange) {
-      onChange(newLines.join('\n'));
+      onChange(val);
+    }
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.max(120, textareaRef.current.scrollHeight)}px`;
     }
   };
 
-  const handleLineKeyDown = (idx: number, e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      const currentLine = lines[idx] || '';
-      let prefix = '';
+  // 1-Tap Checkbox Toggle in Preview Mode
+  const handleToggleCheckboxInPreview = (lineIndex: number) => {
+    const lines = content.split('\n');
+    const line = lines[lineIndex];
+    if (!line) return;
 
+    let updated = line;
+    if (line.startsWith('- [ ] ')) {
+      updated = line.replace('- [ ] ', '- [x] ');
+    } else if (line.startsWith('- [x] ')) {
+      updated = line.replace('- [x] ', '- [ ] ');
+    } else if (line.startsWith('* [ ] ')) {
+      updated = line.replace('* [ ] ', '* [x] ');
+    } else if (line.startsWith('* [x] ')) {
+      updated = line.replace('* [x] ', '* [ ] ');
+    }
+
+    lines[lineIndex] = updated;
+    if (onChange) {
+      onChange(lines.join('\n'));
+    }
+  };
+
+  // Keyboard Navigation & Markdown Shortcuts inside Textarea
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    // Ctrl/Cmd + Enter: Commit and exit edit mode
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      setIsEditing(false);
+      return;
+    }
+
+    // Escape: Commit and exit edit mode
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsEditing(false);
+      return;
+    }
+
+    // Ctrl/Cmd + B: Bold
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+      e.preventDefault();
+      wrapSelection('**', '**', 'bold text');
+      return;
+    }
+
+    // Ctrl/Cmd + I: Italic
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
+      e.preventDefault();
+      wrapSelection('*', '*', 'italic text');
+      return;
+    }
+
+    // Ctrl/Cmd + K: Link
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      wrapSelection('[', '](https://)', 'link text');
+      return;
+    }
+
+    // Enter: Auto-continue list prefixes (- , * , - [ ] , > )
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const start = textarea.selectionStart;
+      const beforeCursor = content.substring(0, start);
+      const lastNewLine = beforeCursor.lastIndexOf('\n');
+      const lineStart = lastNewLine === -1 ? 0 : lastNewLine + 1;
+      const currentLine = content.substring(lineStart, start);
+
+      let prefix = '';
       if (currentLine.startsWith('- [ ] ') || currentLine.startsWith('* [ ] ')) {
         if (currentLine.trim() === '- [ ]' || currentLine.trim() === '* [ ]') {
-          // Clear empty checkbox line
-          handleLineChange(idx, '');
+          // Clear empty checkbox on second Enter
+          e.preventDefault();
+          const newContent = content.substring(0, lineStart) + content.substring(start);
+          if (onChange) onChange(newContent);
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.setSelectionRange(lineStart, lineStart);
+            }
+          }, 0);
           return;
         }
         prefix = '- [ ] ';
@@ -178,8 +264,15 @@ export default function MarkdownPreview({
         prefix = '- [ ] ';
       } else if (currentLine.startsWith('- ') || currentLine.startsWith('* ')) {
         if (currentLine.trim() === '-' || currentLine.trim() === '*') {
-          // Clear empty bullet
-          handleLineChange(idx, '');
+          // Clear empty bullet on second Enter
+          e.preventDefault();
+          const newContent = content.substring(0, lineStart) + content.substring(start);
+          if (onChange) onChange(newContent);
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.setSelectionRange(lineStart, lineStart);
+            }
+          }, 0);
           return;
         }
         prefix = '- ';
@@ -187,53 +280,85 @@ export default function MarkdownPreview({
         prefix = '> ';
       }
 
-      const newLines = [...lines.slice(0, idx + 1), prefix, ...lines.slice(idx + 1)];
-      if (onChange) {
-        onChange(newLines.join('\n'));
-      }
-      setActiveLineIndex(idx + 1);
-    } else if (e.key === 'Backspace') {
-      const currentLine = lines[idx] || '';
-      if (currentLine === '' && lines.length > 1) {
+      if (prefix) {
         e.preventDefault();
-        const newLines = lines.filter((_, i) => i !== idx);
-        if (onChange) {
-          onChange(newLines.join('\n'));
+        const newContent = content.substring(0, start) + '\n' + prefix + content.substring(start);
+        if (onChange) onChange(newContent);
+        setTimeout(() => {
+          if (textareaRef.current) {
+            const newPos = start + 1 + prefix.length;
+            textareaRef.current.setSelectionRange(newPos, newPos);
+          }
+        }, 0);
+      }
+    }
+
+    // Tab: Insert 2 spaces
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newContent = content.substring(0, start) + '  ' + content.substring(end);
+      if (onChange) onChange(newContent);
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.setSelectionRange(start + 2, start + 2);
         }
-        setActiveLineIndex(Math.max(0, idx - 1));
-      }
-    } else if (e.key === 'ArrowUp') {
-      if (activeInputRef.current?.selectionStart === 0) {
-        e.preventDefault();
-        setActiveLineIndex(Math.max(0, idx - 1));
-      }
-    } else if (e.key === 'ArrowDown') {
-      const len = lines[idx]?.length || 0;
-      if (activeInputRef.current?.selectionStart === len) {
-        e.preventDefault();
-        setActiveLineIndex(Math.min(lines.length - 1, idx + 1));
-      }
-    } else if (e.key === 'Escape') {
-      setActiveLineIndex(null);
+      }, 0);
     }
   };
 
-  const handleToggleCheckbox = (idx: number) => {
-    const line = lines[idx];
-    let updatedLine = line;
-    if (line.startsWith('- [ ] ')) {
-      updatedLine = line.replace('- [ ] ', '- [x] ');
-    } else if (line.startsWith('- [x] ')) {
-      updatedLine = line.replace('- [x] ', '- [ ] ');
-    } else if (line.startsWith('* [ ] ')) {
-      updatedLine = line.replace('* [ ] ', '* [x] ');
-    } else if (line.startsWith('* [x] ')) {
-      updatedLine = line.replace('* [x] ', '* [ ] ');
-    }
-    handleLineChange(idx, updatedLine);
+  // Helper: Wrap text selection
+  const wrapSelection = (before: string, after: string = before, placeholderText = 'text') => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = content.substring(start, end);
+    const textToWrap = selected.length > 0 ? selected : placeholderText;
+    const replacement = `${before}${textToWrap}${after}`;
+    const newContent = content.substring(0, start) + replacement + content.substring(end);
+    if (onChange) onChange(newContent);
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(
+          start + before.length,
+          start + before.length + textToWrap.length
+        );
+      }
+    }, 0);
   };
 
-  // If non-editable, render pure HTML preview
+  // Helper: Toggle line prefix (e.g. checkbox or bullet)
+  const toggleLinePrefix = (prefix: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const beforeCursor = content.substring(0, start);
+    const lastNewLine = beforeCursor.lastIndexOf('\n');
+    const lineStart = lastNewLine === -1 ? 0 : lastNewLine + 1;
+    const currentLine = content.substring(lineStart, start);
+
+    let newContent: string;
+    let newCursor: number;
+    if (currentLine.startsWith(prefix)) {
+      newContent = content.substring(0, lineStart) + currentLine.substring(prefix.length) + content.substring(start);
+      newCursor = Math.max(lineStart, start - prefix.length);
+    } else {
+      newContent = content.substring(0, lineStart) + prefix + content.substring(lineStart);
+      newCursor = start + prefix.length;
+    }
+    if (onChange) onChange(newContent);
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(newCursor, newCursor);
+      }
+    }, 0);
+  };
+
+  // Non-editable mode (pure HTML render)
   if (!editable) {
     if (!content.trim()) {
       return (
@@ -256,13 +381,101 @@ export default function MarkdownPreview({
     );
   }
 
-  // If empty content, render interactive placeholder row
-  if (content.trim() === '' && activeLineIndex === null) {
+  // EDIT MODE: Full Multi-line Textarea + Quick Formatting Toolbar
+  if (isEditing) {
     return (
       <div
         ref={containerRef}
-        onPointerDown={() => setActiveLineIndex(0)}
-        onClick={() => setActiveLineIndex(0)}
+        className={`w-full flex flex-col rounded-xl bg-[#111111] border border-stone-800/90 shadow-lg p-2.5 space-y-2 transition-all ${className}`}
+      >
+        <textarea
+          ref={textareaRef}
+          value={content}
+          onChange={handleTextChange}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          className="w-full bg-transparent text-stone-200 font-mono text-xs sm:text-sm focus:outline-none resize-none leading-relaxed placeholder-stone-600 min-h-[120px]"
+        />
+
+        {/* Floating Quick Action Toolbar */}
+        <div className="flex items-center justify-between pt-2 border-t border-stone-850 gap-1 flex-wrap select-none">
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => wrapSelection('**', '**', 'bold')}
+              title="Bold (Ctrl+B)"
+              className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer"
+            >
+              <Bold className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => wrapSelection('*', '*', 'italic')}
+              title="Italic (Ctrl+I)"
+              className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer"
+            >
+              <Italic className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => wrapSelection('[', '](https://)', 'link text')}
+              title="Link (Ctrl+K)"
+              className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer"
+            >
+              <Link2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleLinePrefix('- [ ] ')}
+              title="Checklist Item"
+              className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer"
+            >
+              <CheckSquare className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleLinePrefix('- ')}
+              title="Bullet List"
+              className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer"
+            >
+              <List className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => wrapSelection('`', '`', 'code')}
+              title="Inline Code"
+              className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer"
+            >
+              <Code className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-stone-600 font-mono hidden sm:inline">
+              Ctrl+Enter or Esc to save
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-stone-800 hover:bg-stone-750 text-stone-200 hover:text-white text-xs font-mono font-medium border border-stone-700 transition-all cursor-pointer active:scale-95 shadow-sm"
+            >
+              <Check className="w-3 h-3 text-emerald-400" />
+              <span>Done</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // PREVIEW MODE: Rich Formatted Markdown with Interactive Checkboxes & Clickable Links
+  const lines = content.length > 0 ? content.split('\n') : [];
+
+  if (lines.length === 0 || content.trim() === '') {
+    return (
+      <div
+        ref={containerRef}
+        onClick={() => setIsEditing(true)}
         className={`w-full min-h-[60px] text-stone-600 font-serif text-sm italic cursor-text py-2 select-none hover:text-stone-400 transition-colors ${className}`}
       >
         {placeholder}
@@ -273,134 +486,136 @@ export default function MarkdownPreview({
   return (
     <div
       ref={containerRef}
-      className={`w-full flex-1 flex flex-col font-serif text-sm leading-relaxed text-stone-300 space-y-0.5 ${className}`}
+      onClick={() => setIsEditing(true)}
+      className={`group relative w-full flex-1 flex flex-col font-serif text-sm leading-relaxed text-stone-300 space-y-1 cursor-text py-1 rounded-lg hover:bg-white/[0.02] px-1.5 -mx-1.5 transition-colors ${className}`}
+      title="Click to edit description"
     >
       {lines.map((line, idx) => {
-        const isEditingThisLine = activeLineIndex === idx;
         const trimmed = line.trim();
 
-        // Checkbox Line detection
+        // Checkbox Line
         const isUnchecked = trimmed.startsWith('- [ ] ') || trimmed.startsWith('* [ ] ');
         const isChecked = trimmed.startsWith('- [x] ') || trimmed.startsWith('* [x] ');
         const isCheckbox = isUnchecked || isChecked;
         const checkboxLabel = isCheckbox ? line.replace(/^(\s*[-*]\s*\[[ x]\]\s*)/, '') : '';
 
-        // Heading detection
+        // Heading
         const isH1 = trimmed.startsWith('# ');
         const isH2 = trimmed.startsWith('## ');
         const isH3 = trimmed.startsWith('### ');
 
-        // Bullet detection
+        // Bullet
         const isBullet = (trimmed.startsWith('- ') || trimmed.startsWith('* ')) && !isCheckbox;
         const bulletContent = isBullet ? line.replace(/^(\s*[-*]\s*)/, '') : '';
 
-        // Quote detection
+        // Quote
         const isQuote = trimmed.startsWith('> ');
         const quoteContent = isQuote ? line.replace(/^(\s*>\s*)/, '') : '';
 
         // Divider
         const isDivider = trimmed === '---' || trimmed === '***';
 
-        if (isEditingThisLine) {
+        if (isCheckbox) {
           return (
-            <div key={idx} className="relative w-full py-0.5">
-              <textarea
-                ref={activeInputRef}
-                value={line}
-                onChange={(e) => {
-                  handleLineChange(idx, e.target.value);
-                  if (activeInputRef.current) {
-                    activeInputRef.current.style.height = 'auto';
-                    activeInputRef.current.style.height = `${activeInputRef.current.scrollHeight}px`;
-                  }
+            <div key={idx} className="flex items-start gap-2 w-full my-0.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleCheckboxInPreview(idx);
                 }}
-                onKeyDown={(e) => handleLineKeyDown(idx, e)}
-                placeholder={idx === 0 ? placeholder : ''}
-                rows={1}
-                className="w-full bg-white/[0.04] border-l-2 border-indigo-500/80 text-stone-100 font-mono text-xs sm:text-sm px-2 py-1 rounded-r focus:outline-none resize-none leading-relaxed overflow-hidden"
+                className={`mt-1 w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+                  isChecked
+                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+                    : 'border-stone-700 hover:border-stone-500 bg-stone-900/60 text-stone-500'
+                }`}
+                title={isChecked ? 'Mark incomplete' : 'Mark complete'}
+              >
+                {isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+              </button>
+              <span
+                className={`flex-1 ${
+                  isChecked ? 'line-through text-stone-500 opacity-70' : 'text-stone-300'
+                }`}
+                dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(checkboxLabel) }}
               />
             </div>
           );
         }
 
-        // Render formatted live-preview line
+        if (isH1) {
+          return (
+            <h1
+              key={idx}
+              className="text-lg font-bold text-stone-100 mt-2 mb-0.5 first:mt-0"
+              dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(line.substring(2)) }}
+            />
+          );
+        }
+
+        if (isH2) {
+          return (
+            <h2
+              key={idx}
+              className="text-base font-bold text-stone-200 mt-1.5 mb-0.5 first:mt-0"
+              dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(line.substring(3)) }}
+            />
+          );
+        }
+
+        if (isH3) {
+          return (
+            <h3
+              key={idx}
+              className="text-sm font-bold text-stone-300 mt-1 mb-0.5 first:mt-0"
+              dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(line.substring(4)) }}
+            />
+          );
+        }
+
+        if (isBullet) {
+          return (
+            <div key={idx} className="flex items-start gap-2 w-full pl-2">
+              <span className="text-stone-500 select-none">•</span>
+              <span
+                className="flex-1"
+                dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(bulletContent) }}
+              />
+            </div>
+          );
+        }
+
+        if (isQuote) {
+          return (
+            <blockquote
+              key={idx}
+              className="border-l-2 border-stone-700 pl-3 my-0.5 text-stone-400 italic"
+              dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(quoteContent) }}
+            />
+          );
+        }
+
+        if (isDivider) {
+          return <hr key={idx} className="border-stone-800 my-1 w-full" />;
+        }
+
+        if (line === '') {
+          return <div key={idx} className="h-2 w-full" />;
+        }
+
         return (
-          <div
+          <p
             key={idx}
-            onPointerDown={(e) => {
-              const target = e.target as HTMLElement;
-              if (target.closest('a') || target.closest('button')) {
-                return;
-              }
-              setActiveLineIndex(idx);
-            }}
-            onClick={() => setActiveLineIndex(idx)}
-            className="group relative flex items-start gap-1.5 px-1.5 py-0.5 -mx-1.5 rounded hover:bg-white/[0.03] transition-colors cursor-text min-h-[24px]"
-          >
-            {isCheckbox ? (
-              <div className="flex items-start gap-2 w-full">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleToggleCheckbox(idx);
-                  }}
-                  className={`mt-1 w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-all cursor-pointer ${
-                    isChecked
-                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
-                      : 'border-stone-700 hover:border-stone-500 bg-stone-900/60 text-stone-500'
-                  }`}
-                >
-                  {isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                </button>
-                <span
-                  className={`flex-1 ${
-                    isChecked ? 'line-through text-stone-500 opacity-70' : 'text-stone-300'
-                  }`}
-                  dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(checkboxLabel) }}
-                />
-              </div>
-            ) : isH1 ? (
-              <h1
-                className="text-lg font-bold text-stone-100 mt-2 mb-0.5 first:mt-0 flex-1"
-                dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(line.substring(2)) }}
-              />
-            ) : isH2 ? (
-              <h2
-                className="text-base font-bold text-stone-200 mt-1.5 mb-0.5 first:mt-0 flex-1"
-                dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(line.substring(3)) }}
-              />
-            ) : isH3 ? (
-              <h3
-                className="text-sm font-bold text-stone-300 mt-1 mb-0.5 first:mt-0 flex-1"
-                dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(line.substring(4)) }}
-              />
-            ) : isBullet ? (
-              <div className="flex items-start gap-2 w-full pl-2">
-                <span className="text-stone-500 select-none">•</span>
-                <span
-                  className="flex-1"
-                  dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(bulletContent) }}
-                />
-              </div>
-            ) : isQuote ? (
-              <blockquote
-                className="border-l-2 border-stone-700 pl-3 my-0.5 text-stone-400 italic flex-1"
-                dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(quoteContent) }}
-              />
-            ) : isDivider ? (
-              <hr className="border-stone-800 my-1 w-full" />
-            ) : line === '' ? (
-              <div className="h-4 w-full" />
-            ) : (
-              <p
-                className="text-stone-300 leading-relaxed flex-1"
-                dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(line) }}
-              />
-            )}
-          </div>
+            className="text-stone-300 leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(line) }}
+          />
         );
       })}
+
+      {/* Subtle hover edit cue */}
+      <span className="text-[10px] text-stone-600 font-mono opacity-0 group-hover:opacity-100 transition-opacity select-none pt-1">
+        Click to edit
+      </span>
     </div>
   );
 }
