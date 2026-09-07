@@ -139,7 +139,13 @@ export default function MarkdownPreview({
   // Click outside listener to exit line edit mode
   useEffect(() => {
     const handlePointerDown = (e: PointerEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (!containerRef.current) return;
+      const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+      if (path.length > 0) {
+        if (!path.includes(containerRef.current)) {
+          setActiveLineIndex(null);
+        }
+      } else if (!containerRef.current.contains(e.target as Node)) {
         setActiveLineIndex(null);
       }
     };
@@ -255,6 +261,7 @@ export default function MarkdownPreview({
     return (
       <div
         ref={containerRef}
+        onPointerDown={() => setActiveLineIndex(0)}
         onClick={() => setActiveLineIndex(0)}
         className={`w-full min-h-[60px] text-stone-600 font-serif text-sm italic cursor-text py-2 select-none hover:text-stone-400 transition-colors ${className}`}
       >
@@ -308,14 +315,6 @@ export default function MarkdownPreview({
                   }
                 }}
                 onKeyDown={(e) => handleLineKeyDown(idx, e)}
-                onBlur={() => {
-                  // Slight delay so user can click another line or link without blur race
-                  setTimeout(() => {
-                    if (activeLineIndex === idx) {
-                      setActiveLineIndex(null);
-                    }
-                  }, 120);
-                }}
                 placeholder={idx === 0 ? placeholder : ''}
                 rows={1}
                 className="w-full bg-white/[0.04] border-l-2 border-indigo-500/80 text-stone-100 font-mono text-xs sm:text-sm px-2 py-1 rounded-r focus:outline-none resize-none leading-relaxed overflow-hidden"
@@ -328,6 +327,13 @@ export default function MarkdownPreview({
         return (
           <div
             key={idx}
+            onPointerDown={(e) => {
+              const target = e.target as HTMLElement;
+              if (target.closest('a') || target.closest('button')) {
+                return;
+              }
+              setActiveLineIndex(idx);
+            }}
             onClick={() => setActiveLineIndex(idx)}
             className="group relative flex items-start gap-1.5 px-1.5 py-0.5 -mx-1.5 rounded hover:bg-white/[0.03] transition-colors cursor-text min-h-[24px]"
           >

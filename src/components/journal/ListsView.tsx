@@ -1173,7 +1173,7 @@ export default function ListsView({
 	}, [selectedView, listTaskCounts, taskLists, listTasks]);
 
 	return (
-		<div className="space-y-0" id="tasks-view-dashboard">
+		<div className="space-y-0 md:flex md:flex-col md:flex-1 md:h-full md:min-h-0" id="tasks-view-dashboard">
 			{/* ── MOBILE: Row 1 & Row 2 Layout ── */}
 			<div className="md:hidden">
 				{isMobileSearchOpen ? (
@@ -1285,7 +1285,7 @@ export default function ListsView({
 			</div>
 
 			{/* ── DESKTOP: Two-column layout with Redesigned Sidebar ── */}
-			<div className="hidden md:flex gap-0 h-[600px] overflow-hidden">
+			<div className="hidden md:flex gap-0 flex-1 h-full min-h-0 overflow-hidden">
 				{/* LEFT COLUMN — Sidebar */}
 				<div className="w-[210px] lg:w-[270px] h-full overflow-y-auto shrink-0 flex flex-col min-h-0 border-r border-stone-800/60 pr-3 mr-3 font-sans">
 					{/* Smart Views */}

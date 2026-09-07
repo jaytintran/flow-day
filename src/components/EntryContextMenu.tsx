@@ -88,6 +88,11 @@ export default function EntryContextMenu({
     []
   ) || [];
 
+  const liveEntry = useLiveQuery(
+    () => (entry ? db.entries.get(entry.id) : undefined),
+    [entry?.id]
+  ) || entry;
+
   // Calculate boundary-aware coordinates for the main context menu
   useEffect(() => {
     if (!menuRef.current) return;
@@ -124,11 +129,22 @@ export default function EntryContextMenu({
       }
     };
     const handleWindowBlur = () => onClose();
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (menuRef.current && target && menuRef.current.contains(target)) {
+        return;
+      }
+      const floatingSubmenu = document.getElementById('context-menu-floating-submenu');
+      if (floatingSubmenu && target && floatingSubmenu.contains(target)) {
+        return;
+      }
+      onClose();
+    };
 
     window.addEventListener('pointerdown', handlePointerDown);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('resize', handleWindowBlur);
-    window.addEventListener('scroll', handleWindowBlur, true);
+    window.addEventListener('scroll', handleScroll, true);
 
     return () => {
       if (leaveTimeoutRef.current) {
@@ -137,21 +153,21 @@ export default function EntryContextMenu({
       window.removeEventListener('pointerdown', handlePointerDown);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('resize', handleWindowBlur);
-      window.removeEventListener('scroll', handleWindowBlur, true);
+      window.removeEventListener('scroll', handleScroll, true);
     };
   }, [onClose]);
 
-  if (!entry) return null;
+  if (!liveEntry) return null;
 
-  const isTask = entry.type === 'task';
-  const isLog = entry.type === 'log';
-  const isNote = entry.type === 'note';
-  const isEvent = entry.type === 'event';
-  const isTimeBlock = entry.type === 'time-block';
-  const task = isTask ? (entry as Task) : null;
+  const isTask = liveEntry.type === 'task';
+  const isLog = liveEntry.type === 'log';
+  const isNote = liveEntry.type === 'note';
+  const isEvent = liveEntry.type === 'event';
+  const isTimeBlock = liveEntry.type === 'time-block';
+  const task = isTask ? (liveEntry as Task) : null;
   const isTimerActive = isTask && activeTaskId === task?.id;
 
-  const isBatch = !!(selectedTaskIds && selectedTaskIds.length > 1 && selectedTaskIds.includes(entry.id));
+  const isBatch = !!(selectedTaskIds && selectedTaskIds.length > 1 && selectedTaskIds.includes(liveEntry.id));
   const batchCount = isBatch ? selectedTaskIds.length : 1;
 
   // Submenu Hover Handlers
@@ -323,7 +339,6 @@ export default function EntryContextMenu({
         : [...currentListIds, listId];
       await db.entries.update(task.id, { category_ids: updated } as any);
     }
-    onClose();
   };
 
   const handleDuplicate = async () => {
