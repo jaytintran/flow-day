@@ -148,7 +148,7 @@ export default function App() {
       </main>
 
       {/* ZONE 3 — INPUT BAR (FIXED BOTTOM) */}
-      {viewMode !== 'hub' && viewMode !== 'habits' && (
+      {viewMode !== 'hub' && viewMode !== 'habits' && viewMode !== 'lists' && (
         <footer
           className="flex-none relative z-35 bg-[#121212]"
           id="app-fixed-input"

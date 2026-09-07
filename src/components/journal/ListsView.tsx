@@ -7,6 +7,7 @@ import React, {
 	useState,
 	useMemo,
 	useEffect,
+	useRef,
 } from "react";
 import {
 	Search,
@@ -28,6 +29,7 @@ import {
 	Plus,
 	Palette,
 	Edit2,
+	Star,
 } from "lucide-react";
 import {
 	DndContext,
@@ -230,6 +232,48 @@ export default function ListsView({
 	// Sidebar Direct List Inline Rename State
 	const [editingListId, setEditingListId] = useState<string | null>(null);
 	const [editingListName, setEditingListName] = useState("");
+
+	// Dedicated Quick Task Input State in Lists View
+	const [quickTaskTitle, setQuickTaskTitle] = useState("");
+	const [quickTaskStatus, setQuickTaskStatus] = useState<TaskStatus>("todo");
+	const [quickTaskStarred, setQuickTaskStarred] = useState(false);
+	const quickTaskInputRef = useRef<HTMLInputElement>(null);
+
+	const handleQuickCreateTask = async (e?: React.FormEvent) => {
+		if (e) e.preventDefault();
+		const trimmed = quickTaskTitle.trim();
+		if (!trimmed) return;
+
+		const targetCategoryIds: string[] = [];
+		if (
+			selectedView &&
+			selectedView !== "all" &&
+			selectedView !== "unassigned" &&
+			selectedView !== "paper" &&
+			selectedView !== "trophy"
+		) {
+			targetCategoryIds.push(selectedView);
+		}
+
+		const newTaskId = crypto.randomUUID();
+		const newTask: Task = {
+			id: newTaskId,
+			type: "task",
+			title: trimmed,
+			status: quickTaskStatus,
+			time_spent: 0,
+			created_at: new Date(),
+			starred: quickTaskStarred || selectedView === "paper",
+			...(targetCategoryIds.length > 0
+				? { category_ids: targetCategoryIds }
+				: {}),
+			...(targetFolderId ? { folder_id: targetFolderId } : {}),
+		};
+
+		await db.entries.add(newTask);
+		setQuickTaskTitle("");
+		quickTaskInputRef.current?.focus();
+	};
 
 	// Dedicated Drag Sensor for Custom Lists in Sidebar
 	const listSensors = useSensors(
@@ -1236,6 +1280,113 @@ export default function ListsView({
 		};
 	}, [selectedView, listTaskCounts, taskLists, listTasks]);
 
+	const activeFolder = targetFolderId
+		? allFolders.find((f) => f.id === targetFolderId)
+		: null;
+
+	const quickTaskInputBar = (
+		<div className="pt-2 pb-1 shrink-0">
+			<form
+				onSubmit={handleQuickCreateTask}
+				className="flex items-center gap-2 bg-[#121212]/95 backdrop-blur-md border border-stone-800 hover:border-stone-700 focus-within:border-amber-500/50 focus-within:ring-1 focus-within:ring-amber-500/20 rounded-2xl px-3 py-2 shadow-xl transition-all"
+			>
+				{/* Status selector toggle */}
+				<div className="relative shrink-0">
+					<button
+						type="button"
+						onClick={() => {
+							setQuickTaskStatus((prev) =>
+								prev === "todo"
+									? "in_progress"
+									: prev === "in_progress"
+										? "maybe"
+										: "todo",
+							);
+						}}
+						className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-stone-900 border border-stone-800 text-[10px] font-mono font-bold uppercase tracking-wider text-stone-300 hover:text-stone-100 hover:border-stone-700 transition-all cursor-pointer"
+						title="Click to toggle initial status (To Do / In Progress / Maybe)"
+					>
+						<span
+							className={`w-2 h-2 rounded-full ${
+								quickTaskStatus === "in_progress"
+									? "bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.5)]"
+									: quickTaskStatus === "maybe"
+										? "bg-indigo-400"
+										: "bg-stone-400"
+							}`}
+						/>
+						<span>
+							{quickTaskStatus === "in_progress"
+								? "Active"
+								: quickTaskStatus === "maybe"
+									? "Maybe"
+									: "To Do"}
+						</span>
+					</button>
+				</div>
+
+				{/* Target folder badge if folder is targeted */}
+				{activeFolder && (
+					<span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[10px] font-mono font-semibold shrink-0">
+						<Folder className="w-3 h-3 text-indigo-400" />
+						<span className="truncate max-w-[90px]">{activeFolder.name}</span>
+						<button
+							type="button"
+							onClick={() => setTargetFolderId(undefined)}
+							className="hover:text-stone-100 cursor-pointer ml-0.5"
+							title="Clear target folder"
+						>
+							<X className="w-3 h-3" />
+						</button>
+					</span>
+				)}
+
+				{/* Text input */}
+				<input
+					ref={quickTaskInputRef}
+					id="quick-task-input"
+					type="text"
+					value={quickTaskTitle}
+					onChange={(e) => setQuickTaskTitle(e.target.value)}
+					placeholder={
+						activeFolder
+							? `Add task to "${activeFolder.name}"... (Press Enter to add)`
+							: `Add task to ${activeViewInfo.name}... (Press Enter to add)`
+					}
+					className="flex-1 min-w-0 bg-transparent text-[13px] text-stone-100 placeholder-stone-500 focus:outline-none"
+				/>
+
+				{/* Star / Focus toggle */}
+				<button
+					type="button"
+					onClick={() => setQuickTaskStarred(!quickTaskStarred)}
+					className={`p-1.5 rounded-lg border transition-all cursor-pointer shrink-0 ${
+						quickTaskStarred || selectedView === "paper"
+							? "bg-amber-500/15 border-amber-500/30 text-amber-400"
+							: "bg-transparent border-transparent text-stone-500 hover:text-stone-300 hover:bg-stone-800"
+					}`}
+					title={quickTaskStarred ? "Starred / In Paper List" : "Mark as Starred"}
+				>
+					<Star
+						className={`w-3.5 h-3.5 ${
+							quickTaskStarred || selectedView === "paper" ? "fill-current" : ""
+						}`}
+					/>
+				</button>
+
+				{/* Add button */}
+				<button
+					type="submit"
+					disabled={!quickTaskTitle.trim()}
+					className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-30 disabled:hover:bg-amber-500 text-stone-950 text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer disabled:cursor-not-allowed flex items-center gap-1.5 shadow-sm active:scale-95 shrink-0"
+				>
+					<Plus className="w-3.5 h-3.5" />
+					<span>Add</span>
+				</button>
+			</form>
+		</div>
+	);
+
 	return (
 		<div className="space-y-0 md:flex md:flex-col md:flex-1 md:h-full md:min-h-0" id="tasks-view-dashboard">
 			{/* ── MOBILE: Row 1 & Row 2 Layout ── */}
@@ -1324,6 +1475,11 @@ export default function ListsView({
 
 				{/* Row 2: Folder Strip Panel */}
 				{folderStripPanel}
+
+				{/* Quick Task Input on Mobile */}
+				{selectedView !== "trophy" && (
+					<div className="mb-2">{quickTaskInputBar}</div>
+				)}
 
 				{/* Content */}
 				<div className="my-1">
@@ -1621,6 +1777,9 @@ export default function ListsView({
 							>
 								{renderTaskContent(true)}
 							</div>
+
+							{/* Docked Quick Task Input for Lists View */}
+							{quickTaskInputBar}
 						</>
 					)}
 				</div>

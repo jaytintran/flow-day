@@ -1005,14 +1005,16 @@ export default function Journal({
 
 	return (
 		<div
-			className={`flex-1 px-2 md:px-6 pb-4 md:pb-6 ${
+			className={`flex-1 px-2 md:px-6 ${
 				viewMode === "hub" || viewMode === "habits"
 					? "overflow-hidden pt-1 pb-1 px-1 md:px-4 flex flex-col h-full"
-					: viewMode === "lists" || viewMode === "records"
-						? "overflow-y-auto md:overflow-hidden pt-4 md:pt-4 flex flex-col md:h-full"
-						: viewMode === "timeline"
-							? "overflow-y-auto pt-0"
-							: "overflow-y-auto pt-4 md:pt-6"
+					: viewMode === "lists"
+						? "overflow-y-auto md:overflow-hidden pt-3 md:pt-3 pb-2 md:pb-3 flex flex-col md:h-full"
+						: viewMode === "records"
+							? "overflow-y-auto md:overflow-hidden pt-4 md:pt-4 pb-4 md:pb-6 flex flex-col md:h-full"
+							: viewMode === "timeline"
+								? "overflow-y-auto pt-0 pb-4 md:pb-6"
+								: "overflow-y-auto pt-4 md:pt-6 pb-4 md:pb-6"
 			}`}
 			id="timeline-journal-scrollable"
 			ref={containerRef}
