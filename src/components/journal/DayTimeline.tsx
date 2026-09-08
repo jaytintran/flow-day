@@ -151,7 +151,11 @@ export default function DayTimeline({
     }
   });
   // Local state for time picker and time ruler
-  const [pickerEntry, setPickerEntry] = useState<TimelineEntry | null>(null);
+  const [pickerConfig, setPickerConfig] = useState<{
+    entry: TimelineEntry;
+    mode: 'start' | 'end' | 'span' | 'completed' | 'created';
+    initialDate: Date;
+  } | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     entry: TimelineEntry | TimeBlock;
     x: number;
@@ -374,25 +378,40 @@ export default function DayTimeline({
 
     if (entry.type === 'task') {
       const task = entry as Task;
+      const FIFTEEN_MINS_MS = 15 * 60 * 1000;
+
       // 1. If task had scheduled start and scheduled end time, always preserve the planned span!
       if (task.scheduled_at && task.scheduled_end_at) {
         const s = new Date(task.scheduled_at).getTime();
         const e = new Date(task.scheduled_end_at).getTime();
-        if (e - s >= 15 * 60 * 1000) {
+        if (e - s >= FIFTEEN_MINS_MS) {
           startDate = new Date(s);
           endDate = new Date(e);
         }
       }
-      // 2. If task has focus/tracked time >= 15 mins (900,000 ms) and is done
-      else if (task.status === 'done' && task.completed_at && task.time_spent && task.time_spent >= 15 * 60 * 1000) {
+      // 2. If task had an explicit scheduled time and is now completed, and gap >= 15 mins
+      else if (
+        task.status === 'done' &&
+        task.completed_at &&
+        task.scheduled_at &&
+        task.has_explicit_time &&
+        Math.abs(new Date(task.completed_at).getTime() - new Date(task.scheduled_at).getTime()) >= FIFTEEN_MINS_MS
+      ) {
+        const s = new Date(task.scheduled_at).getTime();
+        const e = new Date(task.completed_at).getTime();
+        startDate = new Date(Math.min(s, e));
+        endDate = new Date(Math.max(s, e));
+      }
+      // 3. If task has focus/tracked time >= 15 mins (900,000 ms) and is done
+      else if (
+        task.status === 'done' &&
+        task.completed_at &&
+        task.time_spent &&
+        task.time_spent >= FIFTEEN_MINS_MS
+      ) {
         const completedTime = new Date(task.completed_at).getTime();
         endDate = new Date(task.completed_at);
         startDate = new Date(completedTime - task.time_spent);
-      }
-      // 3. For pending task with scheduled start & end
-      else if (task.scheduled_at && task.scheduled_end_at) {
-        startDate = new Date(task.scheduled_at);
-        endDate = new Date(task.scheduled_end_at);
       }
     } else if (entry.type === 'log') {
       const log = entry as Log;
@@ -518,7 +537,11 @@ export default function DayTimeline({
     // Only open standard picker modal if the ruler overlay never got activated
     if (hadStart && !activeRulerState && !('block_type' in entry || 'children_ids' in entry)) {
       e.stopPropagation();
-      setPickerEntry(entry as TimelineEntry);
+      setPickerConfig({
+        entry: hadStart.entry as TimelineEntry,
+        mode: hadStart.mode,
+        initialDate: hadStart.initialDate,
+      });
     }
   };
 
@@ -565,11 +588,11 @@ export default function DayTimeline({
       } else if (mode === 'completed') {
         await db.entries.update(task.id, { completed_at: newStart } as any);
       } else if (mode === 'start') {
-        await db.entries.update(task.id, { scheduled_at: newStart } as any);
+        await db.entries.update(task.id, { scheduled_at: newStart, has_explicit_time: true } as any);
       } else if (mode === 'end' && newEnd) {
-        await db.entries.update(task.id, { scheduled_end_at: newEnd } as any);
+        await db.entries.update(task.id, { scheduled_end_at: newEnd, has_explicit_time: true } as any);
       } else if (mode === 'span' && newEnd) {
-        await db.entries.update(task.id, { scheduled_at: newStart, scheduled_end_at: newEnd } as any);
+        await db.entries.update(task.id, { scheduled_at: newStart, scheduled_end_at: newEnd, has_explicit_time: true } as any);
       }
     } else if (timelineEntry.type === 'log') {
       const log = timelineEntry as Log;
@@ -629,9 +652,7 @@ export default function DayTimeline({
         isCompletedTask = true;
       } else {
         primaryTime = formatTime(task.scheduled_at || task.created_at);
-        isScheduledTime =
-          !!task.scheduled_at &&
-          new Date(task.scheduled_at).getTime() !== new Date(task.created_at).getTime();
+        isScheduledTime = !!task.has_explicit_time || (!!task.scheduled_at && new Date(task.scheduled_at).getTime() !== new Date(task.created_at).getTime());
       }
     } else if (isLog) {
       primaryTime = formatTime((entry as Log).timestamp);
@@ -1864,12 +1885,26 @@ export default function DayTimeline({
 
       {/* Time Picker Sheet */}
       <TimePickerSheet
-        open={pickerEntry !== null}
-        onClose={() => setPickerEntry(null)}
-        initialDate={pickerEntry ? getPickerInitialDate(pickerEntry) : new Date()}
-        onConfirm={(newDate) => {
-          if (pickerEntry) onTimePickerConfirm(pickerEntry, newDate);
-          setPickerEntry(null);
+        open={pickerConfig !== null}
+        onClose={() => setPickerConfig(null)}
+        initialDate={pickerConfig ? pickerConfig.initialDate : new Date()}
+        onConfirm={async (newDate) => {
+          if (pickerConfig) {
+            const { entry, mode } = pickerConfig;
+            if (entry.type === 'task') {
+              const task = entry as Task;
+              if (mode === 'created') {
+                await db.entries.update(task.id, { created_at: newDate } as any);
+              } else if (mode === 'completed') {
+                await db.entries.update(task.id, { completed_at: newDate } as any);
+              } else {
+                onTimePickerConfirm(entry, newDate);
+              }
+            } else {
+              onTimePickerConfirm(entry, newDate);
+            }
+          }
+          setPickerConfig(null);
         }}
       />
 

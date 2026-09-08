@@ -93,9 +93,9 @@ export default function CategoryManagementSheet({
   };
 
   const handleDelete = async (cat: Category) => {
-    // unlink all entries tagged with this category
-    const allEntries = await db.entries.toArray();
-    for (const e of allEntries) {
+    // unlink all entries tagged with this category using indexed lookup
+    const taggedEntries = await db.entries.where('category_ids').equals(cat.id).toArray();
+    for (const e of taggedEntries) {
       const ids = (e as any).category_ids;
       if (Array.isArray(ids) && ids.includes(cat.id)) {
         await db.entries.update(e.id, {

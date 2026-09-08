@@ -53,6 +53,7 @@ export interface Task extends BaseEntry {
   starred?: boolean;
   is_accomplishment?: boolean; // marks a completed task as an accomplishment for the Trophy view
   folder_id?: string; // links to a ListFolder
+  has_explicit_time?: boolean; // true if user explicitly scheduled an exact hour/minute or span
 }
 
 export interface ListFolder {

@@ -11,6 +11,7 @@ import {
   CheckSquare,
   List,
   Code,
+  SquareCode,
   Check,
 } from 'lucide-react';
 
@@ -71,10 +72,50 @@ export function parseMarkdown(text: string): string {
   const lines = text.split('\n');
   const result: string[] = [];
   let inList = false;
+  let inCodeBlock = false;
+  let codeBlockLang = '';
+  let codeBlockLines: string[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
+
+    // Fenced Code Block start/end: ``` or ```lang
+    if (trimmed.startsWith('```')) {
+      if (inList) { result.push('</ul>'); inList = false; }
+
+      if (inCodeBlock) {
+        // Closing code block
+        const escapedCode = codeBlockLines
+          .map((l) =>
+            l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          )
+          .join('\n');
+        result.push(
+          `<div class="my-2.5 rounded-xl border border-stone-800 bg-[#0d0d0d] overflow-hidden font-mono text-[13px] text-stone-200">` +
+            (codeBlockLang
+              ? `<div class="px-3.5 py-1 text-[10px] font-mono uppercase tracking-widest text-stone-500 bg-stone-900/60 border-b border-stone-800/80">${codeBlockLang}</div>`
+              : '') +
+            `<pre class="p-3.5 overflow-x-auto leading-relaxed text-amber-300/90 font-mono"><code>${escapedCode}</code></pre>` +
+          `</div>`
+        );
+        inCodeBlock = false;
+        codeBlockLang = '';
+        codeBlockLines = [];
+        continue;
+      } else {
+        // Opening code block
+        inCodeBlock = true;
+        codeBlockLang = trimmed.substring(3).trim();
+        codeBlockLines = [];
+        continue;
+      }
+    }
+
+    if (inCodeBlock) {
+      codeBlockLines.push(line);
+      continue;
+    }
 
     if (trimmed.startsWith('# ')) {
       if (inList) { result.push('</ul>'); inList = false; }
@@ -112,6 +153,23 @@ export function parseMarkdown(text: string): string {
     }
   }
 
+  // Handle unclosed code block if user is still typing
+  if (inCodeBlock) {
+    const escapedCode = codeBlockLines
+      .map((l) =>
+        l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      )
+      .join('\n');
+    result.push(
+      `<div class="my-2.5 rounded-xl border border-stone-800 bg-[#0d0d0d] overflow-hidden font-mono text-[13px] text-stone-200">` +
+        (codeBlockLang
+          ? `<div class="px-3.5 py-1 text-[10px] font-mono uppercase tracking-widest text-stone-500 bg-stone-900/60 border-b border-stone-800/80">${codeBlockLang}</div>`
+          : '') +
+        `<pre class="p-3.5 overflow-x-auto leading-relaxed text-amber-300/90 font-mono"><code>${escapedCode}</code></pre>` +
+      `</div>`
+    );
+  }
+
   if (inList) {
     result.push('</ul>');
   }
@@ -133,12 +191,31 @@ export default function MarkdownPreview({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  // Auto-adjust textarea height smoothly without collapsing parent scroll offset
+  const adjustHeight = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    // Find closest scrollable ancestor
+    const scrollParent = textarea.closest('.overflow-y-auto') as HTMLElement | null;
+    const prevScrollTop = scrollParent ? scrollParent.scrollTop : null;
+
+    // Set to 0 to calculate true scrollHeight without latching to inflated height
+    textarea.style.height = '0px';
+    const targetHeight = Math.max(140, textarea.scrollHeight);
+    textarea.style.height = `${targetHeight}px`;
+
+    // Restore parent scroll position so viewport doesn't shift down
+    if (scrollParent && prevScrollTop !== null) {
+      scrollParent.scrollTop = prevScrollTop;
+    }
+  };
+
   // Focus and auto-resize textarea when entering edit mode
   useEffect(() => {
     if (isEditing && textareaRef.current) {
       textareaRef.current.focus();
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.max(120, textareaRef.current.scrollHeight)}px`;
+      adjustHeight();
     }
   }, [isEditing]);
 
@@ -168,10 +245,7 @@ export default function MarkdownPreview({
     if (onChange) {
       onChange(val);
     }
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.max(120, textareaRef.current.scrollHeight)}px`;
-    }
+    adjustHeight();
   };
 
   // 1-Tap Checkbox Toggle in Preview Mode
@@ -320,6 +394,7 @@ export default function MarkdownPreview({
     const newContent = content.substring(0, start) + replacement + content.substring(end);
     if (onChange) onChange(newContent);
     setTimeout(() => {
+      adjustHeight();
       if (textareaRef.current) {
         textareaRef.current.focus();
         textareaRef.current.setSelectionRange(
@@ -351,6 +426,7 @@ export default function MarkdownPreview({
     }
     if (onChange) onChange(newContent);
     setTimeout(() => {
+      adjustHeight();
       if (textareaRef.current) {
         textareaRef.current.focus();
         textareaRef.current.setSelectionRange(newCursor, newCursor);
@@ -448,6 +524,14 @@ export default function MarkdownPreview({
             >
               <Code className="w-3.5 h-3.5" />
             </button>
+            <button
+              type="button"
+              onClick={() => wrapSelection('```\n', '\n```', 'code block')}
+              title="Code Block (```)"
+              className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer"
+            >
+              <SquareCode className="w-3.5 h-3.5" />
+            </button>
           </div>
 
           <div className="flex items-center gap-2">
@@ -468,10 +552,99 @@ export default function MarkdownPreview({
     );
   }
 
-  // PREVIEW MODE: Rich Formatted Markdown with Interactive Checkboxes & Clickable Links
-  const lines = content.length > 0 ? content.split('\n') : [];
+  // PREVIEW MODE: Rich Formatted Markdown with Interactive Checkboxes, Code Blocks & Clickable Links
+  type ParsedBlock =
+    | { type: 'code'; lang: string; code: string }
+    | { type: 'checkbox'; isChecked: boolean; label: string; lineIndex: number }
+    | { type: 'h1'; text: string }
+    | { type: 'h2'; text: string }
+    | { type: 'h3'; text: string }
+    | { type: 'bullet'; text: string }
+    | { type: 'quote'; text: string }
+    | { type: 'divider' }
+    | { type: 'empty' }
+    | { type: 'paragraph'; text: string };
 
-  if (lines.length === 0 || content.trim() === '') {
+  const parsedBlocks = React.useMemo(() => {
+    const rawLines = content.length > 0 ? content.split('\n') : [];
+    const blocks: ParsedBlock[] = [];
+    let inCode = false;
+    let codeLang = '';
+    let codeLines: string[] = [];
+
+    for (let i = 0; i < rawLines.length; i++) {
+      const line = rawLines[i];
+      const trimmed = line.trim();
+
+      if (trimmed.startsWith('```')) {
+        if (inCode) {
+          blocks.push({
+            type: 'code',
+            lang: codeLang,
+            code: codeLines.join('\n'),
+          });
+          inCode = false;
+          codeLang = '';
+          codeLines = [];
+          continue;
+        } else {
+          inCode = true;
+          codeLang = trimmed.substring(3).trim();
+          codeLines = [];
+          continue;
+        }
+      }
+
+      if (inCode) {
+        codeLines.push(line);
+        continue;
+      }
+
+      const isUnchecked = trimmed.startsWith('- [ ] ') || trimmed.startsWith('* [ ] ');
+      const isChecked = trimmed.startsWith('- [x] ') || trimmed.startsWith('* [x] ');
+      const isCheckbox = isUnchecked || isChecked;
+      if (isCheckbox) {
+        const checkboxLabel = line.replace(/^(\s*[-*]\s*\[[ x]\]\s*)/, '');
+        blocks.push({
+          type: 'checkbox',
+          isChecked,
+          label: checkboxLabel,
+          lineIndex: i,
+        });
+        continue;
+      }
+
+      if (trimmed.startsWith('# ')) {
+        blocks.push({ type: 'h1', text: line.substring(2) });
+      } else if (trimmed.startsWith('## ')) {
+        blocks.push({ type: 'h2', text: line.substring(3) });
+      } else if (trimmed.startsWith('### ')) {
+        blocks.push({ type: 'h3', text: line.substring(4) });
+      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        blocks.push({ type: 'bullet', text: line.replace(/^(\s*[-*]\s*)/, '') });
+      } else if (trimmed.startsWith('> ')) {
+        blocks.push({ type: 'quote', text: line.replace(/^(\s*>\s*)/, '') });
+      } else if (/^\s*([-*_]\s*){3,}$/.test(trimmed)) {
+        blocks.push({ type: 'divider' });
+      } else if (trimmed === '') {
+        blocks.push({ type: 'empty' });
+      } else {
+        blocks.push({ type: 'paragraph', text: line });
+      }
+    }
+
+    if (inCode) {
+      blocks.push({
+        type: 'code',
+        lang: codeLang,
+        code: codeLines.join('\n'),
+      });
+    }
+
+    return blocks;
+  }, [content]);
+
+  if (parsedBlocks.length === 0 || content.trim() === '') {
     return (
       <div
         ref={containerRef}
@@ -489,32 +662,37 @@ export default function MarkdownPreview({
       onClick={() => setIsEditing(true)}
       className={`w-full flex-1 flex flex-col font-serif text-[15px] leading-relaxed text-stone-300 space-y-1.5 cursor-text py-1 ${className}`}
     >
-      {lines.map((line, idx) => {
-        const trimmed = line.trim();
+      {parsedBlocks.map((block, idx) => {
+        if (block.type === 'code') {
+          return (
+            <div
+              key={idx}
+              onClick={(e) => e.stopPropagation()}
+              className="my-2.5 rounded-xl border border-stone-800 bg-[#0d0d0d] overflow-hidden font-mono text-[13px] text-stone-200 shadow-sm cursor-auto"
+            >
+              <div className="flex items-center justify-between px-3.5 py-1.5 bg-stone-900/60 border-b border-stone-800/80 text-[10px] font-mono uppercase tracking-widest text-stone-500 select-none">
+                <span>{block.lang || 'code'}</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(block.code);
+                    } catch {}
+                  }}
+                  className="px-2 py-0.5 rounded text-stone-500 hover:text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer"
+                  title="Copy code"
+                >
+                  Copy
+                </button>
+              </div>
+              <pre className="p-3.5 overflow-x-auto leading-relaxed text-amber-300/90 font-mono select-text">
+                <code>{block.code}</code>
+              </pre>
+            </div>
+          );
+        }
 
-        // Checkbox Line
-        const isUnchecked = trimmed.startsWith('- [ ] ') || trimmed.startsWith('* [ ] ');
-        const isChecked = trimmed.startsWith('- [x] ') || trimmed.startsWith('* [x] ');
-        const isCheckbox = isUnchecked || isChecked;
-        const checkboxLabel = isCheckbox ? line.replace(/^(\s*[-*]\s*\[[ x]\]\s*)/, '') : '';
-
-        // Heading
-        const isH1 = trimmed.startsWith('# ');
-        const isH2 = trimmed.startsWith('## ');
-        const isH3 = trimmed.startsWith('### ');
-
-        // Bullet
-        const isBullet = (trimmed.startsWith('- ') || trimmed.startsWith('* ')) && !isCheckbox;
-        const bulletContent = isBullet ? line.replace(/^(\s*[-*]\s*)/, '') : '';
-
-        // Quote
-        const isQuote = trimmed.startsWith('> ');
-        const quoteContent = isQuote ? line.replace(/^(\s*>\s*)/, '') : '';
-
-        // Divider
-        const isDivider = /^\s*([-*_]\s*){3,}$/.test(trimmed);
-
-        if (isDivider) {
+        if (block.type === 'divider') {
           return (
             <div key={idx} className="w-full py-2.5 my-1.5 select-none">
               <div className="w-full h-px bg-stone-800 border-t border-stone-800/80" />
@@ -522,87 +700,87 @@ export default function MarkdownPreview({
           );
         }
 
-        if (isCheckbox) {
+        if (block.type === 'checkbox') {
           return (
             <div key={idx} className="flex items-start gap-2 w-full my-0.5">
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleToggleCheckboxInPreview(idx);
+                  handleToggleCheckboxInPreview(block.lineIndex);
                 }}
                 className={`mt-1 w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-all cursor-pointer ${
-                  isChecked
+                  block.isChecked
                     ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
                     : 'border-stone-700 hover:border-stone-500 bg-stone-900/60 text-stone-500'
                 }`}
-                title={isChecked ? 'Mark incomplete' : 'Mark complete'}
+                title={block.isChecked ? 'Mark incomplete' : 'Mark complete'}
               >
-                {isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                {block.isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
               </button>
               <span
                 className={`flex-1 text-[15px] ${
-                  isChecked ? 'line-through text-stone-500 opacity-70' : 'text-stone-300'
+                  block.isChecked ? 'line-through text-stone-500 opacity-70' : 'text-stone-300'
                 }`}
-                dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(checkboxLabel) }}
+                dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(block.label) }}
               />
             </div>
           );
         }
 
-        if (isH1) {
+        if (block.type === 'h1') {
           return (
             <h1
               key={idx}
               className="text-xl font-bold text-stone-100 mt-3 mb-1 first:mt-0 tracking-tight"
-              dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(line.substring(2)) }}
+              dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(block.text) }}
             />
           );
         }
 
-        if (isH2) {
+        if (block.type === 'h2') {
           return (
             <h2
               key={idx}
               className="text-lg font-bold text-stone-200 mt-2.5 mb-1 first:mt-0 tracking-tight"
-              dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(line.substring(3)) }}
+              dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(block.text) }}
             />
           );
         }
 
-        if (isH3) {
+        if (block.type === 'h3') {
           return (
             <h3
               key={idx}
               className="text-base font-semibold text-stone-300 mt-2 mb-0.5 first:mt-0"
-              dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(line.substring(4)) }}
+              dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(block.text) }}
             />
           );
         }
 
-        if (isBullet) {
+        if (block.type === 'bullet') {
           return (
             <div key={idx} className="flex items-start gap-2 w-full pl-2 text-[15px]">
               <span className="text-stone-500 select-none">•</span>
               <span
                 className="flex-1"
-                dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(bulletContent) }}
+                dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(block.text) }}
               />
             </div>
           );
         }
 
-        if (isQuote) {
+        if (block.type === 'quote') {
           return (
             <blockquote
               key={idx}
               className="border-l-2 border-stone-700 pl-3.5 my-1 text-stone-400 italic text-[15px]"
-              dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(quoteContent) }}
+              dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(block.text) }}
             />
           );
         }
 
-        if (line === '') {
+        if (block.type === 'empty') {
           return <div key={idx} className="h-2 w-full" />;
         }
 
@@ -610,7 +788,7 @@ export default function MarkdownPreview({
           <p
             key={idx}
             className="text-stone-300 text-[15px] leading-relaxed"
-            dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(line) }}
+            dangerouslySetInnerHTML={{ __html: parseInlineMarkdown(block.text) }}
           />
         );
       })}

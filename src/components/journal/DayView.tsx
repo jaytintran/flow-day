@@ -8,7 +8,7 @@ import DayTimeline, { RenderItem } from './DayTimeline';
 import { TimelineEntry, Task, DayRange } from '../../types';
 import { ChevronDown, ChevronRight, Calendar, Trash2, Sparkles, AlertCircle, Play, Plus } from 'lucide-react';
 import EntryContextMenu from '../EntryContextMenu';
-import { toLocalDateString, formatDateLabel, isSameDay } from '../../utils';
+import { toLocalDateString, formatDateLabel, isSameDay, getEffectiveDate } from '../../utils';
 
 interface DayViewProps {
   activeDate: Date;
@@ -349,11 +349,14 @@ export default function DayView({
 
           // Get items for this column's day
           const colDayEntries = entries.filter((e) => {
-            if (e.type === 'task' && !e.scheduled_at) {
-              if (e.status !== 'done' || !e.completed_at) return false;
-              return toLocalDateString(new Date(e.completed_at)) === colDayString;
+            if (e.type === 'task') {
+              const task = e as Task;
+              if (task.status === 'done' && task.completed_at) {
+                return toLocalDateString(new Date(task.completed_at)) === colDayString;
+              }
+              return toLocalDateString(getEffectiveDate(task)) === colDayString;
             }
-            return toLocalDateString(new Date(e.scheduled_at || e.created_at || (e as any).timestamp)) === colDayString;
+            return toLocalDateString(getEffectiveDate(e)) === colDayString;
           });
 
           const colRenderItems = getDayRenderItems ? getDayRenderItems(colDayEntries) : [];

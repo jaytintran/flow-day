@@ -415,15 +415,13 @@ export default function EntryContextMenu({
     setTimeout(() => onClose(), 400);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (isBatch && onBatchDelete && selectedTaskIds) {
       onBatchDelete(selectedTaskIds);
     } else if (isBatch && selectedTaskIds) {
-      db.entries.bulkDelete(selectedTaskIds);
-    } else if (onDeleteEntry) {
-      onDeleteEntry(entry.id);
+      await db.entries.bulkDelete(selectedTaskIds);
     } else {
-      db.entries.delete(entry.id);
+      await db.entries.delete(entry.id);
     }
     onClose();
   };

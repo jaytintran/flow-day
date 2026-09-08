@@ -549,7 +549,6 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
         cleanTitle,
         defaultBaseDate,
       );
-      cleanTitle = textAfterDateRemoval;
 
       const {
         parsedStart,
@@ -557,11 +556,14 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
         hasSpan,
         hasTime,
         textAfterTimeRemoval,
-      } = parseSmartTimeSpan(cleanTitle, dateBase);
-      cleanTitle = textAfterTimeRemoval;
+      } = parseSmartTimeSpan(textAfterDateRemoval, dateBase);
 
-      const finalTitle = cleanTitle || title.trim();
+      const finalTitle = textAfterTimeRemoval || textAfterDateRemoval || title.trim();
       if (!finalTitle) return;
+
+      const hasExplicitDate = dateBase.toDateString() !== defaultBaseDate.toDateString();
+      const hasExplicitTime = hasTime || hasSpan || timeManuallySet;
+      const hasExplicitSchedule = hasExplicitTime || hasExplicitDate;
 
       newEntry = {
         id: entryId,
@@ -570,7 +572,8 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
         status: 'todo',
         time_spent: 0,
         created_at: new Date(),
-        scheduled_at: parsedStart,
+        ...(hasExplicitSchedule ? { scheduled_at: parsedStart } : {}),
+        has_explicit_time: hasExplicitTime,
         ...(hasSpan && parsedEnd ? { scheduled_end_at: parsedEnd } : {}),
       };
     } else if (activeType === 'log') {

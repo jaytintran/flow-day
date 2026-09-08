@@ -612,18 +612,44 @@ export default function Journal({
 		});
 	};
 
-	// Read all timeline entries reactive from Dexie.js (filter out objectives & goals — they live in their own sheets)
-	const entries = (useLiveQuery(() => db.entries.toArray()) || []).filter(
-		(e) => e.type !== "objective" && e.type !== "goal",
-	);
+	// Read timeline entries reactive from Dexie.js
+	// Goals & Objectives live in their own sheets; habit-logs are scoped to a sliding window around activeDate
+	const entries =
+		useLiveQuery(async () => {
+			const windowStart = new Date(activeDate);
+			windowStart.setDate(windowStart.getDate() - 30);
+			windowStart.setHours(0, 0, 0, 0);
+
+			const windowEnd = new Date(activeDate);
+			windowEnd.setDate(windowEnd.getDate() + 30);
+			windowEnd.setHours(23, 59, 59, 999);
+
+			const all = await db.entries
+				.filter((e) => {
+					// Always exclude goals & objectives from timeline/journal
+					if (e.type === "objective" || e.type === "goal") return false;
+					// For habit-logs, only include logs within the active 60-day window
+					if (e.type === "habit-log") {
+						const t = new Date(e.timestamp || e.created_at).getTime();
+						return t >= windowStart.getTime() && t <= windowEnd.getTime();
+					}
+					// Include all tasks, events, notes, time-blocks, and logs
+					return true;
+				})
+				.toArray();
+			return all;
+		}, [activeDate]) || [];
 
 	// Group and sort logic for Day View and Timeline View
 	const getEntrySortTime = (e: TimelineEntry): number => {
-		// For tasks: if scheduled_at is set, anchor to scheduled_at; otherwise use completed_at → created_at
+		// For tasks: if done, anchor to completed_at (reflects actual completion); otherwise scheduled_at → created_at
 		if (e.type === "task") {
-			if (e.scheduled_at) return new Date(e.scheduled_at).getTime();
-			if (e.completed_at) return new Date(e.completed_at).getTime();
-			return new Date(e.created_at).getTime();
+			const task = e as Task;
+			if (task.status === "done" && task.completed_at) {
+				return new Date(task.completed_at).getTime();
+			}
+			if (task.scheduled_at) return new Date(task.scheduled_at).getTime();
+			return new Date(task.created_at).getTime();
 		}
 		// For non-tasks: carried_to → natural timestamp (events/notes: timestamp, time-blocks: start_at)
 		return getEffectiveDate(e).getTime();
@@ -816,7 +842,10 @@ export default function Journal({
 			case "task": {
 				const task = entry as Task;
 				const field = task.status === "done" ? "completed_at" : "scheduled_at";
-				await db.entries.update(id, { [field]: newDate } as any);
+				await db.entries.update(id, {
+					[field]: newDate,
+					...(field === "scheduled_at" ? { has_explicit_time: true } : {}),
+				} as any);
 				break;
 			}
 			case "event":
@@ -858,10 +887,7 @@ export default function Journal({
 
 			const children = others.filter((entry) => {
 				if (assignedIds.has(entry.id)) return false;
-				const checkTime =
-					entry.type === "task"
-						? new Date(entry.scheduled_at || entry.created_at).getTime()
-						: getEntrySortTime(entry);
+				const checkTime = getEntrySortTime(entry);
 				const fits = checkTime >= start && checkTime <= end;
 				if (fits) {
 					assignedIds.add(entry.id);
@@ -880,7 +906,7 @@ export default function Journal({
 		);
 
 		// Combine into timeline
-		const items: any[] = [];
+		const items: RenderItem[] = [];
 		timeBlocksWithChildren.forEach(({ block, children }) => {
 			items.push({
 				type: "bracket",
@@ -905,10 +931,12 @@ export default function Journal({
 	// Day View data
 	const activeDayString = toLocalDateString(activeDate);
 	const activeDayEntries = entries.filter((e) => {
-		if (e.type === "task" && !e.scheduled_at) {
-			// Include completed dateless tasks anchored to their completion date
-			if (e.status !== "done" || !e.completed_at) return false;
-			return toLocalDateString(new Date(e.completed_at)) === activeDayString;
+		if (e.type === "task") {
+			const task = e as Task;
+			if (task.status === "done" && task.completed_at) {
+				return toLocalDateString(new Date(task.completed_at)) === activeDayString;
+			}
+			return toLocalDateString(getEffectiveDate(task)) === activeDayString;
 		}
 		return toLocalDateString(getEffectiveDate(e)) === activeDayString;
 	});
@@ -921,10 +949,15 @@ export default function Journal({
 		}
 		const map: { [key: string]: TimelineEntry[] } = {};
 		entries.forEach((e) => {
-			if (e.type === "task" && !e.scheduled_at) {
-				// Include completed dateless tasks, bucketed by their completion date
-				if (e.status !== "done" || !e.completed_at) return;
-				const dayStr = toLocalDateString(new Date(e.completed_at));
+			if (e.type === "task") {
+				const task = e as Task;
+				if (task.status === "done" && task.completed_at) {
+					const dayStr = toLocalDateString(new Date(task.completed_at));
+					if (!map[dayStr]) map[dayStr] = [];
+					map[dayStr].push(e);
+					return;
+				}
+				const dayStr = toLocalDateString(getEffectiveDate(task));
 				if (!map[dayStr]) map[dayStr] = [];
 				map[dayStr].push(e);
 				return;

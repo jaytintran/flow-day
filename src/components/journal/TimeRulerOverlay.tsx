@@ -238,11 +238,13 @@ export default function TimeRulerOverlay({
     >
       {/* 1. Header guide prompt */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-1.5 rounded-full bg-stone-900/90 border border-stone-800 text-stone-300 text-xs font-mono shadow-2xl pointer-events-none">
-        <Clock className={`w-3.5 h-3.5 ${mode === 'completed' ? 'text-emerald-400' : 'text-amber-400'}`} />
+        <Clock className={`w-3.5 h-3.5 ${mode === 'completed' ? 'text-emerald-400' : mode === 'created' ? 'text-stone-400' : 'text-amber-400'}`} />
         <span>
           {mode === 'completed'
             ? 'Drag vertically to adjust completion time · Drop onto (X) to cancel'
-            : 'Drag vertically to adjust time · Drop onto (X) to cancel'}
+            : mode === 'created'
+              ? 'Drag vertically to adjust creation time · Drop onto (X) to cancel'
+              : 'Drag vertically to adjust time · Drop onto (X) to cancel'}
         </span>
       </div>
 
@@ -290,7 +292,9 @@ export default function TimeRulerOverlay({
           className={`absolute -right-2 left-0 h-[2px] -translate-y-1/2 flex items-center justify-end ${
             mode === 'completed'
               ? 'bg-emerald-400 shadow-[0_0_10px_#10b981]'
-              : 'bg-amber-400 shadow-[0_0_10px_#f59e0b]'
+              : mode === 'created'
+                ? 'bg-stone-300 shadow-[0_0_10px_rgba(214,211,209,0.5)]'
+                : 'bg-amber-400 shadow-[0_0_10px_#f59e0b]'
           }`}
           style={{ top: `${indicatorPct}%` }}
         >
@@ -298,7 +302,9 @@ export default function TimeRulerOverlay({
             className={`w-2.5 h-2.5 rounded-full ring-4 ${
               mode === 'completed'
                 ? 'bg-emerald-400 ring-emerald-400/20'
-                : 'bg-amber-400 ring-amber-400/20'
+                : mode === 'created'
+                  ? 'bg-stone-300 ring-stone-400/20'
+                  : 'bg-amber-400 ring-amber-400/20'
             } -mr-1`}
           />
         </div>
@@ -319,14 +325,20 @@ export default function TimeRulerOverlay({
           className={`w-6 md:w-8 h-[1.5px] ${
             mode === 'completed'
               ? 'bg-emerald-400/80 shadow-[0_0_8px_#10b981]'
-              : 'bg-amber-400/80 shadow-[0_0_8px_#f59e0b]'
+              : mode === 'created'
+                ? 'bg-stone-400/80 shadow-[0_0_8px_rgba(168,162,158,0.5)]'
+                : 'bg-amber-400/80 shadow-[0_0_8px_#f59e0b]'
           }`}
         />
 
         {/* Floating Time Pill */}
         <div
           className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#121212] border text-stone-100 shadow-[0_8px_30px_rgba(0,0,0,0.85)] backdrop-blur-md ${
-            mode === 'completed' ? 'border-emerald-500/50' : 'border-amber-500/50'
+            mode === 'completed'
+              ? 'border-emerald-500/50'
+              : mode === 'created'
+                ? 'border-stone-700 shadow-[0_0_12px_rgba(255,255,255,0.05)]'
+                : 'border-amber-500/50'
           }`}
         >
           {mode === 'completed' && (
@@ -334,9 +346,18 @@ export default function TimeRulerOverlay({
               Completed
             </span>
           )}
+          {mode === 'created' && (
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-stone-400 bg-stone-500/15 border border-stone-500/30 px-1.5 py-0.5 rounded">
+              Created
+            </span>
+          )}
           <span
             className={`text-base md:text-lg font-mono font-bold tracking-tight ${
-              mode === 'completed' ? 'text-emerald-400' : 'text-amber-400'
+              mode === 'completed'
+                ? 'text-emerald-400'
+                : mode === 'created'
+                  ? 'text-stone-200'
+                  : 'text-amber-400'
             }`}
           >
             {formattedTime}
