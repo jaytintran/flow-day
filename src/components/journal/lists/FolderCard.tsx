@@ -14,6 +14,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Task, Category, ListFolder, TimelineEntry } from '../../../types';
+import { STATUS_GROUPS } from '../ListsView';
 import DesktopTaskCard from './DesktopTaskCard';
 import MobileTaskItem from './MobileTaskItem';
 
@@ -46,6 +47,7 @@ interface FolderCardProps {
   isDesktop?: boolean;
   gridClass?: string;
   showContent?: boolean;
+  statusFilter?: "all" | "todo" | "in_progress" | "done" | "dropped" | "maybe";
   onContextMenu?: (task: Task, e: React.MouseEvent) => void;
 }
 
@@ -78,11 +80,40 @@ export default function FolderCard({
   isDesktop = false,
   gridClass = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5',
   showContent = true,
+  statusFilter = 'all',
   onContextMenu,
 }: FolderCardProps) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(folder.name);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const [collapsedStatusGroups, setCollapsedStatusGroups] = useState<
+    Record<string, boolean>
+  >(() => {
+    try {
+      const saved = localStorage.getItem(
+        `flowday_folder_${folder.id}_collapsed_status_groups`
+      );
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const toggleStatusGroup = (groupKey: string) => {
+    setCollapsedStatusGroups((prev) => {
+      const next = { ...prev, [groupKey]: !prev[groupKey] };
+      try {
+        localStorage.setItem(
+          `flowday_folder_${folder.id}_collapsed_status_groups`,
+          JSON.stringify(next)
+        );
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
 
   const { setNodeRef, isOver } = useDroppable({
     id: `folder-drop-${folder.id}`,
@@ -118,7 +149,7 @@ export default function FolderCard({
     <div
       id={`folder-${folder.id}`}
       ref={setNodeRef}
-      className={`rounded-2xl border transition-all duration-200 ${
+      className={`rounded-2xl border transition-all duration-200 scroll-mt-4 ${
         isOver
           ? 'border-amber-500/60 bg-amber-500/[0.04] shadow-[0_0_20px_rgba(245,158,11,0.1)]'
           : 'border-stone-800/80 bg-[#101010]'
@@ -217,70 +248,176 @@ export default function FolderCard({
       {/* Folder Tasks */}
       {!isCollapsed && (
         <div className="p-2.5">
-          <SortableContext
-            items={tasks.map((t) => t.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            {isDesktop ? (
-              <div className={gridClass}>
-                {tasks.map((task) => (
-                  <DesktopTaskCard
-                    key={task.id}
-                    task={task}
-                    activeTaskId={activeTaskId}
-                    deletingId={deletingId}
-                    taskLists={taskLists}
-                    selectedListId={selectedListId}
-                    availableFolders={availableFolders}
-                    isSelected={selectedTaskIds?.has(task.id)}
-                    onClickCard={onClickCard}
-                    onDeleteEntry={onDeleteEntry}
-                    onOpenDetail={onOpenDetail}
-                    onToggleTaskStatus={onToggleTaskStatus}
-                    onOpenStatusModal={onOpenStatusModal}
-                    onActivateTask={onActivateTask}
-                    onOpenScheduleModal={onOpenScheduleModal}
-                    onOpenListPicker={onOpenListPicker}
-                    onOpenFolderPicker={onOpenFolderPicker}
-                    onToggleAccomplishment={onToggleAccomplishment}
-                    showContent={showContent}
-                    onContextMenu={onContextMenu}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                {tasks.map((task) => (
-                  <MobileTaskItem
-                    key={task.id}
-                    task={task}
-                    activeTaskId={activeTaskId}
-                    deletingId={deletingId}
-                    taskLists={taskLists}
-                    selectedListId={selectedListId}
-                    availableFolders={availableFolders}
-                    isSelected={selectedTaskIds?.has(task.id)}
-                    onClickCard={onClickCard}
-                    isSwiped={activeSwipedTaskId === task.id}
-                    onSetSwiped={(swiped) =>
-                      onSetSwipedTaskId?.(swiped ? task.id : null)
-                    }
-                    onDeleteEntry={onDeleteEntry}
-                    onOpenDetail={onOpenDetail}
-                    onToggleTaskStatus={onToggleTaskStatus}
-                    onOpenStatusModal={onOpenStatusModal}
-                    onActivateTask={onActivateTask}
-                    onOpenScheduleModal={onOpenScheduleModal}
-                    onOpenListPicker={onOpenListPicker}
-                    onOpenFolderPicker={onOpenFolderPicker}
-                    onToggleAccomplishment={onToggleAccomplishment}
-                    showContent={showContent}
-                    onContextMenu={onContextMenu}
-                  />
-                ))}
-              </div>
-            )}
-          </SortableContext>
+          {statusFilter === 'all' ? (
+            <div className="space-y-4">
+              {STATUS_GROUPS.map((group) => {
+                const groupTasks = tasks.filter(group.filterFn);
+                if (groupTasks.length === 0) return null;
+                const isGroupCollapsed = !!collapsedStatusGroups[group.key];
+
+                return (
+                  <div key={group.key} className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleStatusGroup(group.key)}
+                      className="w-full flex items-center justify-between py-1 px-1.5 rounded-lg text-left hover:bg-stone-900/40 transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-2">
+                        <ChevronDown
+                          className={`w-3.5 h-3.5 text-stone-500 transition-transform duration-200 ${
+                            isGroupCollapsed ? '-rotate-90' : 'rotate-0'
+                          }`}
+                        />
+                        <span
+                          className={`w-2 h-2 rounded-full ${group.dotColor}`}
+                        />
+                        <span
+                          className={`text-[11px] font-mono font-bold uppercase tracking-wider ${group.textColor}`}
+                        >
+                          {group.label}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-stone-500 tabular-nums">
+                        {groupTasks.length}
+                      </span>
+                    </button>
+
+                    {!isGroupCollapsed && (
+                      <SortableContext
+                        items={groupTasks.map((t) => t.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {isDesktop ? (
+                          <div className={gridClass}>
+                            {groupTasks.map((task) => (
+                              <DesktopTaskCard
+                                key={task.id}
+                                task={task}
+                                activeTaskId={activeTaskId}
+                                deletingId={deletingId}
+                                taskLists={taskLists}
+                                selectedListId={selectedListId}
+                                availableFolders={availableFolders}
+                                isSelected={selectedTaskIds?.has(task.id)}
+                                onClickCard={onClickCard}
+                                onDeleteEntry={onDeleteEntry}
+                                onOpenDetail={onOpenDetail}
+                                onToggleTaskStatus={onToggleTaskStatus}
+                                onOpenStatusModal={onOpenStatusModal}
+                                onActivateTask={onActivateTask}
+                                onOpenScheduleModal={onOpenScheduleModal}
+                                onOpenListPicker={onOpenListPicker}
+                                onOpenFolderPicker={onOpenFolderPicker}
+                                onToggleAccomplishment={onToggleAccomplishment}
+                                showContent={showContent}
+                                onContextMenu={onContextMenu}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {groupTasks.map((task) => (
+                              <MobileTaskItem
+                                key={task.id}
+                                task={task}
+                                activeTaskId={activeTaskId}
+                                deletingId={deletingId}
+                                taskLists={taskLists}
+                                selectedListId={selectedListId}
+                                availableFolders={availableFolders}
+                                isSelected={selectedTaskIds?.has(task.id)}
+                                onClickCard={onClickCard}
+                                isSwiped={activeSwipedTaskId === task.id}
+                                onSetSwiped={(swiped) =>
+                                  onSetSwipedTaskId?.(swiped ? task.id : null)
+                                }
+                                onDeleteEntry={onDeleteEntry}
+                                onOpenDetail={onOpenDetail}
+                                onToggleTaskStatus={onToggleTaskStatus}
+                                onOpenStatusModal={onOpenStatusModal}
+                                onActivateTask={onActivateTask}
+                                onOpenScheduleModal={onOpenScheduleModal}
+                                onOpenListPicker={onOpenListPicker}
+                                onOpenFolderPicker={onOpenFolderPicker}
+                                onToggleAccomplishment={onToggleAccomplishment}
+                                showContent={showContent}
+                                onContextMenu={onContextMenu}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </SortableContext>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <SortableContext
+              items={tasks.map((t) => t.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {isDesktop ? (
+                <div className={gridClass}>
+                  {tasks.map((task) => (
+                    <DesktopTaskCard
+                      key={task.id}
+                      task={task}
+                      activeTaskId={activeTaskId}
+                      deletingId={deletingId}
+                      taskLists={taskLists}
+                      selectedListId={selectedListId}
+                      availableFolders={availableFolders}
+                      isSelected={selectedTaskIds?.has(task.id)}
+                      onClickCard={onClickCard}
+                      onDeleteEntry={onDeleteEntry}
+                      onOpenDetail={onOpenDetail}
+                      onToggleTaskStatus={onToggleTaskStatus}
+                      onOpenStatusModal={onOpenStatusModal}
+                      onActivateTask={onActivateTask}
+                      onOpenScheduleModal={onOpenScheduleModal}
+                      onOpenListPicker={onOpenListPicker}
+                      onOpenFolderPicker={onOpenFolderPicker}
+                      onToggleAccomplishment={onToggleAccomplishment}
+                      showContent={showContent}
+                      onContextMenu={onContextMenu}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {tasks.map((task) => (
+                    <MobileTaskItem
+                      key={task.id}
+                      task={task}
+                      activeTaskId={activeTaskId}
+                      deletingId={deletingId}
+                      taskLists={taskLists}
+                      selectedListId={selectedListId}
+                      availableFolders={availableFolders}
+                      isSelected={selectedTaskIds?.has(task.id)}
+                      onClickCard={onClickCard}
+                      isSwiped={activeSwipedTaskId === task.id}
+                      onSetSwiped={(swiped) =>
+                        onSetSwipedTaskId?.(swiped ? task.id : null)
+                      }
+                      onDeleteEntry={onDeleteEntry}
+                      onOpenDetail={onOpenDetail}
+                      onToggleTaskStatus={onToggleTaskStatus}
+                      onOpenStatusModal={onOpenStatusModal}
+                      onActivateTask={onActivateTask}
+                      onOpenScheduleModal={onOpenScheduleModal}
+                      onOpenListPicker={onOpenListPicker}
+                      onOpenFolderPicker={onOpenFolderPicker}
+                      onToggleAccomplishment={onToggleAccomplishment}
+                      showContent={showContent}
+                      onContextMenu={onContextMenu}
+                    />
+                  ))}
+                </div>
+              )}
+            </SortableContext>
+          )}
 
           {tasks.length === 0 && (
             <div

@@ -138,7 +138,7 @@ const LIST_COLORS: Record<
 	},
 };
 
-const STATUS_GROUPS: Array<{
+export const STATUS_GROUPS: Array<{
 	key: string;
 	label: string;
 	dotColor: string;
@@ -902,9 +902,35 @@ export default function ListsView({
 						<button
 							key={folder.id}
 							onClick={() => {
-								const el = document.getElementById(`folder-${folder.id}`);
-								if (el) {
-									el.scrollIntoView({ behavior: "smooth", block: "start" });
+								const scrollToFolder = () => {
+									const el = document.getElementById(`folder-${folder.id}`);
+									if (el) {
+										const scrollContainer = el.closest(".overflow-y-auto") as HTMLElement | null;
+										if (scrollContainer) {
+											const containerRect = scrollContainer.getBoundingClientRect();
+											const elRect = el.getBoundingClientRect();
+											const targetScrollTop =
+												scrollContainer.scrollTop +
+												(elRect.top - containerRect.top) -
+												16;
+											scrollContainer.scrollTo({
+												top: Math.max(0, targetScrollTop),
+												behavior: "smooth",
+											});
+										} else {
+											el.scrollIntoView({ behavior: "smooth", block: "start" });
+										}
+									}
+								};
+
+								if (collapsedFolders[folder.id]) {
+									setCollapsedFolders((prev) => ({
+										...prev,
+										[folder.id]: false,
+									}));
+									setTimeout(scrollToFolder, 50);
+								} else {
+									scrollToFolder();
 								}
 							}}
 							className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-mono font-semibold bg-stone-900/60 border border-stone-800 text-stone-300 hover:border-amber-500/40 hover:text-amber-300 transition-all cursor-pointer shrink-0"
@@ -961,53 +987,8 @@ export default function ListsView({
 			collisionDetection={closestCenter}
 			onDragEnd={handleDragEnd}
 		>
-			<div className="space-y-4">
-				{/* Folders List */}
-				{currentListFolders.map((folder) => {
-					const fTasks = folderTasksMap[folder.id] ?? [];
-					if (statusFilter !== "all" && fTasks.length === 0) return null;
-
-					return (
-						<FolderCard
-							key={folder.id}
-							folder={folder}
-							tasks={fTasks}
-							isCollapsed={!!collapsedFolders[folder.id]}
-							onToggleCollapse={() => toggleFolderCollapse(folder.id)}
-							onRenameFolder={handleRenameFolder}
-							onDeleteFolder={handleDeleteFolder}
-							activeTaskId={activeTaskId}
-							deletingId={deletingId}
-							taskLists={taskLists}
-							selectedListId={selectedView}
-							availableFolders={availableFoldersForPicker}
-							selectedTaskIds={selectedTaskIds}
-							onClickCard={handleTaskClick}
-							activeSwipedTaskId={activeSwipedTaskId}
-							onSetSwipedTaskId={setActiveSwipedTaskId}
-							onDeleteEntry={onDeleteEntry}
-							onOpenDetail={onOpenDetail}
-							onToggleTaskStatus={onToggleTaskStatus}
-							onOpenStatusModal={setStatusPickerTask}
-							onActivateTask={onActivateTask}
-							onOpenScheduleModal={setScheduleModalTask}
-							onOpenListPicker={(t) => setListPickerTaskId(t.id)}
-							onOpenFolderPicker={setFolderPickerTask}
-							onAddTaskToFolder={(fId) => {
-								setTargetFolderId(fId);
-								const input = document.getElementById("quick-task-input");
-								if (input) input.focus();
-							}}
-							onToggleAccomplishment={handleToggleAccomplishment}
-							isDesktop={isDesktop}
-							gridClass={gridClass}
-							showContent={showContent}
-							onContextMenu={handleTaskContextMenu}
-						/>
-					);
-				})}
-
-				{/* Root / Unfolderized Tasks Section */}
+			<div className="space-y-6">
+				{/* 1. Root / Unfolderized Items Section (Shown First) */}
 				<div
 					ref={setRootNodeRef}
 					className={`rounded-2xl transition-all duration-150 ${
@@ -1019,9 +1000,9 @@ export default function ListsView({
 					}`}
 				>
 					{currentListFolders.length > 0 && rootTasks.length > 0 && (
-						<div className="flex items-center justify-between mb-2 px-1">
+						<div className="flex items-center justify-between mb-2.5 px-1">
 							<span className="text-[10px] font-mono uppercase tracking-widest text-stone-500 font-bold">
-								General Tasks ({rootTasks.length})
+								General Items ({rootTasks.length})
 							</span>
 						</div>
 					)}
@@ -1209,22 +1190,69 @@ export default function ListsView({
 								)}
 							</SortableContext>
 						)}
-
-						{rootTasks.length === 0 && currentListFolders.length === 0 && (
-							<div className="py-20 text-center text-stone-500 select-none">
-								<ListTodo className="w-10 h-10 text-stone-800 mx-auto mb-3" />
-								<h4 className="font-mono font-medium text-xs text-stone-400 mb-1">
-									{searchQuery.trim()
-										? "No matching tasks found."
-										: "List is empty."}
-								</h4>
-								<p className="text-[11px] font-mono text-stone-600 max-w-sm mx-auto">
-									Create an item using the input engine or add a folder to organize your backlog.
-								</p>
-							</div>
-						)}
 					</div>
 				</div>
+
+				{/* 2. Folders List Section (Moved Below General Items) */}
+				{currentListFolders.map((folder) => {
+					const fTasks = folderTasksMap[folder.id] ?? [];
+					if (statusFilter !== "all" && fTasks.length === 0) return null;
+
+					return (
+						<FolderCard
+							key={folder.id}
+							folder={folder}
+							tasks={fTasks}
+							isCollapsed={!!collapsedFolders[folder.id]}
+							onToggleCollapse={() => toggleFolderCollapse(folder.id)}
+							onRenameFolder={handleRenameFolder}
+							onDeleteFolder={handleDeleteFolder}
+							activeTaskId={activeTaskId}
+							deletingId={deletingId}
+							taskLists={taskLists}
+							selectedListId={selectedView}
+							availableFolders={availableFoldersForPicker}
+							selectedTaskIds={selectedTaskIds}
+							onClickCard={handleTaskClick}
+							activeSwipedTaskId={activeSwipedTaskId}
+							onSetSwipedTaskId={setActiveSwipedTaskId}
+							onDeleteEntry={onDeleteEntry}
+							onOpenDetail={onOpenDetail}
+							onToggleTaskStatus={onToggleTaskStatus}
+							onOpenStatusModal={setStatusPickerTask}
+							onActivateTask={onActivateTask}
+							onOpenScheduleModal={setScheduleModalTask}
+							onOpenListPicker={(t) => setListPickerTaskId(t.id)}
+							onOpenFolderPicker={setFolderPickerTask}
+							onAddTaskToFolder={(fId) => {
+								setTargetFolderId(fId);
+								const input = document.getElementById("quick-task-input");
+								if (input) input.focus();
+							}}
+							onToggleAccomplishment={handleToggleAccomplishment}
+							isDesktop={isDesktop}
+							gridClass={gridClass}
+							showContent={showContent}
+							statusFilter={statusFilter}
+							onContextMenu={handleTaskContextMenu}
+						/>
+					);
+				})}
+
+				{/* Empty State when no root items and no folders */}
+				{rootTasks.length === 0 && currentListFolders.length === 0 && (
+					<div className="py-20 text-center text-stone-500 select-none">
+						<ListTodo className="w-10 h-10 text-stone-800 mx-auto mb-3" />
+						<h4 className="font-mono font-medium text-xs text-stone-400 mb-1">
+							{searchQuery.trim()
+								? "No matching items found."
+								: "List is empty."}
+						</h4>
+						<p className="text-[11px] font-mono text-stone-600 max-w-sm mx-auto">
+							Create an item using the input engine or add a folder to organize your backlog.
+						</p>
+					</div>
+				)}
 			</div>
 		</DndContext>
 	);

@@ -289,23 +289,6 @@ export default function SortableSidebarListItem({
 					</span>
 				)}
 			</div>
-
-			{/* Sub-Folders when this list is active */}
-			{isActive && listFolders.length > 0 && (
-				<div className="pl-6 pr-1 py-1 space-y-0.5 border-l border-stone-800/80 ml-4 my-0.5">
-					{listFolders.map((f) => (
-						<button
-							key={f.id}
-							type="button"
-							onClick={() => onFolderClick(f.id)}
-							className="w-full flex items-center gap-1.5 px-2 py-1 rounded-lg text-left text-[11px] font-mono text-stone-400 hover:text-amber-300 hover:bg-stone-900/60 transition-colors cursor-pointer"
-						>
-							<Folder className="w-3 h-3 text-amber-400/80 shrink-0" />
-							<span className="flex-1 truncate">{f.name}</span>
-						</button>
-					))}
-				</div>
-			)}
 		</div>
 	);
 }
