@@ -287,7 +287,7 @@ export default function FolderCard({
               onClick={() => onAddTaskToFolder(folder.id)}
               className="py-4 border border-dashed border-stone-800/70 rounded-xl text-center text-[11px] font-mono text-stone-600 hover:text-stone-400 hover:border-stone-700 transition-colors cursor-pointer select-none"
             >
-              + Add or drag tasks into {folder.name}
+              + Add or drag items into {folder.name}
             </div>
           )}
         </div>

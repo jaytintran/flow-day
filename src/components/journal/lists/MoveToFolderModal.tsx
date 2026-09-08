@@ -70,7 +70,7 @@ export default function MoveToFolderModal({
             >
               <Layers className="w-3.5 h-3.5 text-stone-400 shrink-0" />
               <span className="flex-1 min-w-0 text-xs font-mono truncate">
-                General Tasks (No Folder)
+                General Items (No Folder)
               </span>
               {!task.folder_id && (
                 <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 stroke-[3]" />

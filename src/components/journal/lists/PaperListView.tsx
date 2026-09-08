@@ -55,7 +55,7 @@ export default function PaperListView({
       >
         {activeTasks.length === 0 && doneTasks.length === 0 && (
           <p className="text-stone-600 text-center py-20">
-            No tasks in your backlog.
+            No items in your backlog.
           </p>
         )}
 

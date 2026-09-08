@@ -637,7 +637,7 @@ export default function DayNavigator({
                   ) : viewMode === 'lists' ? (
                     <>
                       <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]" />
-                      All Active Lists & Tasks
+                      All Domains & Areas
                     </>
                   ) : viewMode === 'habits' ? (
                     <>

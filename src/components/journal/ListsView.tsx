@@ -774,7 +774,7 @@ export default function ListsView({
 	// ─── Drag and Drop Sensor & Handlers ──────────────────────────────────────
 	const sensors = useSensors(
 		useSensor(PointerSensor, {
-			activationConstraint: { delay: 150, tolerance: 5 },
+			activationConstraint: { distance: 8 },
 		}),
 		useSensor(KeyboardSensor, {
 			coordinateGetter: sortableKeyboardCoordinates,
@@ -1219,7 +1219,7 @@ export default function ListsView({
 										: "List is empty."}
 								</h4>
 								<p className="text-[11px] font-mono text-stone-600 max-w-sm mx-auto">
-									Create a task using the input engine or add a folder to organize your backlog.
+									Create an item using the input engine or add a folder to organize your backlog.
 								</p>
 							</div>
 						)}
@@ -1232,7 +1232,7 @@ export default function ListsView({
 	const activeViewInfo = useMemo(() => {
 		if (selectedView === "all") {
 			return {
-				name: "All Tasks",
+				name: "All Items",
 				icon: <Layers className="w-3.5 h-3.5 text-stone-300" />,
 				count: listTaskCounts["all"]?.active ?? 0,
 			};
@@ -1274,7 +1274,7 @@ export default function ListsView({
 			};
 		}
 		return {
-			name: "Tasks",
+			name: "Items",
 			icon: <ListTodo className="w-3.5 h-3.5" />,
 			count: 0,
 		};
@@ -1350,8 +1350,8 @@ export default function ListsView({
 					onChange={(e) => setQuickTaskTitle(e.target.value)}
 					placeholder={
 						activeFolder
-							? `Add task to "${activeFolder.name}"... (Press Enter to add)`
-							: `Add task to ${activeViewInfo.name}... (Press Enter to add)`
+							? `Add item to "${activeFolder.name}"... (Press Enter to add)`
+							: `Add item to ${activeViewInfo.name}... (Press Enter to add)`
 					}
 					className="flex-1 min-w-0 bg-transparent text-[13px] text-stone-100 placeholder-stone-500 focus:outline-none"
 				/>
@@ -1402,7 +1402,7 @@ export default function ListsView({
 									type="text"
 									value={searchQuery}
 									onChange={(e) => setSearchQuery(e.target.value)}
-									placeholder="Search tasks..."
+									placeholder="Search items..."
 									className="w-full pl-8 pr-3 py-1.5 text-xs font-mono bg-white/[0.05] border border-white/20 rounded-xl text-stone-200 placeholder-stone-500 focus:outline-none focus:border-indigo-400/60 transition-all"
 								/>
 							</div>
@@ -1432,7 +1432,7 @@ export default function ListsView({
 								<button
 									onClick={() => setIsMobileSearchOpen(true)}
 									className="p-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-stone-400 hover:text-stone-200 hover:bg-white/[0.08] transition-all cursor-pointer shrink-0"
-									title="Search tasks"
+									title="Search items"
 								>
 									<Search className="w-3.5 h-3.5" />
 								</button>
@@ -1535,7 +1535,7 @@ export default function ListsView({
 						>
 							<Layers className="w-4 h-4 text-stone-300 shrink-0" />
 							<span className="flex-1 min-w-0 text-[13px] font-medium truncate">
-								All Tasks
+								All Items
 							</span>
 							<span className="text-[11px] font-mono text-stone-500 font-semibold tabular-nums">
 								{listTaskCounts["all"]?.active ?? 0}
@@ -1597,13 +1597,13 @@ export default function ListsView({
 					{/* Custom Lists Header */}
 					<div className="pt-2.5 border-t border-stone-800/80 flex items-center justify-between px-2 mb-1.5 shrink-0">
 						<span className="text-[11px] font-mono font-bold uppercase tracking-wider text-stone-500">
-							Custom Lists
+							Domains / Areas / Lists
 						</span>
 						<button
 							type="button"
 							onClick={() => setIsCreatingList(true)}
 							className="p-1 rounded-md text-stone-500 hover:text-amber-400 hover:bg-stone-800 transition-colors cursor-pointer"
-							title="Add new list"
+							title="Add new domain / list"
 						>
 							<Plus className="w-3.5 h-3.5" />
 						</button>
@@ -1727,7 +1727,7 @@ export default function ListsView({
 									</div>
 								)}
 
-								{/* Ghost "+ New List" Button */}
+								{/* Ghost "+ New D/A/L" Button */}
 								{!isCreatingList && (
 									<button
 										type="button"
@@ -1735,7 +1735,7 @@ export default function ListsView({
 										className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-mono text-stone-500 hover:text-stone-300 hover:bg-stone-900/50 border border-dashed border-stone-800/80 hover:border-stone-700 transition-all cursor-pointer mt-1"
 									>
 										<Plus className="w-3.5 h-3.5 text-stone-500" />
-										<span>New List</span>
+										<span>+ New D/A/L</span>
 									</button>
 								)}
 							</div>
@@ -1769,7 +1769,7 @@ export default function ListsView({
 										type="text"
 										value={searchQuery}
 										onChange={(e) => setSearchQuery(e.target.value)}
-										placeholder="Search tasks..."
+										placeholder="Search items..."
 										className="w-full sm:w-64 pl-8 pr-3 py-1.5 text-xs font-mono bg-white/[0.03] border border-white/[0.08] rounded-xl text-stone-200 placeholder-stone-500 focus:outline-none focus:border-indigo-400/50 focus:bg-white/[0.05] transition-all"
 									/>
 								</div>
@@ -2359,6 +2359,84 @@ export default function ListsView({
 						</motion.div>
 					</motion.div>
 				</AnimatePresence>
+			)}
+
+			{/* ── Popovers and Modals ── */}
+			{statusPickerTask && (
+				<TaskStatusPickerPopover
+					task={statusPickerTask}
+					onClose={() => setStatusPickerTask(null)}
+				/>
+			)}
+
+			{scheduleModalTask && (
+				<ScheduleCalendarModal
+					task={scheduleModalTask}
+					onClose={() => setScheduleModalTask(null)}
+					onSelectDate={(taskId, date) => {
+						onCarryTask(taskId, date);
+						setScheduleModalTask(null);
+					}}
+					onUnschedule={async (taskId) => {
+						await db.entries.update(taskId, { scheduled_at: undefined } as any);
+						setScheduleModalTask(null);
+					}}
+				/>
+			)}
+
+			{listPickerTaskId && (
+				(() => {
+					const t = allTasks.find((item) => item.id === listPickerTaskId);
+					if (!t) return null;
+					return (
+						<ListPickerPopover
+							task={t}
+							lists={taskLists}
+							onClose={() => setListPickerTaskId(null)}
+						/>
+					);
+				})()
+			)}
+
+			{folderPickerTask && (
+				<MoveToFolderModal
+					task={folderPickerTask}
+					folders={availableFoldersForPicker}
+					onClose={() => setFolderPickerTask(null)}
+					onSelectFolder={async (taskId, folderId) => {
+						await handleMoveTaskToFolder(taskId, folderId);
+						setFolderPickerTask(null);
+					}}
+				/>
+			)}
+
+			{/* Floating Selection Action Bar */}
+			{selectedTaskIds.size > 0 && (
+				<motion.div
+					initial={{ opacity: 0, y: 20 }}
+					animate={{ opacity: 1, y: 0 }}
+					exit={{ opacity: 0, y: 20 }}
+					className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-2 px-4 py-2 bg-[#141414]/95 border border-amber-500/40 rounded-2xl shadow-2xl backdrop-blur-md"
+				>
+					<span className="text-xs font-mono font-bold text-amber-400">
+						{selectedTaskIds.size} selected
+					</span>
+					<div className="h-4 w-px bg-stone-700 mx-1" />
+					<button
+						type="button"
+						onClick={handleClearSelection}
+						className="px-2.5 py-1 text-[11px] font-mono font-semibold text-stone-300 hover:text-white bg-stone-800/80 hover:bg-stone-700 rounded-lg transition-colors cursor-pointer"
+					>
+						Clear (Esc)
+					</button>
+					<button
+						type="button"
+						onClick={handleBatchDelete}
+						className="px-2.5 py-1 text-[11px] font-mono font-semibold text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 rounded-lg transition-colors cursor-pointer"
+					>
+						Delete
+					</button>
+				</motion.div>
 			)}
 
 			{contextMenu && (
