@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Check,
   CircleDashed,
@@ -15,6 +15,7 @@ import {
   Clock,
   Play,
   Folder,
+  Trash2,
 } from 'lucide-react';
 import { db } from '../../../db';
 import { Task, Category, ListFolder, TimelineEntry } from '../../../types';
@@ -87,6 +88,32 @@ export default function DesktopTaskCard({
   const hasTimeSpent = (task.time_spent ?? 0) > 0;
   const achievementsCount = task.achievements?.length ?? 0;
 
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const confirmTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (confirmTimeoutRef.current) {
+        clearTimeout(confirmTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isConfirmingDelete) {
+      setIsConfirmingDelete(true);
+      if (confirmTimeoutRef.current) clearTimeout(confirmTimeoutRef.current);
+      confirmTimeoutRef.current = setTimeout(() => {
+        setIsConfirmingDelete(false);
+      }, 3000);
+    } else {
+      if (confirmTimeoutRef.current) clearTimeout(confirmTimeoutRef.current);
+      setIsConfirmingDelete(false);
+      onDeleteEntry(task.id);
+    }
+  };
+
   return (
     <SortableRow id={task.id} hideHandle>
       <div
@@ -117,8 +144,8 @@ export default function DesktopTaskCard({
                     : 'bg-[#141414] border-stone-800/80 hover:border-stone-700 hover:bg-[#181818]'
         }`}
       >
-        {/* Top Row: Enlarged Status Checkbox + Title + Trophy */}
-        <div className="flex items-start gap-3">
+        {/* Top Row: Enlarged Status Checkbox + Title + Trophy + Persistent Delete Button */}
+        <div className="flex items-start gap-2">
           <button
             type="button"
             onClick={(e) => {
@@ -130,11 +157,11 @@ export default function DesktopTaskCard({
                 ? 'bg-emerald-500/20 border-emerald-500/45 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.25)]'
                 : isInProgress
                   ? 'border-amber-500/60 bg-amber-500/15 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.25)] animate-pulse'
-                  : isDropped
-                    ? 'border-rose-500/40 bg-rose-500/10 text-rose-400'
-                    : isMaybe
-                      ? 'border-indigo-500/40 bg-indigo-500/10 text-indigo-400'
-                      : 'border-stone-700 hover:border-stone-500 bg-stone-900/90 text-stone-400 hover:text-stone-200'
+                : isDropped
+                  ? 'border-rose-500/40 bg-rose-500/10 text-rose-400'
+                  : isMaybe
+                    ? 'border-indigo-500/40 bg-indigo-500/10 text-indigo-400'
+                    : 'border-stone-700 hover:border-stone-500 bg-stone-900/90 text-stone-400 hover:text-stone-200'
             }`}
             title="Click to change status"
           >
@@ -163,33 +190,50 @@ export default function DesktopTaskCard({
             </span>
           </div>
 
-          {isDone && (
+          {/* Action buttons at top right */}
+          <div className="flex items-center gap-1 shrink-0 -mt-0.5">
+            {isDone && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onToggleAccomplishment) {
+                    onToggleAccomplishment(task);
+                  } else {
+                    db.entries.update(task.id, {
+                      is_accomplishment: !task.is_accomplishment,
+                    } as any);
+                  }
+                }}
+                className={`p-1 rounded-lg border transition-all cursor-pointer shrink-0 ${
+                  task.is_accomplishment
+                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
+                    : 'bg-stone-900/40 border-stone-800 text-stone-600 hover:text-amber-400'
+                }`}
+                title="Toggle Accomplishment"
+              >
+                <Trophy
+                  className={`w-3.5 h-3.5 ${
+                    task.is_accomplishment ? 'fill-amber-400' : ''
+                  }`}
+                />
+              </button>
+            )}
+
+            {/* Persistent 2-Click Delete Button */}
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onToggleAccomplishment) {
-                  onToggleAccomplishment(task);
-                } else {
-                  db.entries.update(task.id, {
-                    is_accomplishment: !task.is_accomplishment,
-                  } as any);
-                }
-              }}
-              className={`p-1 rounded-lg border transition-all cursor-pointer shrink-0 ${
-                task.is_accomplishment
-                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
-                  : 'bg-stone-900/40 border-stone-800 text-stone-600 hover:text-amber-400'
+              onClick={handleDeleteClick}
+              className={`p-1 rounded-lg transition-all cursor-pointer shrink-0 ${
+                isConfirmingDelete
+                  ? 'bg-rose-500/25 text-rose-300 border border-rose-500/60 animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.35)]'
+                  : 'text-stone-500 hover:text-rose-400 hover:bg-stone-850/70 border border-transparent'
               }`}
-              title="Toggle Accomplishment"
+              title={isConfirmingDelete ? 'Click again to confirm delete' : 'Delete task'}
             >
-              <Trophy
-                className={`w-3.5 h-3.5 ${
-                  task.is_accomplishment ? 'fill-amber-400' : ''
-                }`}
-              />
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
-          )}
+          </div>
         </div>
 
         {/* Bottom Metadata Badges Row */}

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Check,
   CircleDashed,
@@ -15,6 +15,7 @@ import {
   Clock,
   Play,
   Folder,
+  Trash2,
 } from 'lucide-react';
 import { db } from '../../../db';
 import { Task, Category, ListFolder, TimelineEntry } from '../../../types';
@@ -86,6 +87,32 @@ export default function DesktopTaskRow({
 
   const hasTimeSpent = (task.time_spent ?? 0) > 0;
   const achievementsCount = task.achievements?.length ?? 0;
+
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const confirmTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (confirmTimeoutRef.current) {
+        clearTimeout(confirmTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isConfirmingDelete) {
+      setIsConfirmingDelete(true);
+      if (confirmTimeoutRef.current) clearTimeout(confirmTimeoutRef.current);
+      confirmTimeoutRef.current = setTimeout(() => {
+        setIsConfirmingDelete(false);
+      }, 3000);
+    } else {
+      if (confirmTimeoutRef.current) clearTimeout(confirmTimeoutRef.current);
+      setIsConfirmingDelete(false);
+      onDeleteEntry(task.id);
+    }
+  };
 
   return (
     <SortableRow id={task.id} hideHandle>
@@ -294,6 +321,20 @@ export default function DesktopTaskRow({
               <span>Track</span>
             </button>
           )}
+
+          {/* Persistent 2-Click Delete Button */}
+          <button
+            type="button"
+            onClick={handleDeleteClick}
+            className={`p-1 rounded-md transition-all cursor-pointer shrink-0 ${
+              isConfirmingDelete
+                ? 'bg-rose-500/25 text-rose-300 border border-rose-500/60 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.35)]'
+                : 'text-stone-500 hover:text-rose-400 hover:bg-stone-850/70 border border-transparent'
+            }`}
+            title={isConfirmingDelete ? 'Click again to confirm delete' : 'Delete task'}
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
         </div>
       </div>
     </SortableRow>
