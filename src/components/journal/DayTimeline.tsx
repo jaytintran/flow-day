@@ -1491,13 +1491,13 @@ export default function DayTimeline({
   return (
     <div className="w-full relative" key={labelString}>
       {isFromTimelineView && (
-        <div className="sticky top-[94px] sm:top-[72px] z-20 bg-[#0a0a0a] pt-3 pb-1.5 transition-all w-full">
+        <div className="sticky top-[94px] sm:top-[72px] z-20 bg-stone-950 pt-3 pb-1.5 transition-all w-full">
           <div
             id={`spine-day-${labelString}`}
             className={`flex items-center justify-between py-2 px-3 rounded-xl border transition-all ${
               isToday
-                ? 'bg-[#14120a] border-amber-500/35 text-amber-300'
-                : 'bg-[#0e0e0e] border-stone-800/80 hover:border-stone-700 text-stone-300'
+                ? 'bg-amber-950/20 border-amber-500/35 text-amber-400'
+                : 'bg-stone-900 border-stone-800/80 hover:border-stone-700 text-stone-300'
             }`}
           >
             <div className="flex items-center gap-2 min-w-0 flex-1">

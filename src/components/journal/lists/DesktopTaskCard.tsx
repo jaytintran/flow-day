@@ -101,7 +101,7 @@ export default function DesktopTaskCard({
           e.preventDefault();
           if (onContextMenu) onContextMenu(task, e);
         }}
-        className={`group relative flex flex-col justify-between gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none min-h-[96px] ${
+        className={`group relative flex flex-col justify-between gap-3 p-3.5 rounded-2xl border transition-all duration-200 hover:-translate-y-0.5 cursor-pointer select-none min-h-[96px] ${
           isSelected
             ? 'bg-violet-500/15 border-violet-500/60 ring-2 ring-violet-500/40 shadow-[0_0_15px_rgba(139,92,246,0.15)]'
             : isActive
@@ -148,14 +148,14 @@ export default function DesktopTaskCard({
 
           <div className="flex-1 min-w-0">
             <span
-              className={`text-[13px] font-serif font-medium leading-snug line-clamp-2 transition-colors ${
+              className={`text-[13px] font-serif font-medium leading-snug line-clamp-2 ${
                 isDone
                   ? isAccomplishment
                     ? 'text-stone-300 font-medium'
                     : 'line-through text-stone-500'
                   : isDropped
                     ? 'line-through text-stone-500'
-                    : 'text-stone-200 group-hover:text-amber-200'
+                    : 'text-stone-200'
               }`}
             >
               {isAccomplishment && <span className="mr-1">🏆</span>}

@@ -101,7 +101,7 @@ export default function DesktopTaskRow({
           e.preventDefault();
           if (onContextMenu) onContextMenu(task, e);
         }}
-        className={`group relative flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl border transition-all cursor-pointer select-none min-h-[44px] ${
+        className={`group relative flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl border transition-all duration-150 hover:-translate-y-0.5 cursor-pointer select-none min-h-[44px] ${
           isSelected
             ? 'bg-violet-500/15 border-violet-500/60 ring-2 ring-violet-500/40 shadow-[0_0_12px_rgba(139,92,246,0.15)]'
             : isActive
@@ -147,14 +147,14 @@ export default function DesktopTaskRow({
           </button>
 
           <span
-            className={`text-xs font-serif font-medium truncate transition-colors ${
+            className={`text-xs font-serif font-medium truncate ${
               isDone
                 ? isAccomplishment
                   ? 'text-stone-300 font-medium'
                   : 'line-through text-stone-500'
                 : isDropped
                   ? 'line-through text-stone-500'
-                  : 'text-stone-200 group-hover:text-amber-200'
+                  : 'text-stone-200'
             }`}
           >
             {isAccomplishment && <span className="mr-1">🏆</span>}

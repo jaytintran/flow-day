@@ -94,10 +94,10 @@ export default function App() {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#0a0a0a] text-stone-200 font-sans selection:bg-stone-800 selection:text-stone-100 relative select-none">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-stone-950 text-stone-200 font-sans selection:bg-stone-800 selection:text-stone-100 relative select-none">
       {/* ZONE 1 — HEADER (FIXED TOP) */}
       <header
-        className="flex-none relative z-40 bg-[#121212]"
+        className="flex-none relative z-40 bg-stone-900"
         id="app-fixed-header"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
@@ -128,7 +128,7 @@ export default function App() {
 
       {/* ZONE 2 — MAIN TIMELINE (SCROLLABLE AREA) */}
       <main
-        className="flex-1 min-h-0 overflow-hidden flex flex-col relative bg-[#0a0a0a]"
+        className="flex-1 min-h-0 overflow-hidden flex flex-col relative bg-stone-950"
         id="app-scrollable-main"
       >
         {/* Subtle grid lines background overlay */}
@@ -150,7 +150,7 @@ export default function App() {
       {/* ZONE 3 — INPUT BAR (FIXED BOTTOM) */}
       {viewMode !== 'hub' && viewMode !== 'habits' && viewMode !== 'lists' && viewMode !== 'records' && (
         <footer
-          className="flex-none relative z-35 bg-[#121212]"
+          className="flex-none relative z-35 bg-stone-900"
           id="app-fixed-input"
           style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
         >

@@ -11,15 +11,19 @@ import {
   CheckCircle,
   AlertTriangle,
   Info,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useGistSync } from '../hooks/useGistSync';
+import { useTheme } from '../lib/theme';
 
 export default function Settings() {
   const [isOpen, setIsOpen] = useState(false);
   const [showPat, setShowPat] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [confirmAction, setConfirmAction] = useState<'push' | 'pull' | null>(null);
+  const [theme, setTheme] = useTheme();
 
   const [showTimelineContent, setShowTimelineContent] = useState(() => {
     try {
@@ -170,7 +174,7 @@ export default function Settings() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-[#121212] border border-stone-850 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]"
+              className="bg-stone-900 border border-stone-850 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]"
             >
               {/* Header */}
               <div className="flex items-center justify-between border-b border-stone-850 p-4 shrink-0">
@@ -259,6 +263,45 @@ export default function Settings() {
                 {/* PREFERENCES SECTION */}
                 <div className="space-y-4 border-b border-stone-850 pb-6">
                   <h3 className="text-stone-200 font-serif font-bold text-sm">Preferences</h3>
+
+                  {/* Theme / Eye-Care Appearance */}
+                  <div className="flex items-center justify-between p-3.5 bg-stone-900/40 border border-stone-850 rounded-xl">
+                    <div className="flex flex-col gap-1 pr-4">
+                      <span className="text-xs text-stone-200 font-semibold font-sans">
+                        Theme &amp; Appearance
+                      </span>
+                      <span className="text-[10px] font-mono text-stone-500">
+                        Dark Obsidian or Warm Sepia Paper for low eye strain.
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 bg-stone-950 border border-stone-800 p-1 rounded-xl shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setTheme('dark')}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          theme === 'dark'
+                            ? 'bg-amber-500 text-stone-950 shadow-sm'
+                            : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
+                        }`}
+                      >
+                        <Moon className="w-3.5 h-3.5" />
+                        <span>Dark</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTheme('sepia')}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          theme === 'sepia'
+                            ? 'bg-amber-500 text-stone-950 shadow-sm'
+                            : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
+                        }`}
+                      >
+                        <Sun className="w-3.5 h-3.5" />
+                        <span>Sepia</span>
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between p-3.5 bg-stone-900/40 border border-stone-850 rounded-xl">
                     <div className="flex flex-col gap-1 pr-4">
                       <span className="text-xs text-stone-200 font-semibold font-sans">
@@ -289,7 +332,7 @@ export default function Settings() {
                         Grid columns for task cards on desktop in Lists view.
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 bg-[#0a0a0a] border border-stone-800 p-1 rounded-xl shrink-0">
+                    <div className="flex items-center gap-1 bg-stone-950 border border-stone-800 p-1 rounded-xl shrink-0">
                       {['1', '2', '3', '4'].map((num) => (
                         <button
                           key={num}
@@ -337,7 +380,7 @@ export default function Settings() {
                           type="time"
                           value={sleepTime}
                           onChange={(e) => handleSaveSleepTime(e.target.value)}
-                          className="mt-3 bg-[#0a0a0a] border border-stone-850 hover:border-stone-800 focus:border-amber-500/35 rounded-xl px-3 py-2 text-xs text-stone-100 font-mono focus:outline-none focus:bg-stone-950 transition-all cursor-pointer"
+                          className="mt-3 bg-stone-950 border border-stone-850 hover:border-stone-800 focus:border-amber-500/35 rounded-xl px-3 py-2 text-xs text-stone-100 font-mono focus:outline-none focus:bg-stone-950 transition-all cursor-pointer"
                         />
                       </div>
                     )}
@@ -374,7 +417,7 @@ export default function Settings() {
                         Select interactive Mindmap canvas or original multi-column Hub on desktop.
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 bg-[#0a0a0a] border border-stone-800 p-1 rounded-xl shrink-0">
+                    <div className="flex items-center gap-1 bg-stone-950 border border-stone-800 p-1 rounded-xl shrink-0">
                       {[
                         { id: 'canvas', label: 'Mindmap' },
                         { id: 'classic', label: 'Classic' },
@@ -421,7 +464,7 @@ export default function Settings() {
                           placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
                           value={pat}
                           onChange={(e) => setPat(e.target.value)}
-                          className="w-full bg-[#0a0a0a] border border-stone-850 hover:border-stone-800 focus:border-amber-500/35 rounded-xl px-3.5 py-2.5 text-xs text-stone-100 placeholder-stone-700 font-mono focus:outline-none focus:bg-stone-950 transition-all pr-10"
+                          className="w-full bg-stone-950 border border-stone-850 hover:border-stone-800 focus:border-amber-500/35 rounded-xl px-3.5 py-2.5 text-xs text-stone-100 placeholder-stone-700 font-mono focus:outline-none focus:bg-stone-950 transition-all pr-10"
                         />
                         <button
                           type="button"
@@ -443,7 +486,7 @@ export default function Settings() {
                           placeholder="e.g. 8a6b2c4d..."
                           value={gistId}
                           onChange={(e) => setGistId(e.target.value)}
-                          className="flex-1 bg-[#0a0a0a] border border-stone-850 hover:border-stone-800 focus:border-amber-500/35 rounded-xl px-3.5 py-2.5 text-xs text-stone-100 placeholder-stone-700 font-mono focus:outline-none focus:bg-stone-950 transition-all"
+                          className="flex-1 bg-stone-950 border border-stone-850 hover:border-stone-800 focus:border-amber-500/35 rounded-xl px-3.5 py-2.5 text-xs text-stone-100 placeholder-stone-700 font-mono focus:outline-none focus:bg-stone-950 transition-all"
                         />
                         {!gistId.trim() && pat.trim() && (
                           <button

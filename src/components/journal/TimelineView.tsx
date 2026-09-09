@@ -240,11 +240,11 @@ export default function TimelineView({
   return (
     <div className="space-y-3" ref={containerRef}>
       {/* ─── Timeline Top Filter & Sort Bar ───────────────────────────────── */}
-      <div className="sticky top-0 z-30 bg-[#0a0a0a] pt-2 pb-2 sm:pt-3 sm:pb-2 transition-all">
-        <div className="bg-[#0e0e0e] border border-stone-800/80 rounded-2xl p-2 sm:p-2.5">
+      <div className="sticky top-0 z-30 bg-stone-950 pt-2 pb-2 sm:pt-3 sm:pb-2 transition-all">
+        <div className="bg-stone-900 border border-stone-800/80 rounded-2xl p-2 sm:p-2.5">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-2.5">
           {/* Status Filter Tabs (All / To Do / Done) */}
-          <div className="flex items-center gap-1 bg-black/40 border border-stone-800/80 p-1 rounded-xl w-full sm:w-auto overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-1 bg-stone-950/60 border border-stone-800/80 p-1 rounded-xl w-full sm:w-auto overflow-x-auto scrollbar-none">
             <button
               type="button"
               onClick={() => handleStatusFilterChange('all')}
@@ -288,7 +288,7 @@ export default function TimelineView({
           {/* Type & Sort Options */}
           <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
             {/* Entry Type Selector */}
-            <div className="flex items-center gap-1 bg-black/40 border border-stone-800/80 p-0.5 rounded-xl">
+            <div className="flex items-center gap-1 bg-stone-950/60 border border-stone-800/80 p-0.5 rounded-xl">
               {(
                 [
                   { id: 'all', label: 'All Types', icon: ListFilter },
@@ -412,7 +412,7 @@ export default function TimelineView({
           )}
         </div>
       ) : (
-        <div className="py-24 text-center text-stone-500 select-none bg-[#0e0e0e]/40 border border-dashed border-stone-800/80 rounded-2xl p-8">
+        <div className="py-24 text-center text-stone-500 select-none bg-stone-900/40 border border-dashed border-stone-800/80 rounded-2xl p-8">
           <Calendar className="w-12 h-12 text-stone-800 mx-auto mb-4" />
           <h4 className="font-sans font-medium text-sm text-stone-400 mb-1">
             No entries match your filter

@@ -178,7 +178,7 @@ export default function TrophyView({
                             onContextMenu(task, e);
                           }
                         }}
-                        className="bg-[#121212] border border-amber-500/30 hover:border-amber-500/60 rounded-xl p-3 flex flex-col justify-between gap-2.5 transition-all cursor-pointer group shadow-[0_0_12px_rgba(245,158,11,0.06)]"
+                        className="bg-[#121212] border border-amber-500/30 hover:border-amber-500/60 rounded-xl p-3 flex flex-col justify-between gap-2.5 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer group shadow-[0_0_12px_rgba(245,158,11,0.06)]"
                       >
                         <div className="flex items-start gap-2.5">
                           <div className="w-5 h-5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center shrink-0 mt-0.5 shadow-[0_0_6px_rgba(245,158,11,0.2)]">
@@ -186,7 +186,7 @@ export default function TrophyView({
                           </div>
 
                           <div className="flex-1 min-w-0">
-                            <span className="text-xs font-serif font-semibold text-stone-200 group-hover:text-amber-200 leading-snug line-clamp-2 transition-colors">
+                            <span className="text-xs font-serif font-semibold text-stone-200 leading-snug line-clamp-2">
                               {task.title}
                             </span>
                             {task.content && task.content.trim() && (
