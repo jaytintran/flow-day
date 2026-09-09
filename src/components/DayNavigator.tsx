@@ -782,18 +782,48 @@ export default function DayNavigator({
             </div>
           )}
 
-          {/* 3. View Mode Switcher segmented control (Desktop only) */}
+          {/* 3. View Mode Switcher pill style (Desktop only) */}
           <div
-            className="hidden md:flex items-center gap-1 bg-[#0c0c0c] border border-stone-800/90 rounded-2xl p-1 md:w-auto overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] shadow-inner"
+            className="hidden md:flex gap-1 bg-stone-900 border border-stone-800 rounded-full p-1 md:w-auto overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
             id="view-mode-switcher"
           >
             {[
-              { id: 'lists', label: 'Lists', dot: 'bg-violet-400' },
-              { id: 'day', label: 'Day', dot: 'bg-amber-400' },
-              { id: 'timeline', label: 'Timeline', dot: 'bg-sky-400' },
-              { id: 'records', label: 'Records', dot: 'bg-orange-400' },
-              { id: 'habits', label: 'Habits', dot: 'bg-emerald-400' },
-              { id: 'hub', label: 'Hub', dot: 'bg-rose-400' },
+              {
+                id: 'lists',
+                label: 'Lists',
+                activeColor:
+                  'bg-violet-600 text-white shadow-[0_0_12px_rgba(139,92,246,0.35)]',
+              },
+              {
+                id: 'day',
+                label: 'Day',
+                activeColor:
+                  'bg-amber-500 text-stone-950 shadow-[0_0_12px_rgba(245,158,11,0.35)]',
+              },
+              {
+                id: 'timeline',
+                label: 'Timeline',
+                activeColor:
+                  'bg-sky-500 text-stone-950 shadow-[0_0_12px_rgba(14,165,233,0.35)]',
+              },
+              {
+                id: 'records',
+                label: 'Records',
+                activeColor:
+                  'bg-orange-500 text-stone-950 shadow-[0_0_12px_rgba(249,115,22,0.35)]',
+              },
+              {
+                id: 'habits',
+                label: 'Habits',
+                activeColor:
+                  'bg-emerald-500 text-stone-950 shadow-[0_0_12px_rgba(16,185,129,0.35)]',
+              },
+              {
+                id: 'hub',
+                label: 'Hub',
+                activeColor:
+                  'bg-rose-500 text-white shadow-[0_0_12px_rgba(244,63,94,0.35)]',
+              },
             ].map((tab) => {
               const isSelected = viewMode === tab.id;
               return (
@@ -801,20 +831,13 @@ export default function DayNavigator({
                   key={tab.id}
                   id={`view-mode-${tab.id}`}
                   onClick={() => setViewMode(tab.id as any)}
-                  className={`relative px-3.5 py-1.5 rounded-xl transition-all duration-150 text-xs font-mono font-bold tracking-wider cursor-pointer flex items-center gap-1.5 whitespace-nowrap select-none ${
+                  className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer whitespace-nowrap ${
                     isSelected
-                      ? 'bg-stone-800 text-stone-100 shadow-xs border border-stone-700/70'
-                      : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900/60 border border-transparent'
+                      ? tab.activeColor
+                      : 'text-stone-500 hover:text-stone-300'
                   }`}
                 >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
-                      isSelected
-                        ? `${tab.dot} shadow-[0_0_6px_currentColor]`
-                        : 'bg-stone-600 opacity-60'
-                    }`}
-                  />
-                  <span>{tab.label}</span>
+                  {tab.label}
                 </button>
               );
             })}

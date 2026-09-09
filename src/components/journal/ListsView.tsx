@@ -43,7 +43,9 @@ import {
 	useSensor,
 	useSensors,
 	type DragEndEvent,
+	type DragStartEvent,
 	useDroppable,
+	DragOverlay,
 } from "@dnd-kit/core";
 import {
 	SortableContext,
@@ -396,6 +398,7 @@ export default function ListsView({
 	// Multi-Selection State & Batch Modals
 	const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
 	const [lastSelectedTaskId, setLastSelectedTaskId] = useState<string | null>(null);
+	const [activeDragTask, setActiveDragTask] = useState<Task | null>(null);
 	const [batchScheduleModalOpen, setBatchScheduleModalOpen] = useState(false);
 	const [batchListPickerOpen, setBatchListPickerOpen] = useState(false);
 	const [batchFolderPickerOpen, setBatchFolderPickerOpen] = useState(false);
@@ -845,71 +848,102 @@ export default function ListsView({
 
 	const handleDragEnd = async (event: DragEndEvent) => {
 		const { active, over } = event;
+		setActiveDragTask(null);
 		if (!over) return;
 
 		const activeTaskId = active.id as string;
 		const draggedTask = allTasks.find((t) => t.id === activeTaskId);
 		if (!draggedTask) return;
 
+		const isMultiDrag =
+			selectedTaskIds.has(activeTaskId) && selectedTaskIds.size > 1;
+		const targetTaskIds = isMultiDrag
+			? Array.from(selectedTaskIds)
+			: [activeTaskId];
+
 		const overIdStr = String(over.id);
-		// Dragged onto top tab chips
+
+		// Dragged onto top tab chips (folder-tab-drop-...)
 		if (overIdStr.startsWith("folder-tab-drop-")) {
 			const targetTab = overIdStr.replace("folder-tab-drop-", "");
-			if (targetTab === "unfiled" || targetTab === "root") {
-				if (draggedTask.folder_id !== undefined) {
-					await db.entries.update(activeTaskId, { folder_id: undefined } as any);
-				}
+			if (
+				targetTab === "unfiled" ||
+				targetTab === "root" ||
+				targetTab === "flat"
+			) {
+				await db.transaction("rw", db.entries, async () => {
+					for (const id of targetTaskIds) {
+						await db.entries.update(id, { folder_id: undefined } as any);
+					}
+				});
 				return;
 			}
-			if (targetTab !== "all" && draggedTask.folder_id !== targetTab) {
-				await db.entries.update(activeTaskId, { folder_id: targetTab } as any);
+			if (targetTab !== "all") {
+				await db.transaction("rw", db.entries, async () => {
+					for (const id of targetTaskIds) {
+						await db.entries.update(id, { folder_id: targetTab } as any);
+					}
+				});
 				return;
 			}
 		}
 
+		// Dragged onto a FolderCard container (folder-drop-...)
 		if (overIdStr.startsWith("folder-drop-")) {
 			const targetFolderId = overIdStr.replace("folder-drop-", "");
-			if (draggedTask.folder_id !== targetFolderId) {
-				await db.entries.update(activeTaskId, {
-					folder_id: targetFolderId,
-				} as any);
-				return;
-			}
+			await db.transaction("rw", db.entries, async () => {
+				for (const id of targetTaskIds) {
+					await db.entries.update(id, { folder_id: targetFolderId } as any);
+				}
+			});
+			return;
 		}
 
+		// Dragged onto root/general tasks area
 		if (overIdStr === "root-tasks-area") {
-			if (draggedTask.folder_id !== undefined) {
-				await db.entries.update(activeTaskId, {
-					folder_id: undefined,
-				} as any);
-				return;
-			}
+			await db.transaction("rw", db.entries, async () => {
+				for (const id of targetTaskIds) {
+					await db.entries.update(id, { folder_id: undefined } as any);
+				}
+			});
+			return;
 		}
 
+		// Dragged onto another task card
 		if (active.id !== over.id) {
 			const overTask = allTasks.find((t) => t.id === over.id);
 			if (overTask) {
-				const sameFolder = draggedTask.folder_id === overTask.folder_id;
-				if (!sameFolder) {
-					await db.entries.update(activeTaskId, {
-						folder_id: overTask.folder_id,
-					} as any);
-				}
-
-				const containerTasks = displayedTasks.filter(
-					(t) => t.folder_id === overTask.folder_id,
-				);
-				const oldIdx = containerTasks.findIndex((t) => t.id === active.id);
-				const newIdx = containerTasks.findIndex((t) => t.id === over.id);
-				if (oldIdx !== -1 && newIdx !== -1) {
-					const reordered = arrayMove(containerTasks, oldIdx, newIdx);
+				if (isMultiDrag) {
 					await db.transaction("rw", db.entries, async () => {
-						for (let i = 0; i < reordered.length; i++) {
-							await db.entries.update(reordered[i].id, {
-								sort_order: i,
+						for (const id of targetTaskIds) {
+							await db.entries.update(id, {
+								folder_id: overTask.folder_id,
 							} as any);
 						}
 					});
+				} else {
+					const sameFolder = draggedTask.folder_id === overTask.folder_id;
+					if (!sameFolder) {
+						await db.entries.update(activeTaskId, {
+							folder_id: overTask.folder_id,
+						} as any);
+					}
+
+					const containerTasks = displayedTasks.filter(
+						(t) => t.folder_id === overTask.folder_id,
+					);
+					const oldIdx = containerTasks.findIndex((t) => t.id === active.id);
+					const newIdx = containerTasks.findIndex((t) => t.id === over.id);
+					if (oldIdx !== -1 && newIdx !== -1) {
+						const reordered = arrayMove(containerTasks, oldIdx, newIdx);
+						await db.transaction("rw", db.entries, async () => {
+							for (let i = 0; i < reordered.length; i++) {
+								await db.entries.update(reordered[i].id, {
+									sort_order: i,
+								} as any);
+							}
+						});
+					}
 				}
 			}
 		}
@@ -1349,14 +1383,10 @@ export default function ListsView({
 	};
 
 	const renderTaskContent = (isDesktop: boolean) => {
-		// Flat All Items (without Folder sections)
-		if (selectedFolderTab === "flat") {
-			return (
-				<DndContext
-					sensors={sensors}
-					collisionDetection={closestCenter}
-					onDragEnd={handleDragEnd}
-				>
+		const renderInner = () => {
+			// Flat All Items (without Folder sections)
+			if (selectedFolderTab === "flat") {
+				return (
 					<div className="space-y-4">
 						{displayedTasks.length > 0 ? (
 							renderTaskGroupList(displayedTasks, isDesktop)
@@ -1371,23 +1401,17 @@ export default function ListsView({
 							</div>
 						)}
 					</div>
-				</DndContext>
-			);
-		}
+				);
+			}
 
-		// Specific Folder Tab Active
-		if (selectedFolderTab !== "all" && selectedFolderTab !== "unfiled") {
-			const activeFolder = currentListFolders.find(
-				(f) => f.id === selectedFolderTab,
-			);
-			const fTasks = folderTasksMap[selectedFolderTab] ?? [];
+			// Specific Folder Tab Active
+			if (selectedFolderTab !== "all" && selectedFolderTab !== "unfiled") {
+				const activeFolder = currentListFolders.find(
+					(f) => f.id === selectedFolderTab,
+				);
+				const fTasks = folderTasksMap[selectedFolderTab] ?? [];
 
-			return (
-				<DndContext
-					sensors={sensors}
-					collisionDetection={closestCenter}
-					onDragEnd={handleDragEnd}
-				>
+				return (
 					<div className="space-y-4">
 						{fTasks.length > 0 ? (
 							renderTaskGroupList(fTasks, isDesktop)
@@ -1409,18 +1433,12 @@ export default function ListsView({
 							</div>
 						)}
 					</div>
-				</DndContext>
-			);
-		}
+				);
+			}
 
-		// Unfiled Items Tab Active
-		if (selectedFolderTab === "unfiled") {
-			return (
-				<DndContext
-					sensors={sensors}
-					collisionDetection={closestCenter}
-					onDragEnd={handleDragEnd}
-				>
+			// Unfiled Items Tab Active
+			if (selectedFolderTab === "unfiled") {
+				return (
 					<div ref={setRootNodeRef} className="space-y-4">
 						{rootTasks.length > 0 ? (
 							renderTaskGroupList(rootTasks, isDesktop)
@@ -1436,17 +1454,11 @@ export default function ListsView({
 							</div>
 						)}
 					</div>
-				</DndContext>
-			);
-		}
+				);
+			}
 
-		// All Items Tab Active
-		return (
-			<DndContext
-				sensors={sensors}
-				collisionDetection={closestCenter}
-				onDragEnd={handleDragEnd}
-			>
+			// All Items Tab Active
+			return (
 				<div className="space-y-6">
 					{/* 1. Root / Unfolderized Items Section */}
 					<div
@@ -1532,6 +1544,62 @@ export default function ListsView({
 						</div>
 					)}
 				</div>
+			);
+		};
+
+		return (
+			<DndContext
+				sensors={sensors}
+				collisionDetection={closestCenter}
+				onDragStart={(event) => {
+					const task = allTasks.find((t) => t.id === event.active.id);
+					if (task) setActiveDragTask(task);
+				}}
+				onDragCancel={() => setActiveDragTask(null)}
+				onDragEnd={handleDragEnd}
+			>
+				{renderInner()}
+				<DragOverlay
+					dropAnimation={{
+						duration: 180,
+						easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)",
+					}}
+				>
+					{activeDragTask ? (
+						<div className="pointer-events-none select-none">
+							{selectedTaskIds.has(activeDragTask.id) &&
+							selectedTaskIds.size > 1 ? (
+								<div className="relative">
+									<div className="absolute inset-0 bg-[#161616] border border-violet-500/30 rounded-2xl rotate-3 scale-95 opacity-50 shadow-lg" />
+									<div className="absolute inset-0 bg-[#181818] border border-violet-500/40 rounded-2xl rotate-1.5 scale-98 opacity-75 shadow-lg" />
+									<div className="relative bg-[#1a1426] border-2 border-violet-500 rounded-2xl p-3.5 shadow-2xl ring-4 ring-violet-500/20 max-w-sm">
+										<div className="flex items-center justify-between gap-2 mb-2">
+											<span className="px-2.5 py-0.5 rounded-full bg-violet-500 text-white text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm">
+												<span>📦</span>
+												<span>Moving {selectedTaskIds.size} tasks</span>
+											</span>
+											<span className="text-[10px] font-mono text-violet-300 font-semibold">
+												Drop to move all
+											</span>
+										</div>
+										<div className="text-xs font-serif font-bold text-stone-100 truncate">
+											{activeDragTask.title}
+										</div>
+									</div>
+								</div>
+							) : (
+								<div className="bg-[#181818] border-2 border-amber-500/70 rounded-2xl p-3.5 shadow-2xl shadow-black/80 ring-2 ring-amber-500/20 scale-105 rotate-1 max-w-sm">
+									<div className="flex items-center gap-2">
+										<div className="w-4 h-4 rounded-md border border-stone-600 bg-stone-900 flex items-center justify-center shrink-0" />
+										<span className="text-xs font-serif font-bold text-stone-100 truncate">
+											{activeDragTask.title}
+										</span>
+									</div>
+								</div>
+							)}
+						</div>
+					) : null}
+				</DragOverlay>
 			</DndContext>
 		);
 	};
