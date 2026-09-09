@@ -177,6 +177,18 @@ export function parseMarkdown(text: string): string {
   return result.join('\n');
 }
 
+type ParsedBlock =
+  | { type: 'code'; lang: string; code: string }
+  | { type: 'checkbox'; isChecked: boolean; label: string; lineIndex: number }
+  | { type: 'h1'; text: string }
+  | { type: 'h2'; text: string }
+  | { type: 'h3'; text: string }
+  | { type: 'bullet'; text: string }
+  | { type: 'quote'; text: string }
+  | { type: 'divider' }
+  | { type: 'empty' }
+  | { type: 'paragraph'; text: string };
+
 export default function MarkdownPreview({
   text,
   value,
@@ -239,6 +251,86 @@ export default function MarkdownPreview({
     return () => window.removeEventListener('pointerdown', handlePointerDown);
   }, [isEditing]);
 
+  // Pre-calculate parsed blocks unconditionally for Preview mode
+  const parsedBlocks = React.useMemo(() => {
+    const rawLines = content.length > 0 ? content.split('\n') : [];
+    const blocks: ParsedBlock[] = [];
+    let inCode = false;
+    let codeLang = '';
+    let codeLines: string[] = [];
+
+    for (let i = 0; i < rawLines.length; i++) {
+      const line = rawLines[i];
+      const trimmed = line.trim();
+
+      if (trimmed.startsWith('```')) {
+        if (inCode) {
+          blocks.push({
+            type: 'code',
+            lang: codeLang,
+            code: codeLines.join('\n'),
+          });
+          inCode = false;
+          codeLang = '';
+          codeLines = [];
+          continue;
+        } else {
+          inCode = true;
+          codeLang = trimmed.substring(3).trim();
+          codeLines = [];
+          continue;
+        }
+      }
+
+      if (inCode) {
+        codeLines.push(line);
+        continue;
+      }
+
+      const isUnchecked = trimmed.startsWith('- [ ] ') || trimmed.startsWith('* [ ] ');
+      const isChecked = trimmed.startsWith('- [x] ') || trimmed.startsWith('* [x] ');
+      const isCheckbox = isUnchecked || isChecked;
+      if (isCheckbox) {
+        const checkboxLabel = line.replace(/^(\s*[-*]\s*\[[ x]\]\s*)/, '');
+        blocks.push({
+          type: 'checkbox',
+          isChecked,
+          label: checkboxLabel,
+          lineIndex: i,
+        });
+        continue;
+      }
+
+      if (trimmed.startsWith('# ')) {
+        blocks.push({ type: 'h1', text: line.substring(2) });
+      } else if (trimmed.startsWith('## ')) {
+        blocks.push({ type: 'h2', text: line.substring(3) });
+      } else if (trimmed.startsWith('### ')) {
+        blocks.push({ type: 'h3', text: line.substring(4) });
+      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        blocks.push({ type: 'bullet', text: line.replace(/^(\s*[-*]\s*)/, '') });
+      } else if (trimmed.startsWith('> ')) {
+        blocks.push({ type: 'quote', text: line.replace(/^(\s*>\s*)/, '') });
+      } else if (/^\s*([-*_]\s*){3,}$/.test(trimmed)) {
+        blocks.push({ type: 'divider' });
+      } else if (trimmed === '') {
+        blocks.push({ type: 'empty' });
+      } else {
+        blocks.push({ type: 'paragraph', text: line });
+      }
+    }
+
+    if (inCode) {
+      blocks.push({
+        type: 'code',
+        lang: codeLang,
+        code: codeLines.join('\n'),
+      });
+    }
+
+    return blocks;
+  }, [content]);
+
   // Handle textarea text change & auto-resize
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
@@ -262,7 +354,7 @@ export default function MarkdownPreview({
     } else if (line.startsWith('* [ ] ')) {
       updated = line.replace('* [ ] ', '* [x] ');
     } else if (line.startsWith('* [x] ')) {
-      updated = line.replace('* [x] ', '* [ ] ');
+      updated = line.replace('* [x] ', '- [ ] ');
     }
 
     lines[lineIndex] = updated;
@@ -551,98 +643,6 @@ export default function MarkdownPreview({
       </div>
     );
   }
-
-  // PREVIEW MODE: Rich Formatted Markdown with Interactive Checkboxes, Code Blocks & Clickable Links
-  type ParsedBlock =
-    | { type: 'code'; lang: string; code: string }
-    | { type: 'checkbox'; isChecked: boolean; label: string; lineIndex: number }
-    | { type: 'h1'; text: string }
-    | { type: 'h2'; text: string }
-    | { type: 'h3'; text: string }
-    | { type: 'bullet'; text: string }
-    | { type: 'quote'; text: string }
-    | { type: 'divider' }
-    | { type: 'empty' }
-    | { type: 'paragraph'; text: string };
-
-  const parsedBlocks = React.useMemo(() => {
-    const rawLines = content.length > 0 ? content.split('\n') : [];
-    const blocks: ParsedBlock[] = [];
-    let inCode = false;
-    let codeLang = '';
-    let codeLines: string[] = [];
-
-    for (let i = 0; i < rawLines.length; i++) {
-      const line = rawLines[i];
-      const trimmed = line.trim();
-
-      if (trimmed.startsWith('```')) {
-        if (inCode) {
-          blocks.push({
-            type: 'code',
-            lang: codeLang,
-            code: codeLines.join('\n'),
-          });
-          inCode = false;
-          codeLang = '';
-          codeLines = [];
-          continue;
-        } else {
-          inCode = true;
-          codeLang = trimmed.substring(3).trim();
-          codeLines = [];
-          continue;
-        }
-      }
-
-      if (inCode) {
-        codeLines.push(line);
-        continue;
-      }
-
-      const isUnchecked = trimmed.startsWith('- [ ] ') || trimmed.startsWith('* [ ] ');
-      const isChecked = trimmed.startsWith('- [x] ') || trimmed.startsWith('* [x] ');
-      const isCheckbox = isUnchecked || isChecked;
-      if (isCheckbox) {
-        const checkboxLabel = line.replace(/^(\s*[-*]\s*\[[ x]\]\s*)/, '');
-        blocks.push({
-          type: 'checkbox',
-          isChecked,
-          label: checkboxLabel,
-          lineIndex: i,
-        });
-        continue;
-      }
-
-      if (trimmed.startsWith('# ')) {
-        blocks.push({ type: 'h1', text: line.substring(2) });
-      } else if (trimmed.startsWith('## ')) {
-        blocks.push({ type: 'h2', text: line.substring(3) });
-      } else if (trimmed.startsWith('### ')) {
-        blocks.push({ type: 'h3', text: line.substring(4) });
-      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-        blocks.push({ type: 'bullet', text: line.replace(/^(\s*[-*]\s*)/, '') });
-      } else if (trimmed.startsWith('> ')) {
-        blocks.push({ type: 'quote', text: line.replace(/^(\s*>\s*)/, '') });
-      } else if (/^\s*([-*_]\s*){3,}$/.test(trimmed)) {
-        blocks.push({ type: 'divider' });
-      } else if (trimmed === '') {
-        blocks.push({ type: 'empty' });
-      } else {
-        blocks.push({ type: 'paragraph', text: line });
-      }
-    }
-
-    if (inCode) {
-      blocks.push({
-        type: 'code',
-        lang: codeLang,
-        code: codeLines.join('\n'),
-      });
-    }
-
-    return blocks;
-  }, [content]);
 
   if (parsedBlocks.length === 0 || content.trim() === '') {
     return (
