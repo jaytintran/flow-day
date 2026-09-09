@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Play,
@@ -34,6 +34,14 @@ import { db } from '../db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { TASK_LIST_SCOPE } from '../utils';
 import CategoryIcon from './CategoryIcon';
+
+export const STATUS_CONFIG: Record<TaskStatus, { label: string; color: string }> = {
+  todo: { label: 'To-do', color: 'text-stone-400' },
+  in_progress: { label: 'In Progress', color: 'text-sky-400' },
+  done: { label: 'Completed', color: 'text-emerald-400' },
+  maybe: { label: 'Maybe / Later', color: 'text-violet-400' },
+  dropped: { label: 'Dropped', color: 'text-stone-500' },
+};
 
 export interface EntryContextMenuProps {
   entry: TimelineEntry | TimeBlock | null;
@@ -77,7 +85,20 @@ export default function EntryContextMenu({
   onBatchReschedule,
 }: EntryContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [adjustedPos, setAdjustedPos] = useState({ x, y });
+  const [adjustedPos, setAdjustedPos] = useState(() => {
+    const estimatedWidth = 256;
+    const estimatedHeight = 420;
+    const padding = 12;
+    let initX = x;
+    let initY = y;
+    if (initX + estimatedWidth > window.innerWidth - padding) {
+      initX = Math.max(padding, window.innerWidth - estimatedWidth - padding);
+    }
+    if (initY + estimatedHeight > window.innerHeight - padding) {
+      initY = Math.max(padding, window.innerHeight - estimatedHeight - padding);
+    }
+    return { x: initX, y: initY };
+  });
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const [submenuPos, setSubmenuPos] = useState<{ x: number; y: number } | null>(null);
   const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -93,8 +114,8 @@ export default function EntryContextMenu({
     [entry?.id]
   ) || entry;
 
-  // Calculate boundary-aware coordinates for the main context menu
-  useEffect(() => {
+  // Calculate boundary-aware coordinates for the main context menu before paint
+  useLayoutEffect(() => {
     if (!menuRef.current) return;
     const rect = menuRef.current.getBoundingClientRect();
     const padding = 12;
@@ -178,12 +199,26 @@ export default function EntryContextMenu({
     }
     const rect = e.currentTarget.getBoundingClientRect();
     const submenuWidth = 196;
+    const submenuHeights: Record<string, number> = {
+      status: 180,
+      lists: 220,
+      reschedule: 170,
+      convert: 130,
+      copy: 100,
+    };
+    const estimatedHeight = submenuHeights[submenuKey] || 160;
     const padding = 12;
+
     const openLeft = rect.right + submenuWidth > window.innerWidth - padding;
     const subX = openLeft
       ? Math.max(padding, rect.left - submenuWidth - 4)
       : Math.min(window.innerWidth - submenuWidth - padding, rect.right + 4);
-    const subY = Math.min(Math.max(padding, rect.top - 4), window.innerHeight - 260);
+
+    let subY = rect.top - 4;
+    // Flip or clamp upward if overflowing screen bottom
+    if (subY + estimatedHeight > window.innerHeight - padding) {
+      subY = Math.max(padding, window.innerHeight - estimatedHeight - padding);
+    }
 
     setActiveSubmenu(submenuKey);
     setSubmenuPos({ x: subX, y: subY });
@@ -552,8 +587,10 @@ export default function EntryContextMenu({
                   )}
                   <span>
                     Status:{' '}
-                    <strong className="capitalize font-mono text-[11px] text-stone-200">
-                      {isBatch ? 'Change status' : task?.status || 'todo'}
+                    <strong className="font-mono text-[11px] text-stone-200">
+                      {isBatch
+                        ? 'Change status'
+                        : (task?.status && STATUS_CONFIG[task.status]?.label) || 'To-do'}
                     </strong>
                   </span>
                 </div>

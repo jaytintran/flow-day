@@ -782,78 +782,42 @@ export default function DayNavigator({
             </div>
           )}
 
-          {/* 3. View Mode Switcher pill style (Desktop only) */}
+          {/* 3. View Mode Switcher segmented control (Desktop only) */}
           <div
-            className="hidden md:flex gap-1 bg-stone-900 border border-stone-800 rounded-full p-1 md:w-auto overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+            className="hidden md:flex items-center gap-1 bg-[#0c0c0c] border border-stone-800/90 rounded-2xl p-1 md:w-auto overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] shadow-inner"
             id="view-mode-switcher"
           >
-            <button
-              id="view-mode-lists"
-              onClick={() => setViewMode('lists')}
-              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer whitespace-nowrap ${
-                viewMode === 'lists'
-                  ? 'bg-emerald-500 text-black'
-                  : 'text-stone-500 hover:text-stone-300'
-              }`}
-            >
-              Lists
-            </button>
-            <button
-              id="view-mode-day"
-              onClick={() => setViewMode('day')}
-              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer whitespace-nowrap ${
-                viewMode === 'day'
-                  ? 'bg-amber-500 text-black'
-                  : 'text-stone-500 hover:text-stone-300'
-              }`}
-            >
-              Day
-            </button>
-
-            <button
-              id="view-mode-timeline"
-              onClick={() => setViewMode('timeline')}
-              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer whitespace-nowrap ${
-                viewMode === 'timeline'
-                  ? 'bg-amber-500 text-black'
-                  : 'text-stone-500 hover:text-stone-300'
-              }`}
-            >
-              Timeline
-            </button>
-            <button
-              id="view-mode-records"
-              onClick={() => setViewMode('records')}
-              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer whitespace-nowrap ${
-                viewMode === 'records'
-                  ? 'bg-amber-500 text-black'
-                  : 'text-stone-500 hover:text-stone-300'
-              }`}
-            >
-              Records
-            </button>
-            <button
-              id="view-mode-habits"
-              onClick={() => setViewMode('habits')}
-              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer whitespace-nowrap ${
-                viewMode === 'habits'
-                  ? 'bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]'
-                  : 'text-stone-500 hover:text-emerald-400'
-              }`}
-            >
-              Habits
-            </button>
-            <button
-              id="view-mode-hub"
-              onClick={() => setViewMode('hub')}
-              className={`flex-1 md:flex-none px-4 py-2 rounded-full transition-all duration-200 text-[11px] uppercase font-bold tracking-widest font-mono cursor-pointer whitespace-nowrap ${
-                viewMode === 'hub'
-                  ? 'bg-amber-500 text-black'
-                  : 'text-stone-500 hover:text-stone-300'
-              }`}
-            >
-              Hub
-            </button>
+            {[
+              { id: 'lists', label: 'Lists', dot: 'bg-violet-400' },
+              { id: 'day', label: 'Day', dot: 'bg-amber-400' },
+              { id: 'timeline', label: 'Timeline', dot: 'bg-sky-400' },
+              { id: 'records', label: 'Records', dot: 'bg-orange-400' },
+              { id: 'habits', label: 'Habits', dot: 'bg-emerald-400' },
+              { id: 'hub', label: 'Hub', dot: 'bg-rose-400' },
+            ].map((tab) => {
+              const isSelected = viewMode === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  id={`view-mode-${tab.id}`}
+                  onClick={() => setViewMode(tab.id as any)}
+                  className={`relative px-3.5 py-1.5 rounded-xl transition-all duration-150 text-xs font-mono font-bold tracking-wider cursor-pointer flex items-center gap-1.5 whitespace-nowrap select-none ${
+                    isSelected
+                      ? 'bg-stone-800 text-stone-100 shadow-xs border border-stone-700/70'
+                      : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900/60 border border-transparent'
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
+                      isSelected
+                        ? `${tab.dot} shadow-[0_0_6px_currentColor]`
+                        : 'bg-stone-600 opacity-60'
+                    }`}
+                  />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
