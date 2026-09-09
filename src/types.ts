@@ -40,6 +40,7 @@ export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'dropped' | 'maybe';
 
 export interface Task extends BaseEntry {
   type: 'task';
+  item_kind?: 'task' | 'list_item';
   title: string;
   status: TaskStatus;
   time_spent: number; // milliseconds

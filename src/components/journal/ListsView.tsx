@@ -304,6 +304,7 @@ export default function ListsView({
 		const newTask: Task = {
 			id: newTaskId,
 			type: "task",
+			item_kind: "list_item",
 			title: trimmed,
 			status: quickTaskStatus,
 			time_spent: 0,

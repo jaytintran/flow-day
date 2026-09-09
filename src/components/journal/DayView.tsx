@@ -351,6 +351,13 @@ export default function DayView({
           const colDayEntries = entries.filter((e) => {
             if (e.type === 'task') {
               const task = e as Task;
+              if (
+                task.item_kind === 'list_item' &&
+                !task.scheduled_at &&
+                task.status !== 'done'
+              ) {
+                return false;
+              }
               if (task.status === 'done' && task.completed_at) {
                 return toLocalDateString(new Date(task.completed_at)) === colDayString;
               }

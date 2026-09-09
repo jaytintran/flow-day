@@ -294,6 +294,18 @@ export class PersonalTimelineDB extends Dexie {
           }
         }
       });
+
+    this.version(16).stores({
+      entries:
+        'id, type, created_at, status, timestamp, start_at, end_at, title, carried_to, objective_id, goal_id, scheduled_at, habit_id, *category_ids, sort_order, *purpose_ids, *domain_ids, starred, folder_id, is_accomplishment, item_kind',
+      habits: 'id, status, sort_order, *purpose_ids, *domain_ids',
+      categories: 'id, name, scope, [scope+name]',
+      purposes: 'id, sort_order, *domain_ids',
+      domains: 'id, sort_order',
+      list_folders: 'id, list_id, sort_order, created_at',
+      entities: 'id, entity_type, status, created_at, scheduled_at, *parent_ids, sort_order',
+      entity_types: 'id, name, is_system, sort_order',
+    });
   }
 }
 
