@@ -1,4 +1,9 @@
-import { useState } from 'react';
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { useState, useEffect } from 'react';
 import {
   Settings as SettingsIcon,
   X,
@@ -13,17 +18,76 @@ import {
   Info,
   Moon,
   Sun,
+  Sliders,
+  Cloud,
+  Keyboard,
+  ShieldCheck,
+  Check,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useGistSync } from '../hooks/useGistSync';
 import { useTheme } from '../lib/theme';
 
-export default function Settings() {
-  const [isOpen, setIsOpen] = useState(false);
+export type SettingsTab = 'preferences' | 'sync' | 'shortcuts';
+
+interface SettingsProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+  initialTab?: SettingsTab;
+}
+
+export default function Settings({
+  isOpen: externalIsOpen,
+  onClose: externalOnClose,
+  initialTab = 'preferences',
+}: SettingsProps) {
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
+
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const [showPat, setShowPat] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [confirmAction, setConfirmAction] = useState<'push' | 'pull' | null>(null);
   const [theme, setTheme] = useTheme();
+
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Update active tab if initialTab prop changes
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // Listen to custom event for opening settings to specific tab
+  useEffect(() => {
+    const handleOpenSettingsEvent = (e: CustomEvent<{ tab?: SettingsTab }>) => {
+      if (e.detail?.tab) {
+        setActiveTab(e.detail.tab);
+      }
+      setInternalIsOpen(true);
+    };
+    window.addEventListener('flowday-open-settings' as any, handleOpenSettingsEvent);
+    return () => {
+      window.removeEventListener('flowday-open-settings' as any, handleOpenSettingsEvent);
+    };
+  }, []);
+
+  const handleClose = () => {
+    if (externalOnClose) {
+      externalOnClose();
+    } else {
+      setInternalIsOpen(false);
+    }
+    setShowHelp(false);
+    setConfirmAction(null);
+  };
 
   const [showTimelineContent, setShowTimelineContent] = useState(() => {
     try {
@@ -142,423 +206,505 @@ export default function Settings() {
     handleSaveCredentials,
   } = useGistSync();
 
-  // Reload credentials whenever the modal opens
   const handleOpen = () => {
     reload();
-    setIsOpen(true);
+    setInternalIsOpen(true);
   };
 
   return (
     <>
-      <button
-        id="settings-btn"
-        type="button"
-        onClick={handleOpen}
-        className="px-2 bg-transparent text-stone-400 hover:text-stone-200 active:scale-95 transition-all h-[46px] flex items-center justify-center cursor-pointer shrink-0 select-none"
-        title="Open Settings"
-      >
-        <SettingsIcon className="w-5.5 h-5.5 shrink-0" />
-      </button>
+      {externalIsOpen === undefined && (
+        <button
+          id="settings-btn"
+          type="button"
+          onClick={handleOpen}
+          className="p-2 bg-transparent text-stone-400 hover:text-stone-200 active:scale-95 transition-all h-9 w-9 rounded-xl hover:bg-stone-850 flex items-center justify-center cursor-pointer shrink-0 select-none"
+          title="Open Settings"
+        >
+          <SettingsIcon className="w-4.5 h-4.5 shrink-0" />
+        </button>
+      )}
 
       <AnimatePresence>
         {isOpen && (
           <div
-            className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-[999] p-4 font-sans"
-            onClick={() => {
-              setIsOpen(false);
-              setShowHelp(false);
-            }}
+            className={`fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex font-sans ${
+              isMobile ? 'items-end justify-center' : 'items-center justify-center p-4'
+            }`}
+            onClick={handleClose}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              initial={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.96 }}
+              animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1 }}
+              exit={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.96 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-stone-900 border border-stone-850 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]"
+              className={`bg-stone-900 border border-stone-800 shadow-2xl relative flex flex-col overflow-hidden w-full ${
+                isMobile
+                  ? 'max-h-[88vh] rounded-t-3xl border-b-0 pb-6'
+                  : 'max-w-xl max-h-[85vh] rounded-2xl'
+              }`}
+              style={
+                isMobile
+                  ? { paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }
+                  : undefined
+              }
             >
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-stone-850 p-4 shrink-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded border border-stone-800 text-stone-400">
-                    Settings
-                  </span>
+              {/* Mobile Grab Handle */}
+              {isMobile && (
+                <div className="w-10 h-1 bg-stone-750 rounded-full self-center mt-3 shrink-0" />
+              )}
+
+              {/* Modal Header & Segmented Tabs */}
+              <div className="flex flex-col border-b border-stone-800 shrink-0 bg-stone-900/90 backdrop-blur-sm pt-3 px-4 md:px-6">
+                <div className="flex items-center justify-between pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold uppercase tracking-widest text-amber-500">
+                      FlowDay
+                    </span>
+                    <span className="text-xs text-stone-500 font-mono">/</span>
+                    <h2 className="text-stone-100 font-serif font-bold text-base">
+                      Settings
+                    </h2>
+                  </div>
+
                   <button
-                    onClick={() => setShowHelp(!showHelp)}
-                    className={`p-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1 text-xs font-mono font-bold uppercase tracking-wider ${
-                      showHelp
-                        ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30'
-                        : 'text-stone-500 hover:text-stone-300 hover:bg-stone-850 border border-transparent'
-                    }`}
-                    title="How to Setup Sync"
+                    type="button"
+                    onClick={handleClose}
+                    className="p-1.5 text-stone-400 hover:text-stone-200 hover:bg-stone-800 rounded-xl transition-colors cursor-pointer"
                   >
-                    <HelpCircle className="w-4 h-4 shrink-0" />
-                    <span>Guide</span>
+                    <X className="w-4.5 h-4.5" />
                   </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsOpen(false);
-                    setShowHelp(false);
-                  }}
-                  className="p-1 text-stone-500 hover:text-stone-300 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                {/* Tab Navigation Strip */}
+                <div className="flex items-center gap-1 overflow-x-auto pb-2 scrollbar-none">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('preferences');
+                      setShowHelp(false);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-mono font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                      activeTab === 'preferences'
+                        ? 'bg-stone-800 text-stone-100 shadow-xs border border-stone-700/60'
+                        : 'text-stone-400 hover:text-stone-200 hover:bg-stone-850/60 border border-transparent'
+                    }`}
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Preferences</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('sync');
+                      setShowHelp(false);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-mono font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                      activeTab === 'sync'
+                        ? 'bg-stone-800 text-stone-100 shadow-xs border border-stone-700/60'
+                        : 'text-stone-400 hover:text-stone-200 hover:bg-stone-850/60 border border-transparent'
+                    }`}
+                  >
+                    <Cloud className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Cloud Sync</span>
+                    {isConfigured && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('shortcuts');
+                      setShowHelp(false);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-mono font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                      activeTab === 'shortcuts'
+                        ? 'bg-stone-800 text-stone-100 shadow-xs border border-stone-700/60'
+                        : 'text-stone-400 hover:text-stone-200 hover:bg-stone-850/60 border border-transparent'
+                    }`}
+                  >
+                    <Keyboard className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Shortcuts &amp; Info</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Main Content Area */}
-              <div className="overflow-y-auto flex-1 p-5 md:p-6 space-y-6">
-                {/* HELP GUIDE / TOOLTIP DRAWER */}
-                <AnimatePresence>
-                  {showHelp && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden border border-amber-500/20 bg-amber-950/10 rounded-xl p-4 text-xs space-y-2.5 text-stone-300 font-mono leading-relaxed"
-                    >
-                      <div className="flex items-center gap-2 text-amber-400 font-bold uppercase tracking-wider text-[10px]">
-                        <Info className="w-4 h-4 text-amber-400" />
-                        Setup Sync Instructions
+              {/* Tab Content Area */}
+              <div className="overflow-y-auto flex-1 p-4 md:p-6 space-y-5">
+                {/* ======================================================== */}
+                {/* TAB 1: PREFERENCES                                      */}
+                {/* ======================================================== */}
+                {activeTab === 'preferences' && (
+                  <div className="space-y-4">
+                    {/* Theme / Appearance */}
+                    <div className="flex items-center justify-between p-3.5 bg-stone-950/60 border border-stone-850 rounded-2xl">
+                      <div className="flex flex-col gap-0.5 pr-4">
+                        <span className="text-xs text-stone-200 font-semibold">
+                          Theme &amp; Appearance
+                        </span>
+                        <span className="text-[11px] font-mono text-stone-500">
+                          Obsidian Dark or Warm Sepia for reduced eye fatigue.
+                        </span>
                       </div>
-                      <ol className="list-decimal pl-4 space-y-1.5 text-stone-400">
-                        <li>
-                          Visit{' '}
-                          <a
-                            href="https://github.com/settings/tokens"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-amber-500 hover:underline"
-                          >
-                            GitHub Personal Access Tokens
-                          </a>
-                          .
-                        </li>
-                        <li>
-                          Generate a token (Classic) with the{' '}
-                          <strong className="text-stone-300">gist</strong> scope checked.
-                        </li>
-                        <li>Copy and paste your generated PAT below.</li>
-                        <li>
-                          Click <strong className="text-stone-300">Auto-Create Gist</strong> to
-                          initialize a new private Gist for FlowDay.
-                        </li>
-                        <li>
-                          Once your Gist is created, click{' '}
-                          <strong className="text-stone-300">Push to Cloud</strong> to save your
-                          current local database.
-                        </li>
-                        <li>
-                          On your other device (mobile/web), enter the same PAT &amp; Gist ID, and
-                          click <strong className="text-stone-300">Pull from Cloud</strong> to load
-                          your data.
-                        </li>
-                      </ol>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* PREFERENCES SECTION */}
-                <div className="space-y-4 border-b border-stone-850 pb-6">
-                  <h3 className="text-stone-200 font-serif font-bold text-sm">Preferences</h3>
-
-                  {/* Theme / Eye-Care Appearance */}
-                  <div className="flex items-center justify-between p-3.5 bg-stone-900/40 border border-stone-850 rounded-xl">
-                    <div className="flex flex-col gap-1 pr-4">
-                      <span className="text-xs text-stone-200 font-semibold font-sans">
-                        Theme &amp; Appearance
-                      </span>
-                      <span className="text-[10px] font-mono text-stone-500">
-                        Dark Obsidian or Warm Sepia Paper for low eye strain.
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 bg-stone-950 border border-stone-800 p-1 rounded-xl shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setTheme('dark')}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                          theme === 'dark'
-                            ? 'bg-amber-500 text-stone-950 shadow-sm'
-                            : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
-                        }`}
-                      >
-                        <Moon className="w-3.5 h-3.5" />
-                        <span>Dark</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTheme('sepia')}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                          theme === 'sepia'
-                            ? 'bg-amber-500 text-stone-950 shadow-sm'
-                            : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
-                        }`}
-                      >
-                        <Sun className="w-3.5 h-3.5" />
-                        <span>Sepia</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3.5 bg-stone-900/40 border border-stone-850 rounded-xl">
-                    <div className="flex flex-col gap-1 pr-4">
-                      <span className="text-xs text-stone-200 font-semibold font-sans">
-                        Show Entry Details
-                      </span>
-                      <span className="text-[10px] font-mono text-stone-500">
-                        Show content details under task, note, and event titles on the timeline.
-                      </span>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={showTimelineContent}
-                        onChange={(e) => handleToggleTimelineContent(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-stone-800 rounded-full peer peer-focus:outline-none peer-checked:bg-amber-500/80 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-stone-500 peer-checked:after:bg-stone-950 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
-                    </label>
-                  </div>
-
-                  {/* Desktop Cards Per Row setting */}
-                  <div className="flex items-center justify-between p-3.5 bg-stone-900/40 border border-stone-850 rounded-xl">
-                    <div className="flex flex-col gap-1 pr-4">
-                      <span className="text-xs text-stone-200 font-semibold font-sans">
-                        Desktop Cards Per Row
-                      </span>
-                      <span className="text-[10px] font-mono text-stone-500">
-                        Grid columns for task cards on desktop in Lists view.
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 bg-stone-950 border border-stone-800 p-1 rounded-xl shrink-0">
-                      {['1', '2', '3', '4'].map((num) => (
+                      <div className="flex items-center gap-1 bg-stone-900 border border-stone-800 p-1 rounded-xl shrink-0">
                         <button
-                          key={num}
                           type="button"
-                          onClick={() => handleSaveCardsPerRow(num)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                            cardsPerRow === num
-                              ? 'bg-amber-500 text-stone-950 shadow-sm'
+                          onClick={() => setTheme('dark')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                            theme === 'dark'
+                              ? 'bg-amber-500 text-stone-950 shadow-xs'
                               : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
                           }`}
                         >
-                          {num}
+                          <Moon className="w-3.5 h-3.5" />
+                          <span>Dark</span>
                         </button>
-                      ))}
+                        <button
+                          type="button"
+                          onClick={() => setTheme('sepia')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                            theme === 'sepia'
+                              ? 'bg-amber-500 text-stone-950 shadow-xs'
+                              : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
+                          }`}
+                        >
+                          <Sun className="w-3.5 h-3.5" />
+                          <span>Sepia</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex flex-col bg-stone-900/40 border border-stone-850 rounded-xl overflow-hidden">
-                    {/* Sleep toggle row */}
-                    <div className="flex items-center justify-between p-3.5">
-                      <div className="flex flex-col gap-1 pr-4">
-                        <span className="text-xs text-stone-200 font-semibold font-sans">
-                          Show Sleep Marker
+                    {/* Show Entry Details */}
+                    <div className="flex items-center justify-between p-3.5 bg-stone-950/60 border border-stone-850 rounded-2xl">
+                      <div className="flex flex-col gap-0.5 pr-4">
+                        <span className="text-xs text-stone-200 font-semibold">
+                          Show Entry Details
                         </span>
-                        <span className="text-[10px] font-mono text-stone-500">
-                          Display a bedtime marker with countdown on the timeline.
+                        <span className="text-[11px] font-mono text-stone-500">
+                          Display descriptions &amp; notes on timeline items.
                         </span>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer select-none">
                         <input
                           type="checkbox"
-                          checked={sleepEnabled}
-                          onChange={(e) => handleToggleSleepEnabled(e.target.checked)}
+                          checked={showTimelineContent}
+                          onChange={(e) => handleToggleTimelineContent(e.target.checked)}
                           className="sr-only peer"
                         />
-                        <div className="w-9 h-5 bg-stone-800 rounded-full peer peer-focus:outline-none peer-checked:bg-amber-500/80 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-stone-500 peer-checked:after:bg-stone-950 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
+                        <div className="w-9 h-5 bg-stone-800 rounded-full peer peer-focus:outline-none peer-checked:bg-amber-500/80 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-stone-400 peer-checked:after:bg-stone-950 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
                       </label>
                     </div>
 
-                    {/* Bedtime picker — only when enabled */}
-                    {sleepEnabled && (
-                      <div className="flex items-center justify-between px-3.5 pb-3.5 pt-0 border-t border-stone-850">
-                        <span className="text-[10px] font-mono text-stone-500 pt-3">Bedtime</span>
-                        <input
-                          type="time"
-                          value={sleepTime}
-                          onChange={(e) => handleSaveSleepTime(e.target.value)}
-                          className="mt-3 bg-stone-950 border border-stone-850 hover:border-stone-800 focus:border-amber-500/35 rounded-xl px-3 py-2 text-xs text-stone-100 font-mono focus:outline-none focus:bg-stone-950 transition-all cursor-pointer"
-                        />
+                    {/* Daylight Phases */}
+                    <div className="flex items-center justify-between p-3.5 bg-stone-950/60 border border-stone-850 rounded-2xl">
+                      <div className="flex flex-col gap-0.5 pr-4">
+                        <span className="text-xs text-stone-200 font-semibold">
+                          Daylight Phases (Day View)
+                        </span>
+                        <span className="text-[11px] font-mono text-stone-500">
+                          Group timeline by Morning, Noon, Afternoon, and Night.
+                        </span>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Daylight Phases toggle row */}
-                  <div className="flex items-center justify-between p-3.5 bg-stone-900/40 border border-stone-850 rounded-xl">
-                    <div className="flex flex-col gap-1 pr-4">
-                      <span className="text-xs text-stone-200 font-semibold font-sans">
-                        Daylight Phases (Day View)
-                      </span>
-                      <span className="text-[10px] font-mono text-stone-500">
-                        Display Morning, Noon, Afternoon, and Evening blocks in Day view.
-                      </span>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={showDayPhases}
-                        onChange={(e) => handleToggleShowDayPhases(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-stone-800 rounded-full peer peer-focus:outline-none peer-checked:bg-amber-500/80 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-stone-500 peer-checked:after:bg-stone-950 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
-                    </label>
-                  </div>
-
-                  {/* Desktop Hub View Mode setting */}
-                  <div className="flex items-center justify-between p-3.5 bg-stone-900/40 border border-stone-850 rounded-xl">
-                    <div className="flex flex-col gap-1 pr-4">
-                      <span className="text-xs text-stone-200 font-semibold font-sans">
-                        Desktop Hub View
-                      </span>
-                      <span className="text-[10px] font-mono text-stone-500">
-                        Select interactive Mindmap canvas or original multi-column Hub on desktop.
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 bg-stone-950 border border-stone-800 p-1 rounded-xl shrink-0">
-                      {[
-                        { id: 'canvas', label: 'Mindmap' },
-                        { id: 'classic', label: 'Classic' },
-                      ].map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => handleSaveDesktopHubLayout(item.id as 'canvas' | 'classic')}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                            desktopHubLayout === item.id
-                              ? 'bg-amber-500 text-stone-950 shadow-sm'
-                              : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
-                          }`}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* SYNC SECTION */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-stone-200 font-serif font-bold text-sm">
-                      GitHub Gist Synchronization
-                    </h3>
-                    {lastSync && (
-                      <span className="text-[9px] font-mono text-stone-500 tracking-wider">
-                        Last synced: {lastSync}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Inputs */}
-                  <div className="space-y-3">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-stone-500 block">
-                        GitHub Personal Access Token (PAT)
-                      </label>
-                      <div className="relative">
+                      <label className="relative inline-flex items-center cursor-pointer select-none">
                         <input
-                          type={showPat ? 'text' : 'password'}
-                          placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                          value={pat}
-                          onChange={(e) => setPat(e.target.value)}
-                          className="w-full bg-stone-950 border border-stone-850 hover:border-stone-800 focus:border-amber-500/35 rounded-xl px-3.5 py-2.5 text-xs text-stone-100 placeholder-stone-700 font-mono focus:outline-none focus:bg-stone-950 transition-all pr-10"
+                          type="checkbox"
+                          checked={showDayPhases}
+                          onChange={(e) => handleToggleShowDayPhases(e.target.checked)}
+                          className="sr-only peer"
                         />
-                        <button
-                          type="button"
-                          onClick={() => setShowPat(!showPat)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300"
-                        >
-                          {showPat ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
+                        <div className="w-9 h-5 bg-stone-800 rounded-full peer peer-focus:outline-none peer-checked:bg-amber-500/80 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-stone-400 peer-checked:after:bg-stone-950 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
+                      </label>
+                    </div>
+
+                    {/* Sleep Marker & Bedtime */}
+                    <div className="flex flex-col bg-stone-950/60 border border-stone-850 rounded-2xl overflow-hidden">
+                      <div className="flex items-center justify-between p-3.5">
+                        <div className="flex flex-col gap-0.5 pr-4">
+                          <span className="text-xs text-stone-200 font-semibold">
+                            Show Sleep Marker
+                          </span>
+                          <span className="text-[11px] font-mono text-stone-500">
+                            Display bedtime line with live countdown on timeline.
+                          </span>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={sleepEnabled}
+                            onChange={(e) => handleToggleSleepEnabled(e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-stone-800 rounded-full peer peer-focus:outline-none peer-checked:bg-amber-500/80 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-stone-400 peer-checked:after:bg-stone-950 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
+                        </label>
                       </div>
+
+                      {sleepEnabled && (
+                        <div className="flex items-center justify-between px-3.5 pb-3.5 pt-2 border-t border-stone-850/80 bg-stone-900/30">
+                          <span className="text-[11px] font-mono text-stone-400">Bedtime</span>
+                          <input
+                            type="time"
+                            value={sleepTime}
+                            onChange={(e) => handleSaveSleepTime(e.target.value)}
+                            className="bg-stone-900 border border-stone-800 hover:border-stone-700 focus:border-amber-500/40 rounded-xl px-3 py-1.5 text-xs text-stone-100 font-mono focus:outline-none transition-all cursor-pointer"
+                          />
+                        </div>
+                      )}
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-stone-500 block">
-                        Gist ID
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder="e.g. 8a6b2c4d..."
-                          value={gistId}
-                          onChange={(e) => setGistId(e.target.value)}
-                          className="flex-1 bg-stone-950 border border-stone-850 hover:border-stone-800 focus:border-amber-500/35 rounded-xl px-3.5 py-2.5 text-xs text-stone-100 placeholder-stone-700 font-mono focus:outline-none focus:bg-stone-950 transition-all"
-                        />
-                        {!gistId.trim() && pat.trim() && (
+                    {/* Desktop Cards Per Row */}
+                    <div className="flex items-center justify-between p-3.5 bg-stone-950/60 border border-stone-850 rounded-2xl">
+                      <div className="flex flex-col gap-0.5 pr-4">
+                        <span className="text-xs text-stone-200 font-semibold">
+                          Desktop Cards Per Row
+                        </span>
+                        <span className="text-[11px] font-mono text-stone-500">
+                          Task grid columns on desktop in Lists view.
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 bg-stone-900 border border-stone-800 p-1 rounded-xl shrink-0">
+                        {['1', '2', '3', '4'].map((num) => (
                           <button
+                            key={num}
                             type="button"
-                            onClick={handleAutoCreateGist}
-                            className="px-3 bg-stone-900 border border-stone-800 hover:border-stone-700 hover:bg-stone-850 text-stone-350 hover:text-amber-500 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider transition-all active:scale-95 cursor-pointer shrink-0"
+                            onClick={() => handleSaveCardsPerRow(num)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                              cardsPerRow === num
+                                ? 'bg-amber-500 text-stone-950 shadow-xs'
+                                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
+                            }`}
                           >
-                            Auto-Create
+                            {num}
                           </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Desktop Hub Layout Mode */}
+                    <div className="flex items-center justify-between p-3.5 bg-stone-950/60 border border-stone-850 rounded-2xl">
+                      <div className="flex flex-col gap-0.5 pr-4">
+                        <span className="text-xs text-stone-200 font-semibold">
+                          Desktop Hub View
+                        </span>
+                        <span className="text-[11px] font-mono text-stone-500">
+                          Interactive Mindmap canvas or multi-column matrix.
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 bg-stone-900 border border-stone-800 p-1 rounded-xl shrink-0">
+                        {[
+                          { id: 'canvas', label: 'Mindmap' },
+                          { id: 'classic', label: 'Classic' },
+                        ].map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() =>
+                              handleSaveDesktopHubLayout(item.id as 'canvas' | 'classic')
+                            }
+                            className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                              desktopHubLayout === item.id
+                                ? 'bg-amber-500 text-stone-950 shadow-xs'
+                                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ======================================================== */}
+                {/* TAB 2: CLOUD SYNC                                       */}
+                {/* ======================================================== */}
+                {activeTab === 'sync' && (
+                  <div className="space-y-4">
+                    {/* Header bar with setup guide button */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col gap-0.5">
+                        <h3 className="text-stone-100 font-serif font-bold text-sm">
+                          GitHub Gist Synchronization
+                        </h3>
+                        {lastSync && (
+                          <span className="text-[10px] font-mono text-stone-500">
+                            Last synced: {lastSync}
+                          </span>
                         )}
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowHelp(!showHelp)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          showHelp
+                            ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                            : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800 border border-stone-800'
+                        }`}
+                      >
+                        <HelpCircle className="w-3.5 h-3.5" />
+                        <span>Setup Guide</span>
+                      </button>
                     </div>
-                  </div>
 
-                  {/* Actions & Feedback banner */}
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={handleSaveCredentials}
-                      className="px-4 py-2.5 bg-stone-900 border border-stone-800 hover:border-stone-700 hover:bg-stone-850 text-stone-300 rounded-xl text-[10px] font-mono font-bold uppercase tracking-widest transition-all active:scale-95 cursor-pointer"
-                    >
-                      Save Credentials
-                    </button>
-                    <button
-                      type="button"
-                      onClick={testConnection}
-                      className="px-4 py-2.5 bg-stone-900 border border-stone-800 hover:border-stone-700 hover:bg-stone-850 text-stone-300 rounded-xl text-[10px] font-mono font-bold uppercase tracking-widest transition-all active:scale-95 cursor-pointer"
-                    >
-                      Test Connection
-                    </button>
-                  </div>
+                    {/* Expandable Setup Instructions */}
+                    <AnimatePresence>
+                      {showHelp && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden border border-amber-500/20 bg-amber-950/15 rounded-2xl p-4 text-xs space-y-2.5 text-stone-300 font-mono leading-relaxed"
+                        >
+                          <div className="flex items-center gap-2 text-amber-400 font-bold uppercase tracking-wider text-[10px]">
+                            <Info className="w-4 h-4" />
+                            How to set up GitHub Gist Sync
+                          </div>
+                          <ol className="list-decimal pl-4 space-y-1.5 text-stone-400 text-[11px]">
+                            <li>
+                              Go to{' '}
+                              <a
+                                href="https://github.com/settings/tokens"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-amber-400 hover:underline"
+                              >
+                                GitHub Personal Access Tokens (Classic)
+                              </a>
+                              .
+                            </li>
+                            <li>
+                              Generate a new token with the{' '}
+                              <strong className="text-stone-200">gist</strong> checkbox enabled.
+                            </li>
+                            <li>Paste the generated token into the PAT field below.</li>
+                            <li>
+                              Click <strong className="text-stone-200">Auto-Create Gist</strong> to
+                              automatically initialize your private FlowDay backup.
+                            </li>
+                            <li>
+                              Click <strong className="text-stone-200">Push to Cloud</strong> to save
+                              your current data, or enter the same PAT &amp; Gist ID on your other
+                              devices to <strong className="text-stone-200">Pull</strong>.
+                            </li>
+                          </ol>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
-                  {/* Dynamic Status Bar */}
-                  {status !== 'idle' && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={`p-3 rounded-xl border flex items-center gap-3 text-xs font-mono leading-relaxed ${
-                        status === 'loading'
-                          ? 'bg-stone-900/60 border-stone-800 text-stone-400'
-                          : status === 'success'
-                            ? 'bg-emerald-950/15 border-emerald-500/25 text-emerald-400'
-                            : 'bg-red-950/15 border-red-500/25 text-red-400'
-                      }`}
-                    >
-                      {status === 'loading' && (
-                        <RefreshCw className="w-4 h-4 animate-spin shrink-0 text-stone-400" />
-                      )}
-                      {status === 'success' && (
-                        <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
-                      )}
-                      {status === 'error' && (
-                        <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
-                      )}
-                      <span className="flex-1">{statusMsg}</span>
-                    </motion.div>
-                  )}
+                    {/* Inputs */}
+                    <div className="space-y-3 p-4 bg-stone-950/60 border border-stone-850 rounded-2xl">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-stone-400 block">
+                          GitHub Personal Access Token (PAT)
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showPat ? 'text' : 'password'}
+                            placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                            value={pat}
+                            onChange={(e) => setPat(e.target.value)}
+                            className="w-full bg-stone-900 border border-stone-800 hover:border-stone-700 focus:border-amber-500/40 rounded-xl px-3.5 py-2.5 text-xs text-stone-100 placeholder-stone-600 font-mono focus:outline-none transition-all pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPat(!showPat)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300 transition-colors"
+                          >
+                            {showPat ? (
+                              <EyeOff className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
 
-                  {/* Sync Push/Pull Panel */}
-                  {isConfigured && (
-                    <div className="border-t border-stone-850 pt-4 mt-2">
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-stone-400 block">
+                          Gist ID
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="e.g. 8a6b2c4d..."
+                            value={gistId}
+                            onChange={(e) => setGistId(e.target.value)}
+                            className="flex-1 bg-stone-900 border border-stone-800 hover:border-stone-700 focus:border-amber-500/40 rounded-xl px-3.5 py-2.5 text-xs text-stone-100 placeholder-stone-600 font-mono focus:outline-none transition-all"
+                          />
+                          {!gistId.trim() && pat.trim() && (
+                            <button
+                              type="button"
+                              onClick={handleAutoCreateGist}
+                              className="px-3 bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider transition-all active:scale-95 cursor-pointer shrink-0"
+                            >
+                              Auto-Create
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Save & Test Buttons */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={handleSaveCredentials}
+                          className="px-3.5 py-2 bg-stone-900 border border-stone-800 hover:border-stone-700 hover:bg-stone-850 text-stone-200 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Save Credentials</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={testConnection}
+                          className="px-3.5 py-2 bg-stone-900 border border-stone-800 hover:border-stone-700 hover:bg-stone-850 text-stone-400 hover:text-stone-200 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
+                        >
+                          Test Connection
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Live Status Feedback */}
+                    {status !== 'idle' && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`p-3 rounded-xl border flex items-center gap-2.5 text-xs font-mono leading-relaxed ${
+                          status === 'loading'
+                            ? 'bg-stone-900 border-stone-800 text-stone-300'
+                            : status === 'success'
+                              ? 'bg-emerald-950/25 border-emerald-500/25 text-emerald-400'
+                              : 'bg-red-950/25 border-red-500/25 text-red-400'
+                        }`}
+                      >
+                        {status === 'loading' && (
+                          <RefreshCw className="w-4 h-4 animate-spin shrink-0 text-amber-400" />
+                        )}
+                        {status === 'success' && (
+                          <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
+                        )}
+                        {status === 'error' && (
+                          <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+                        )}
+                        <span className="flex-1">{statusMsg}</span>
+                      </motion.div>
+                    )}
+
+                    {/* Push / Pull Big Action Cards */}
+                    {isConfigured && (
+                      <div className="grid grid-cols-2 gap-3 pt-1">
                         <button
                           type="button"
                           onClick={() => setConfirmAction('push')}
-                          className="flex flex-col items-center justify-center p-3.5 bg-stone-900 border border-stone-800/80 hover:border-amber-500/25 hover:bg-stone-900/60 rounded-xl transition-all cursor-pointer group active:scale-[0.98]"
+                          className="flex flex-col items-center justify-center p-4 bg-stone-950/80 border border-stone-850 hover:border-amber-500/30 hover:bg-stone-900/60 rounded-2xl transition-all cursor-pointer group active:scale-[0.98]"
                         >
-                          <UploadCloud className="w-5 h-5 text-stone-500 group-hover:text-amber-500 transition-colors mb-1.5" />
-                          <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-stone-300">
+                          <UploadCloud className="w-6 h-6 text-stone-400 group-hover:text-amber-400 transition-colors mb-1.5" />
+                          <span className="text-xs font-mono font-bold uppercase tracking-wider text-stone-200">
                             Push to Cloud
                           </span>
-                          <span className="text-[8px] font-mono text-stone-600 group-hover:text-stone-500 transition-colors mt-0.5">
+                          <span className="text-[10px] font-mono text-stone-500 group-hover:text-stone-400 transition-colors mt-0.5 text-center">
                             Backup local data
                           </span>
                         </button>
@@ -566,58 +712,130 @@ export default function Settings() {
                         <button
                           type="button"
                           onClick={() => setConfirmAction('pull')}
-                          className="flex flex-col items-center justify-center p-3.5 bg-stone-900 border border-stone-800/80 hover:border-amber-500/25 hover:bg-stone-900/60 rounded-xl transition-all cursor-pointer group active:scale-[0.98]"
+                          className="flex flex-col items-center justify-center p-4 bg-stone-950/80 border border-stone-850 hover:border-sky-500/30 hover:bg-stone-900/60 rounded-2xl transition-all cursor-pointer group active:scale-[0.98]"
                         >
-                          <DownloadCloud className="w-5 h-5 text-stone-500 group-hover:text-amber-500 transition-colors mb-1.5" />
-                          <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-stone-300">
+                          <DownloadCloud className="w-6 h-6 text-stone-400 group-hover:text-sky-400 transition-colors mb-1.5" />
+                          <span className="text-xs font-mono font-bold uppercase tracking-wider text-stone-200">
                             Pull from Cloud
                           </span>
-                          <span className="text-[8px] font-mono text-stone-600 group-hover:text-stone-500 transition-colors mt-0.5">
+                          <span className="text-[10px] font-mono text-stone-500 group-hover:text-stone-400 transition-colors mt-0.5 text-center">
                             Restore to this device
                           </span>
                         </button>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Dynamic Confirmations */}
-                  <AnimatePresence>
-                    {confirmAction && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="bg-amber-950/15 border border-amber-500/20 rounded-xl p-4 text-xs font-mono space-y-3"
-                      >
-                        <div className="flex items-center gap-2 text-amber-500 font-bold uppercase tracking-wider text-[10px]">
-                          <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
-                          Are you sure?
-                        </div>
-                        <p className="text-stone-400 leading-relaxed">
-                          {confirmAction === 'push'
-                            ? 'This will OVERWRITE the cloud backup with your current local data. Your other devices will pull this version next time.'
-                            : 'This will OVERWRITE all local data on this device with the version stored in the cloud. Your unsaved local edits will be lost.'}
-                        </p>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={confirmAction === 'push' ? pushToCloud : pullFromCloud}
-                            className="px-3.5 py-1.5 bg-amber-500 text-stone-950 rounded-lg text-[9px] font-mono font-bold uppercase tracking-wider hover:bg-amber-400 active:scale-95 cursor-pointer"
-                          >
-                            Yes, proceed
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setConfirmAction(null)}
-                            className="px-3.5 py-1.5 bg-stone-900 border border-stone-800 text-stone-400 rounded-lg text-[9px] font-mono font-bold uppercase tracking-wider hover:text-stone-250 active:scale-95 cursor-pointer"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </motion.div>
                     )}
-                  </AnimatePresence>
-                </div>
+
+                    {/* Confirm Push/Pull Warning */}
+                    <AnimatePresence>
+                      {confirmAction && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="bg-amber-950/20 border border-amber-500/30 rounded-2xl p-4 text-xs font-mono space-y-3"
+                        >
+                          <div className="flex items-center gap-2 text-amber-400 font-bold uppercase tracking-wider text-[11px]">
+                            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+                            Are you sure you want to proceed?
+                          </div>
+                          <p className="text-stone-400 leading-relaxed text-[11px]">
+                            {confirmAction === 'push'
+                              ? 'This will overwrite your cloud Gist backup with current local data. Other devices will pull this version next time.'
+                              : 'This will completely replace local data on this device with the latest backup in your GitHub Gist. Any unsaved local edits will be replaced.'}
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const act = confirmAction;
+                                setConfirmAction(null);
+                                if (act === 'push') await pushToCloud();
+                                else await pullFromCloud();
+                              }}
+                              className="px-3.5 py-1.5 bg-amber-500 text-stone-950 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-amber-400 active:scale-95 cursor-pointer"
+                            >
+                              Yes, proceed
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmAction(null)}
+                              className="px-3.5 py-1.5 bg-stone-900 border border-stone-800 text-stone-400 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider hover:text-stone-200 active:scale-95 cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
+
+                {/* ======================================================== */}
+                {/* TAB 3: SHORTCUTS & ABOUT                                */}
+                {/* ======================================================== */}
+                {activeTab === 'shortcuts' && (
+                  <div className="space-y-4">
+                    {/* Shortcuts Reference Table */}
+                    <div className="p-4 bg-stone-950/60 border border-stone-850 rounded-2xl space-y-3">
+                      <h4 className="text-stone-200 font-serif font-bold text-xs">
+                        Keyboard Shortcuts
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs font-mono">
+                        <div className="flex items-center justify-between p-2 rounded-xl bg-stone-900/60 border border-stone-850/60">
+                          <span className="text-stone-400">Quick Task Input</span>
+                          <kbd className="px-2 py-0.5 bg-stone-950 border border-stone-800 rounded-md text-stone-300 text-[10px] font-bold">
+                            Enter
+                          </kbd>
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded-xl bg-stone-900/60 border border-stone-850/60">
+                          <span className="text-stone-400">Multi-select Tasks</span>
+                          <kbd className="px-2 py-0.5 bg-stone-950 border border-stone-800 rounded-md text-stone-300 text-[10px] font-bold">
+                            Ctrl / Cmd + Click
+                          </kbd>
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded-xl bg-stone-900/60 border border-stone-850/60">
+                          <span className="text-stone-400">Range Select</span>
+                          <kbd className="px-2 py-0.5 bg-stone-950 border border-stone-800 rounded-md text-stone-300 text-[10px] font-bold">
+                            Shift + Click
+                          </kbd>
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded-xl bg-stone-900/60 border border-stone-850/60">
+                          <span className="text-stone-400">Markdown Save</span>
+                          <kbd className="px-2 py-0.5 bg-stone-950 border border-stone-800 rounded-md text-stone-300 text-[10px] font-bold">
+                            Ctrl + Enter
+                          </kbd>
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded-xl bg-stone-900/60 border border-stone-850/60">
+                          <span className="text-stone-400">Mindmap Child Node</span>
+                          <kbd className="px-2 py-0.5 bg-stone-950 border border-stone-800 rounded-md text-stone-300 text-[10px] font-bold">
+                            Tab
+                          </kbd>
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded-xl bg-stone-900/60 border border-stone-850/60">
+                          <span className="text-stone-400">Mindmap Sibling Node</span>
+                          <kbd className="px-2 py-0.5 bg-stone-950 border border-stone-800 rounded-md text-stone-300 text-[10px] font-bold">
+                            Enter
+                          </kbd>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* About & Philosophy */}
+                    <div className="p-4 bg-stone-950/60 border border-stone-850 rounded-2xl space-y-2">
+                      <div className="flex items-center gap-2 text-stone-200 font-serif font-bold text-xs">
+                        <ShieldCheck className="w-4 h-4 text-amber-500" />
+                        <span>Offline-First Privacy Architecture</span>
+                      </div>
+                      <p className="text-[11px] font-mono text-stone-400 leading-relaxed">
+                        FlowDay stores 100% of your tasks, habits, and timeline locally in your browser's IndexedDB. When Gist sync is configured, your backups are securely compressed and stored directly on your personal GitHub account.
+                      </p>
+                      <div className="pt-2 border-t border-stone-850/80 flex items-center justify-between text-[10px] font-mono text-stone-500">
+                        <span>FlowDay v2.0</span>
+                        <span>Plan with light brushstrokes; record with honest precision.</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
