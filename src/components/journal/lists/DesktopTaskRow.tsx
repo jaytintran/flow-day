@@ -32,6 +32,8 @@ interface DesktopTaskRowProps {
   selectedListId?: string;
   availableFolders?: ListFolder[];
   isSelected?: boolean;
+  isGhost?: boolean;
+  isDragOverlay?: boolean;
   onClickCard?: (task: Task, e: React.MouseEvent) => void;
   onDeleteEntry: (id: string) => void;
   onOpenDetail: (entry: TimelineEntry) => void;
@@ -54,6 +56,8 @@ export default function DesktopTaskRow({
   selectedListId,
   availableFolders,
   isSelected = false,
+  isGhost = false,
+  isDragOverlay = false,
   onClickCard,
   onDeleteEntry,
   onOpenDetail,
@@ -115,9 +119,10 @@ export default function DesktopTaskRow({
   };
 
   return (
-    <SortableRow id={task.id} hideHandle>
+    <SortableRow id={task.id} disabled={isDragOverlay} hideHandle>
       <div
         onClick={(e) => {
+          if (isDragOverlay) return;
           if (onClickCard) {
             onClickCard(task, e);
           } else {
@@ -125,23 +130,40 @@ export default function DesktopTaskRow({
           }
         }}
         onContextMenu={(e) => {
+          if (isDragOverlay) return;
           e.preventDefault();
           if (onContextMenu) onContextMenu(task, e);
         }}
-        className={`group relative flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl border transition-all duration-150 hover:-translate-y-0.5 cursor-pointer select-none min-h-[44px] ${
-          isSelected
-            ? 'bg-violet-500/15 border-violet-500/60 ring-2 ring-violet-500/40 shadow-[0_0_12px_rgba(139,92,246,0.15)]'
-            : isActive
-              ? 'bg-[#18140a] border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/30'
-              : isDone
-                ? isAccomplishment
-                  ? 'bg-[#14120e] border-amber-500/30 hover:border-amber-500/50'
-                  : 'bg-[#101010]/60 border-stone-850 opacity-65 hover:opacity-100 hover:border-stone-700'
-                : isDropped
-                  ? 'bg-rose-950/10 border-rose-900/30 opacity-60'
-                  : isMaybe
-                    ? 'bg-indigo-950/10 border-indigo-900/30 opacity-80'
-                    : 'bg-[#141414] border-stone-800/80 hover:border-stone-700 hover:bg-[#181818]'
+        className={`group relative flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl border transition-colors duration-150 cursor-pointer select-none min-h-[44px] ${
+          isGhost
+            ? 'opacity-25 border-dashed border-stone-600 bg-stone-900/30 pointer-events-none'
+            : isSelected
+              ? `bg-violet-500/15 border-violet-500/60 ring-2 ring-violet-500/40 shadow-[0_0_12px_rgba(139,92,246,0.15)] ${
+                  isDragOverlay ? 'shadow-2xl shadow-black/80 ring-4 ring-violet-500/60 rotate-0.5 cursor-grabbing' : ''
+                }`
+              : isActive
+                ? `bg-[#18140a] border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.15)] ring-1 ring-amber-500/30 ${
+                    isDragOverlay ? 'shadow-2xl shadow-black/80 ring-4 ring-amber-500/60 rotate-0.5 cursor-grabbing' : ''
+                  }`
+                : isDone
+                  ? isAccomplishment
+                    ? `bg-[#14120e] border-amber-500/30 task-card-hover ${
+                        isDragOverlay ? 'shadow-2xl shadow-black/80 ring-4 ring-amber-500/50 rotate-0.5 cursor-grabbing' : ''
+                      }`
+                    : `bg-[#101010]/60 border-stone-850 opacity-65 task-card-hover ${
+                        isDragOverlay ? 'shadow-2xl shadow-black/80 ring-4 ring-stone-500/50 rotate-0.5 cursor-grabbing opacity-100' : ''
+                      }`
+                  : isDropped
+                    ? `bg-rose-950/10 border-rose-900/30 opacity-60 task-card-hover ${
+                        isDragOverlay ? 'shadow-2xl shadow-black/80 ring-4 ring-rose-500/50 rotate-0.5 cursor-grabbing opacity-100' : ''
+                      }`
+                    : isMaybe
+                      ? `bg-indigo-950/10 border-indigo-900/30 opacity-80 task-card-hover ${
+                          isDragOverlay ? 'shadow-2xl shadow-black/80 ring-4 ring-indigo-500/50 rotate-0.5 cursor-grabbing opacity-100' : ''
+                        }`
+                      : `bg-[#141414] border-stone-800/80 task-card-hover ${
+                          isDragOverlay ? 'shadow-2xl shadow-black/80 ring-4 ring-amber-500/60 rotate-0.5 cursor-grabbing' : ''
+                        }`
         }`}
       >
         {/* Left: Status Toggle + Title */}

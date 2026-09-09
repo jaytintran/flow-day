@@ -48,6 +48,7 @@
   --scrollbar-track: #0a0a0a;
   --scrollbar-thumb: #262626;
   --scrollbar-thumb-hover: #404040;
+  --task-card-hover-border: rgba(255, 255, 255, 0.22);
 }
 
 [data-theme="sepia"] {
@@ -74,6 +75,7 @@
   --scrollbar-track: #fbf0d9;
   --scrollbar-thumb: #d5c7a8;
   --scrollbar-thumb-hover: #b2a280;
+  --task-card-hover-border: #8c7d60;
 
   /* Selection styling */
   ::selection {
@@ -347,6 +349,14 @@
 
   .scrollbar-none::-webkit-scrollbar {
     display: none;
+  }
+
+  .task-card-hover {
+    transition: border-color 0.15s ease;
+  }
+
+  .task-card-hover:hover {
+    border-color: var(--task-card-hover-border) !important;
   }
 }
 

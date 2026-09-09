@@ -220,16 +220,21 @@ export default function FolderTabChip({
 				>
 					<span className={`w-1.5 h-1.5 rounded-full ${colorTheme.dot} shrink-0`} />
 					<Folder className={`w-3 h-3 ${isActive ? colorTheme.text : "text-stone-400"} shrink-0`} />
-					<span className="truncate max-w-[130px]">{folder.name}</span>
-					<span
-						className={`text-[9px] font-mono font-bold tabular-nums ml-0.5 px-1 py-0.2 rounded-md ${
-							isActive
-								? "bg-white/10 text-white"
-								: "bg-stone-800 text-stone-400"
-						}`}
-					>
-						{count}
-					</span>
+					{isOver ? (
+						<span className="text-[9px] font-mono font-bold text-amber-300 bg-amber-500/35 px-1.5 py-0.2 rounded animate-pulse">
+							+ Move
+						</span>
+					) : (
+						<span
+							className={`text-[9px] font-mono font-bold tabular-nums ml-0.5 px-1 py-0.2 rounded-md ${
+								isActive
+									? "bg-white/10 text-white"
+									: "bg-stone-800 text-stone-400"
+							}`}
+						>
+							{count}
+						</span>
+					)}
 
 					{/* Hover Trigger for Menu */}
 					<span

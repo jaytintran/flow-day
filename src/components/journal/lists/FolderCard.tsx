@@ -32,6 +32,7 @@ interface FolderCardProps {
   selectedListId?: string;
   availableFolders?: ListFolder[];
   selectedTaskIds?: Set<string>;
+  activeDragTaskIds?: Set<string>;
   onClickCard?: (task: Task, e: React.MouseEvent) => void;
   activeSwipedTaskId?: string | null;
   onSetSwipedTaskId?: (taskId: string | null) => void;
@@ -66,6 +67,7 @@ export default function FolderCard({
   selectedListId,
   availableFolders,
   selectedTaskIds,
+  activeDragTaskIds,
   onClickCard,
   activeSwipedTaskId,
   onSetSwipedTaskId,
@@ -89,6 +91,7 @@ export default function FolderCard({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(folder.name);
   const inputRef = useRef<HTMLInputElement>(null);
+  const autoExpandTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [collapsedStatusGroups, setCollapsedStatusGroups] = useState<
     Record<string, boolean>
@@ -122,6 +125,25 @@ export default function FolderCard({
     id: `folder-drop-${folder.id}`,
     data: { folderId: folder.id },
   });
+
+  // Auto-expand collapsed folder after 600ms hovering with dragged item
+  useEffect(() => {
+    if (isOver && isCollapsed) {
+      autoExpandTimeoutRef.current = setTimeout(() => {
+        onToggleCollapse();
+      }, 600);
+    } else {
+      if (autoExpandTimeoutRef.current) {
+        clearTimeout(autoExpandTimeoutRef.current);
+        autoExpandTimeoutRef.current = null;
+      }
+    }
+    return () => {
+      if (autoExpandTimeoutRef.current) {
+        clearTimeout(autoExpandTimeoutRef.current);
+      }
+    };
+  }, [isOver, isCollapsed, onToggleCollapse]);
 
   useEffect(() => {
     if (isEditingTitle) {
@@ -202,59 +224,69 @@ export default function FolderCard({
             </span>
           )}
 
-          <span className="text-[10px] font-mono text-stone-500 tabular-nums ml-1 shrink-0">
+          <span className="text-[10px] font-mono text-stone-500 font-bold ml-1 tabular-nums">
             ({tasks.length})
           </span>
         </div>
 
-        {/* Folder Actions */}
-        <div className="flex items-center gap-1 shrink-0">
+        {/* Action buttons on right */}
+        <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => onAddTaskToFolder(folder.id)}
-            className="p-1 rounded-lg text-stone-500 hover:text-amber-300 hover:bg-stone-800 transition-colors cursor-pointer"
-            title="Add task in folder"
+            className="p-1 rounded-lg text-stone-500 hover:text-amber-400 hover:bg-stone-800 transition-colors cursor-pointer"
+            title={`Add item to ${folder.name}`}
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (confirmDelete) {
-                onDeleteFolder(folder.id);
-              } else {
-                setConfirmDelete(true);
-                setTimeout(() => setConfirmDelete(false), 3000);
-              }
-            }}
-            className={`p-1 rounded-lg transition-colors cursor-pointer ${
-              confirmDelete
-                ? 'text-red-400 bg-red-950/80 border border-red-800'
-                : 'text-stone-500 hover:text-red-400 hover:bg-stone-800'
-            }`}
-            title={
-              confirmDelete
-                ? 'Click again to confirm deleting folder'
-                : 'Delete folder'
-            }
-          >
-            {confirmDelete ? (
-              <span className="text-[9px] font-mono font-bold px-1">Sure?</span>
-            ) : (
+          {confirmDelete ? (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => onDeleteFolder(folder.id)}
+                className="px-2 py-0.5 rounded-lg bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 text-[10px] font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                Delete
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                className="px-1.5 py-0.5 rounded-lg text-stone-400 hover:text-stone-200 text-[10px] font-mono transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="p-1 rounded-lg text-stone-600 hover:text-rose-400 hover:bg-stone-800 transition-colors cursor-pointer"
+              title="Delete folder"
+            >
               <Trash2 className="w-3.5 h-3.5" />
-            )}
-          </button>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Folder Tasks */}
+      {/* Active Drop Landing Zone Banner */}
+      {isOver && (
+        <div className="mx-3.5 my-2.5 px-3 py-2 rounded-xl bg-amber-500/10 border-2 border-dashed border-amber-500/50 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse">
+          <FolderOpen className="w-4 h-4 text-amber-400 shrink-0" />
+          <span className="text-xs font-mono font-bold text-amber-300">
+            Drop to move into "{folder.name}"
+          </span>
+        </div>
+      )}
+
+      {/* Folder Content: Tasks List / Grid (when expanded) */}
       {!isCollapsed && (
-        <div className="p-2.5">
+        <div className="p-3.5">
           {statusFilter === 'all' ? (
             <div className="space-y-4">
               {STATUS_GROUPS.map((group) => {
-                const groupTasks = tasks.filter(group.filterFn);
+                const groupTasks = tasks.filter((t) => t.status === group.key);
                 if (groupTasks.length === 0) return null;
                 const isGroupCollapsed = !!collapsedStatusGroups[group.key];
 
@@ -303,6 +335,7 @@ export default function FolderCard({
                                   selectedListId={selectedListId}
                                   availableFolders={availableFolders}
                                   isSelected={selectedTaskIds?.has(task.id)}
+                                  isGhost={activeDragTaskIds?.has(task.id)}
                                   onClickCard={onClickCard}
                                   onDeleteEntry={onDeleteEntry}
                                   onOpenDetail={onOpenDetail}
@@ -330,6 +363,7 @@ export default function FolderCard({
                                   selectedListId={selectedListId}
                                   availableFolders={availableFolders}
                                   isSelected={selectedTaskIds?.has(task.id)}
+                                  isGhost={activeDragTaskIds?.has(task.id)}
                                   onClickCard={onClickCard}
                                   onDeleteEntry={onDeleteEntry}
                                   onOpenDetail={onOpenDetail}
@@ -358,6 +392,7 @@ export default function FolderCard({
                                 selectedListId={selectedListId}
                                 availableFolders={availableFolders}
                                 isSelected={selectedTaskIds?.has(task.id)}
+                                isGhost={activeDragTaskIds?.has(task.id)}
                                 onClickCard={onClickCard}
                                 isSwiped={activeSwipedTaskId === task.id}
                                 onSetSwiped={(swiped) =>
@@ -402,6 +437,7 @@ export default function FolderCard({
                         selectedListId={selectedListId}
                         availableFolders={availableFolders}
                         isSelected={selectedTaskIds?.has(task.id)}
+                        isGhost={activeDragTaskIds?.has(task.id)}
                         onClickCard={onClickCard}
                         onDeleteEntry={onDeleteEntry}
                         onOpenDetail={onOpenDetail}
@@ -429,6 +465,7 @@ export default function FolderCard({
                         selectedListId={selectedListId}
                         availableFolders={availableFolders}
                         isSelected={selectedTaskIds?.has(task.id)}
+                        isGhost={activeDragTaskIds?.has(task.id)}
                         onClickCard={onClickCard}
                         onDeleteEntry={onDeleteEntry}
                         onOpenDetail={onOpenDetail}

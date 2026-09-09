@@ -34,16 +34,21 @@ import {
 	List,
 	FolderMinus,
 	FolderTree,
+	HelpCircle,
+	Clock,
 } from "lucide-react";
 import {
 	DndContext,
 	closestCenter,
+	closestCorners,
+	pointerWithin,
 	KeyboardSensor,
 	PointerSensor,
 	useSensor,
 	useSensors,
 	type DragEndEvent,
 	type DragStartEvent,
+	type CollisionDetection,
 	useDroppable,
 	DragOverlay,
 } from "@dnd-kit/core";
@@ -70,6 +75,7 @@ import {
 	createTaskList,
 	migrateTasksOnListDelete,
 	TASK_LIST_SCOPE,
+	formatDuration,
 } from "../../utils";
 
 // Subcomponents
@@ -399,6 +405,7 @@ export default function ListsView({
 	const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
 	const [lastSelectedTaskId, setLastSelectedTaskId] = useState<string | null>(null);
 	const [activeDragTask, setActiveDragTask] = useState<Task | null>(null);
+	const [activeDragWidth, setActiveDragWidth] = useState<number | null>(null);
 	const [batchScheduleModalOpen, setBatchScheduleModalOpen] = useState(false);
 	const [batchListPickerOpen, setBatchListPickerOpen] = useState(false);
 	const [batchFolderPickerOpen, setBatchFolderPickerOpen] = useState(false);
@@ -841,6 +848,34 @@ export default function ListsView({
 		}),
 	);
 
+	const activeDragTaskIds = useMemo(() => {
+		if (!activeDragTask) return undefined;
+		if (selectedTaskIds.has(activeDragTask.id) && selectedTaskIds.size > 1) {
+			return selectedTaskIds;
+		}
+		return new Set([activeDragTask.id]);
+	}, [activeDragTask, selectedTaskIds]);
+
+	// Hybrid collision strategy: Check container droppables (sidebar lists, folder cards, folder tabs, root area) first
+	const customCollisionStrategy: CollisionDetection = (args) => {
+		const pointerCollisions = pointerWithin(args);
+		const containerCollision = pointerCollisions.find((c) => {
+			const idStr = String(c.id);
+			return (
+				idStr.startsWith("sidebar-list-drop-") ||
+				idStr.startsWith("folder-drop-") ||
+				idStr.startsWith("folder-tab-drop-") ||
+				idStr === "root-tasks-area"
+			);
+		});
+
+		if (containerCollision) {
+			return [containerCollision];
+		}
+
+		return closestCorners(args);
+	};
+
 	const { setNodeRef: setRootNodeRef, isOver: isOverRoot } = useDroppable({
 		id: "root-tasks-area",
 		data: { folderId: undefined },
@@ -849,6 +884,7 @@ export default function ListsView({
 	const handleDragEnd = async (event: DragEndEvent) => {
 		const { active, over } = event;
 		setActiveDragTask(null);
+		setActiveDragWidth(null);
 		if (!over) return;
 
 		const activeTaskId = active.id as string;
@@ -862,6 +898,23 @@ export default function ListsView({
 			: [activeTaskId];
 
 		const overIdStr = String(over.id);
+
+		// Dragged onto a sidebar list (sidebar-list-drop-...) -> multi-tagging / add list to categories
+		if (overIdStr.startsWith("sidebar-list-drop-")) {
+			const targetListId = overIdStr.replace("sidebar-list-drop-", "");
+			await db.transaction("rw", db.entries, async () => {
+				for (const id of targetTaskIds) {
+					const t = allTasks.find((item) => item.id === id);
+					const currentCategories = t?.category_ids ?? [];
+					if (!currentCategories.includes(targetListId)) {
+						await db.entries.update(id, {
+							category_ids: [...currentCategories, targetListId],
+						} as any);
+					}
+				}
+			});
+			return;
+		}
 
 		// Dragged onto top tab chips (folder-tab-drop-...)
 		if (overIdStr.startsWith("folder-tab-drop-")) {
@@ -1187,6 +1240,7 @@ export default function ListsView({
 															selectedListId={selectedView}
 															availableFolders={availableFoldersForPicker}
 															isSelected={selectedTaskIds.has(task.id)}
+															isGhost={activeDragTaskIds?.has(task.id)}
 															onClickCard={handleTaskClick}
 															onDeleteEntry={onDeleteEntry}
 															onOpenDetail={onOpenDetail}
@@ -1218,6 +1272,7 @@ export default function ListsView({
 															selectedListId={selectedView}
 															availableFolders={availableFoldersForPicker}
 															isSelected={selectedTaskIds.has(task.id)}
+															isGhost={activeDragTaskIds?.has(task.id)}
 															onClickCard={handleTaskClick}
 															onDeleteEntry={onDeleteEntry}
 															onOpenDetail={onOpenDetail}
@@ -1303,6 +1358,7 @@ export default function ListsView({
 									selectedListId={selectedView}
 									availableFolders={availableFoldersForPicker}
 									isSelected={selectedTaskIds.has(task.id)}
+									isGhost={activeDragTaskIds?.has(task.id)}
 									onClickCard={handleTaskClick}
 									onDeleteEntry={onDeleteEntry}
 									onOpenDetail={onOpenDetail}
@@ -1330,6 +1386,7 @@ export default function ListsView({
 									selectedListId={selectedView}
 									availableFolders={availableFoldersForPicker}
 									isSelected={selectedTaskIds.has(task.id)}
+									isGhost={activeDragTaskIds?.has(task.id)}
 									onClickCard={handleTaskClick}
 									onDeleteEntry={onDeleteEntry}
 									onOpenDetail={onOpenDetail}
@@ -1502,6 +1559,7 @@ export default function ListsView({
 								selectedListId={selectedView}
 								availableFolders={availableFoldersForPicker}
 								selectedTaskIds={selectedTaskIds}
+								activeDragTaskIds={activeDragTaskIds}
 								onClickCard={handleTaskClick}
 								activeSwipedTaskId={activeSwipedTaskId}
 								onSetSwipedTaskId={setActiveSwipedTaskId}
@@ -1547,61 +1605,7 @@ export default function ListsView({
 			);
 		};
 
-		return (
-			<DndContext
-				sensors={sensors}
-				collisionDetection={closestCenter}
-				onDragStart={(event) => {
-					const task = allTasks.find((t) => t.id === event.active.id);
-					if (task) setActiveDragTask(task);
-				}}
-				onDragCancel={() => setActiveDragTask(null)}
-				onDragEnd={handleDragEnd}
-			>
-				{renderInner()}
-				<DragOverlay
-					dropAnimation={{
-						duration: 180,
-						easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)",
-					}}
-				>
-					{activeDragTask ? (
-						<div className="pointer-events-none select-none">
-							{selectedTaskIds.has(activeDragTask.id) &&
-							selectedTaskIds.size > 1 ? (
-								<div className="relative">
-									<div className="absolute inset-0 bg-[#161616] border border-violet-500/30 rounded-2xl rotate-3 scale-95 opacity-50 shadow-lg" />
-									<div className="absolute inset-0 bg-[#181818] border border-violet-500/40 rounded-2xl rotate-1.5 scale-98 opacity-75 shadow-lg" />
-									<div className="relative bg-[#1a1426] border-2 border-violet-500 rounded-2xl p-3.5 shadow-2xl ring-4 ring-violet-500/20 max-w-sm">
-										<div className="flex items-center justify-between gap-2 mb-2">
-											<span className="px-2.5 py-0.5 rounded-full bg-violet-500 text-white text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm">
-												<span>📦</span>
-												<span>Moving {selectedTaskIds.size} tasks</span>
-											</span>
-											<span className="text-[10px] font-mono text-violet-300 font-semibold">
-												Drop to move all
-											</span>
-										</div>
-										<div className="text-xs font-serif font-bold text-stone-100 truncate">
-											{activeDragTask.title}
-										</div>
-									</div>
-								</div>
-							) : (
-								<div className="bg-[#181818] border-2 border-amber-500/70 rounded-2xl p-3.5 shadow-2xl shadow-black/80 ring-2 ring-amber-500/20 scale-105 rotate-1 max-w-sm">
-									<div className="flex items-center gap-2">
-										<div className="w-4 h-4 rounded-md border border-stone-600 bg-stone-900 flex items-center justify-center shrink-0" />
-										<span className="text-xs font-serif font-bold text-stone-100 truncate">
-											{activeDragTask.title}
-										</span>
-									</div>
-								</div>
-							)}
-						</div>
-					) : null}
-				</DragOverlay>
-			</DndContext>
-		);
+		return renderInner();
 	};
 
 	const activeViewInfo = useMemo(() => {
@@ -1767,7 +1771,28 @@ export default function ListsView({
 	);
 
 	return (
-		<div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden" id="tasks-view-dashboard">
+		<DndContext
+			sensors={sensors}
+			collisionDetection={customCollisionStrategy}
+			onDragStart={(event) => {
+				const task = allTasks.find((t) => t.id === event.active.id);
+				if (task) {
+					setActiveDragTask(task);
+					const el =
+						document.getElementById(task.id) ||
+						document.querySelector(`[data-task-id="${task.id}"]`);
+					if (el) {
+						setActiveDragWidth(el.getBoundingClientRect().width);
+					}
+				}
+			}}
+			onDragCancel={() => {
+				setActiveDragTask(null);
+				setActiveDragWidth(null);
+			}}
+			onDragEnd={handleDragEnd}
+		>
+			<div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden" id="tasks-view-dashboard">
 			{/* ── MOBILE: Full Height Flex with Sticky Docked Input ── */}
 			<div className="md:hidden flex flex-col flex-1 h-full min-h-0 overflow-hidden">
 				{/* Top Controls (Search / View Switcher / Status) */}
@@ -2842,6 +2867,144 @@ export default function ListsView({
 					onBatchReschedule={(ids, d) => handleBatchSchedule(d)}
 				/>
 			)}
-		</div>
+			</div>
+
+			<DragOverlay
+				dropAnimation={{
+					duration: 200,
+					easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)",
+				}}
+			>
+				{activeDragTask ? (
+					<div
+						className="pointer-events-none select-none origin-top-left"
+						style={{
+							width: activeDragWidth ? `${activeDragWidth}px` : "360px",
+							maxWidth: "100%",
+						}}
+					>
+						{selectedTaskIds.has(activeDragTask.id) &&
+						selectedTaskIds.size > 1 ? (
+							/* Multi-Card Stacked Deck */
+							<div className="relative w-full">
+								{/* Bottom deck shadow card */}
+								<div className="absolute inset-0 bg-[#161424] dark:bg-[#161424] border border-violet-500/30 rounded-2xl rotate-4 translate-x-2 translate-y-3 opacity-40 shadow-xl" />
+								{/* Middle deck shadow card */}
+								<div className="absolute inset-0 bg-[#181528] dark:bg-[#181528] border border-violet-500/50 rounded-2xl rotate-2 translate-x-1 translate-y-1.5 opacity-70 shadow-xl" />
+								{/* Top active authentic card */}
+								<div className="relative">
+									<div className="absolute -top-3 right-3 z-30 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-600 text-white text-[11px] font-mono font-bold uppercase tracking-wider shadow-lg shadow-violet-950/50 ring-2 ring-violet-400/50">
+										<span>📦</span>
+										<span>Moving {selectedTaskIds.size} tasks</span>
+									</div>
+									{viewLayout === "list" ? (
+										<DesktopTaskRow
+											task={activeDragTask}
+											activeTaskId={activeTaskId}
+											deletingId={deletingId}
+											taskLists={taskLists}
+											selectedListId={selectedView}
+											availableFolders={availableFoldersForPicker}
+											isSelected={true}
+											isGhost={false}
+											isDragOverlay={true}
+											onClickCard={() => {}}
+											onDeleteEntry={() => {}}
+											onOpenDetail={() => {}}
+											onToggleTaskStatus={() => {}}
+											onOpenStatusModal={() => {}}
+											onActivateTask={() => {}}
+											onOpenScheduleModal={() => {}}
+											onOpenListPicker={() => {}}
+											onOpenFolderPicker={() => {}}
+											onToggleAccomplishment={() => {}}
+											showContent={showContent}
+											onContextMenu={() => {}}
+										/>
+									) : (
+										<DesktopTaskCard
+											task={activeDragTask}
+											activeTaskId={activeTaskId}
+											deletingId={deletingId}
+											taskLists={taskLists}
+											selectedListId={selectedView}
+											availableFolders={availableFoldersForPicker}
+											isSelected={true}
+											isGhost={false}
+											isDragOverlay={true}
+											onClickCard={() => {}}
+											onDeleteEntry={() => {}}
+											onOpenDetail={() => {}}
+											onToggleTaskStatus={() => {}}
+											onOpenStatusModal={() => {}}
+											onActivateTask={() => {}}
+											onOpenScheduleModal={() => {}}
+											onOpenListPicker={() => {}}
+											onOpenFolderPicker={() => {}}
+											onToggleAccomplishment={() => {}}
+											showContent={showContent}
+											onContextMenu={() => {}}
+										/>
+									)}
+								</div>
+							</div>
+						) : (
+							/* Single 1:1 Authentic Task Card / Row Clone */
+							<div className="w-full">
+								{viewLayout === "list" ? (
+									<DesktopTaskRow
+										task={activeDragTask}
+										activeTaskId={activeTaskId}
+										deletingId={deletingId}
+										taskLists={taskLists}
+										selectedListId={selectedView}
+										availableFolders={availableFoldersForPicker}
+										isSelected={selectedTaskIds.has(activeDragTask.id)}
+										isGhost={false}
+										isDragOverlay={true}
+										onClickCard={() => {}}
+										onDeleteEntry={() => {}}
+										onOpenDetail={() => {}}
+										onToggleTaskStatus={() => {}}
+										onOpenStatusModal={() => {}}
+										onActivateTask={() => {}}
+										onOpenScheduleModal={() => {}}
+										onOpenListPicker={() => {}}
+										onOpenFolderPicker={() => {}}
+										onToggleAccomplishment={() => {}}
+										showContent={showContent}
+										onContextMenu={() => {}}
+									/>
+								) : (
+									<DesktopTaskCard
+										task={activeDragTask}
+										activeTaskId={activeTaskId}
+										deletingId={deletingId}
+										taskLists={taskLists}
+										selectedListId={selectedView}
+										availableFolders={availableFoldersForPicker}
+										isSelected={selectedTaskIds.has(activeDragTask.id)}
+										isGhost={false}
+										isDragOverlay={true}
+										onClickCard={() => {}}
+										onDeleteEntry={() => {}}
+										onOpenDetail={() => {}}
+										onToggleTaskStatus={() => {}}
+										onOpenStatusModal={() => {}}
+										onActivateTask={() => {}}
+										onOpenScheduleModal={() => {}}
+										onOpenListPicker={() => {}}
+										onOpenFolderPicker={() => {}}
+										onToggleAccomplishment={() => {}}
+										showContent={showContent}
+										onContextMenu={() => {}}
+									/>
+								)}
+							</div>
+						)}
+					</div>
+				) : null}
+			</DragOverlay>
+		</DndContext>
 	);
 }

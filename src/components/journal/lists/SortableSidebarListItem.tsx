@@ -5,6 +5,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useSortable } from "@dnd-kit/sortable";
+import { useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import {
 	GripVertical,
@@ -58,12 +59,17 @@ export default function SortableSidebarListItem({
 	const {
 		attributes,
 		listeners,
-		setNodeRef,
+		setNodeRef: setSortNodeRef,
 		transform,
 		transition,
 		isDragging,
 	} = useSortable({
 		id: list.id,
+	});
+
+	const { setNodeRef: setDropNodeRef, isOver: isTaskOver } = useDroppable({
+		id: `sidebar-list-drop-${list.id}`,
+		data: { listId: list.id },
 	});
 
 	const style = {
@@ -94,7 +100,18 @@ export default function SortableSidebarListItem({
 	}, [isMenuOpen]);
 
 	return (
-		<div ref={setNodeRef} style={style} className="flex flex-col relative group/item">
+		<div
+			ref={(node) => {
+				setSortNodeRef(node);
+				setDropNodeRef(node);
+			}}
+			style={style}
+			className={`flex flex-col relative group/item transition-all duration-150 ${
+				isTaskOver
+					? "ring-2 ring-amber-400 bg-amber-500/20 rounded-xl scale-[1.02] shadow-[0_0_15px_rgba(245,158,11,0.25)]"
+					: ""
+			}`}
+		>
 			<div
 				onClick={onSelect}
 				className={`group relative w-full flex items-center gap-2 px-2.5 py-2 rounded-xl border text-left transition-all duration-150 cursor-pointer ${
@@ -178,7 +195,12 @@ export default function SortableSidebarListItem({
 				{/* Badges / Counters */}
 				{!isEditing && (
 					<span className="flex items-center gap-1.5 shrink-0">
-						{counts.active > 0 && (
+						{isTaskOver && (
+							<span className="text-[9px] font-mono font-bold text-amber-300 bg-amber-500/30 px-1.5 py-0.5 rounded-md animate-pulse shadow-sm">
+								+ Add Tag
+							</span>
+						)}
+						{counts.active > 0 && !isTaskOver && (
 							<span
 								className={`text-[11px] font-mono font-semibold tabular-nums min-w-[14px] text-center ${
 									isActive
