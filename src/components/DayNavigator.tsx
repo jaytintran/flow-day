@@ -860,11 +860,11 @@ export default function DayNavigator({
                 <div className="relative flex-1 min-w-0">
                   {/* Left fade */}
                   {stripCanScrollLeft && (
-                    <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 z-10 bg-gradient-to-r from-[#0a0a0a] to-transparent" />
+                    <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 z-10 bg-gradient-to-r from-[var(--app-bg,#0a0a0a)] to-transparent" />
                   )}
                   {/* Right fade */}
                   {stripCanScrollRight && (
-                    <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 z-10 bg-gradient-to-l from-[#0a0a0a] to-transparent" />
+                    <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 z-10 bg-gradient-to-l from-[var(--app-bg,#0a0a0a)] to-transparent" />
                   )}
 
                   <div

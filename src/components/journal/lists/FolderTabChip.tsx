@@ -7,7 +7,6 @@ import React, { useState, useRef, useEffect } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import {
 	Folder,
-	MoreHorizontal,
 	Edit2,
 	Palette,
 	Trash2,
@@ -157,18 +156,6 @@ export default function FolderTabChip({
 		setConfirmDelete(false);
 	};
 
-	const handleOpenMenuBtn = (e: React.MouseEvent) => {
-		e.preventDefault();
-		e.stopPropagation();
-		if (chipRef.current) {
-			const rect = chipRef.current.getBoundingClientRect();
-			setMenuPos({ x: rect.left, y: rect.bottom + 6 });
-		}
-		setIsMenuOpen((prev) => !prev);
-		setShowColorPicker(false);
-		setConfirmDelete(false);
-	};
-
 	const commitRename = () => {
 		setIsEditing(false);
 		const trimmed = nameDraft.trim();
@@ -211,39 +198,35 @@ export default function FolderTabChip({
 				<button
 					type="button"
 					onClick={onSelect}
-					className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-mono font-semibold transition-all cursor-pointer border ${
+					onDoubleClick={(e) => {
+						e.stopPropagation();
+						setNameDraft(folder.name);
+						setIsEditing(true);
+					}}
+					className={`h-7.5 inline-flex items-center gap-1.5 px-2.5 rounded-xl text-[11px] font-mono font-semibold transition-all cursor-pointer border shrink-0 leading-none ${
 						isActive
 							? colorTheme.bgActive
 							: "bg-white/[0.03] border-white/[0.08] text-stone-400 hover:text-stone-200 hover:bg-white/[0.06] hover:border-white/[0.15]"
 					}`}
-					title={`${folder.name} (${count} items) — Right-click to manage`}
+					title={`${folder.name} (${count} items) — Double-click to rename, right-click to manage`}
 				>
-					<span className={`w-1.5 h-1.5 rounded-full ${colorTheme.dot} shrink-0`} />
-					<Folder className={`w-3 h-3 ${isActive ? colorTheme.text : "text-stone-400"} shrink-0`} />
+					<Folder className={`w-3.5 h-3.5 ${isActive ? colorTheme.text : "text-stone-400"} shrink-0`} />
+					<span className="truncate max-w-[130px] leading-none">{folder.name}</span>
 					{isOver ? (
-						<span className="text-[9px] font-mono font-bold text-amber-300 bg-amber-500/35 px-1.5 py-0.2 rounded animate-pulse">
+						<span className="text-[9px] font-mono font-bold text-amber-300 bg-amber-500/35 px-1.5 py-0.5 rounded-md animate-pulse leading-none">
 							+ Move
 						</span>
 					) : (
 						<span
-							className={`text-[9px] font-mono font-bold tabular-nums ml-0.5 px-1 py-0.2 rounded-md ${
+							className={`text-[10px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded-md leading-none ${
 								isActive
-									? "bg-white/10 text-white"
-									: "bg-stone-800 text-stone-400"
+									? "bg-white/15 text-white"
+									: "bg-black/15 dark:bg-white/5 text-stone-400"
 							}`}
 						>
 							{count}
 						</span>
 					)}
-
-					{/* Hover Trigger for Menu */}
-					<span
-						onClick={handleOpenMenuBtn}
-						className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-stone-700/60 text-stone-400 hover:text-stone-100 transition-opacity ml-0.5"
-						title="Folder options"
-					>
-						<MoreHorizontal className="w-3 h-3" />
-					</span>
 				</button>
 			)}
 

@@ -247,6 +247,58 @@ export default function ListsView({
 		localStorage.setItem(`flowday-tasks-folder-tab-${selectedView}`, tabId);
 	};
 
+	// Mobile folder selector dropdown state
+	const [isMobileFolderDropdownOpen, setIsMobileFolderDropdownOpen] =
+		useState(false);
+	const [mobileDropdownCoords, setMobileDropdownCoords] = useState<{
+		top: number;
+		left: number;
+	} | null>(null);
+	const mobileFolderDropdownMenuRef = useRef<HTMLDivElement>(null);
+	const mobileFolderDropdownBtnRef = useRef<HTMLButtonElement | null>(null);
+
+	const handleToggleMobileFolderDropdown = (
+		e: React.MouseEvent<HTMLButtonElement>,
+	) => {
+		e.stopPropagation();
+		if (isMobileFolderDropdownOpen) {
+			setIsMobileFolderDropdownOpen(false);
+		} else {
+			const rect = e.currentTarget.getBoundingClientRect();
+			mobileFolderDropdownBtnRef.current = e.currentTarget;
+			setMobileDropdownCoords({
+				top: rect.bottom + 6,
+				left: Math.max(8, Math.min(rect.left, window.innerWidth - 230)),
+			});
+			setIsMobileFolderDropdownOpen(true);
+		}
+	};
+
+	useEffect(() => {
+		if (!isMobileFolderDropdownOpen) return;
+		const handleClickOutside = (e: MouseEvent) => {
+			if (
+				mobileFolderDropdownMenuRef.current &&
+				!mobileFolderDropdownMenuRef.current.contains(e.target as Node) &&
+				mobileFolderDropdownBtnRef.current &&
+				!mobileFolderDropdownBtnRef.current.contains(e.target as Node)
+			) {
+				setIsMobileFolderDropdownOpen(false);
+			}
+		};
+		const handleScroll = () => {
+			setIsMobileFolderDropdownOpen(false);
+		};
+		window.addEventListener("mousedown", handleClickOutside);
+		window.addEventListener("scroll", handleScroll, { passive: true });
+		window.addEventListener("resize", handleScroll, { passive: true });
+		return () => {
+			window.removeEventListener("mousedown", handleClickOutside);
+			window.removeEventListener("scroll", handleScroll);
+			window.removeEventListener("resize", handleScroll);
+		};
+	}, [isMobileFolderDropdownOpen]);
+
 	// Desktop Workspace Layout Mode: 'grid' (cards) | 'list' (compact rows)
 	const [viewLayout, setViewLayout] = useState<"grid" | "list">(() => {
 		try {
@@ -1060,16 +1112,21 @@ export default function ListsView({
 		});
 
 	// ─── Interactive Folder Tab / Filter Strip Panel ──────────────────────────
+	const activeMobileFolder = currentListFolders.find(
+		(f) => f.id === selectedFolderTab,
+	);
+
 	const folderStripPanel = selectedView !== "paper" &&
 		selectedView !== "trophy" && (
 			<div className="flex items-center gap-1.5 overflow-x-auto py-1.5 scrollbar-none shrink-0 mb-3">
+				{/* [+ Folder] */}
 				<button
 					type="button"
 					onClick={handleCreateFolder}
-					className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all cursor-pointer shrink-0 active:scale-95"
+					className="h-7.5 inline-flex items-center gap-1.5 px-2.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all cursor-pointer shrink-0 active:scale-95 leading-none"
 					title="Create new folder"
 				>
-					<FolderPlus className="w-3.5 h-3.5" />
+					<FolderPlus className="w-3.5 h-3.5 shrink-0" />
 					<span>+ Folder</span>
 				</button>
 
@@ -1078,16 +1135,22 @@ export default function ListsView({
 					ref={setTabAllNodeRef}
 					type="button"
 					onClick={() => handleSelectFolderTab("all")}
-					className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-mono font-semibold transition-all cursor-pointer border shrink-0 ${
+					className={`h-7.5 inline-flex items-center gap-1.5 px-2.5 rounded-xl text-[11px] font-mono font-semibold transition-all cursor-pointer border shrink-0 leading-none ${
 						selectedFolderTab === "all"
 							? "bg-white/[0.1] border-white/20 text-white shadow-sm font-bold"
 							: "bg-white/[0.03] border-white/[0.08] text-stone-400 hover:text-stone-200 hover:bg-white/[0.06]"
 					} ${isOverTabAll ? "ring-2 ring-amber-400 bg-amber-500/20" : ""}`}
 					title="All Items (Grouped with Folder sections)"
 				>
-					<FolderTree className="w-3 h-3 text-stone-400 shrink-0" />
+					<FolderTree className="w-3.5 h-3.5 text-stone-400 shrink-0" />
 					<span>All</span>
-					<span className="text-[9px] font-mono text-stone-500 tabular-nums ml-0.5">
+					<span
+						className={`text-[10px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded-md leading-none ${
+							selectedFolderTab === "all"
+								? "bg-white/15 text-white"
+								: "bg-black/15 dark:bg-white/5 text-stone-400"
+						}`}
+					>
 						{displayedTasks.length}
 					</span>
 				</button>
@@ -1098,7 +1161,7 @@ export default function ListsView({
 						ref={setTabUnfiledNodeRef}
 						type="button"
 						onClick={() => handleSelectFolderTab("unfiled")}
-						className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-mono font-semibold transition-all cursor-pointer border shrink-0 ${
+						className={`h-7.5 inline-flex items-center gap-1.5 px-2.5 rounded-xl text-[11px] font-mono font-semibold transition-all cursor-pointer border shrink-0 leading-none ${
 							selectedFolderTab === "unfiled"
 								? "bg-white/[0.1] border-white/20 text-white shadow-sm font-bold"
 								: "bg-white/[0.03] border-white/[0.08] text-stone-400 hover:text-stone-200 hover:bg-white/[0.06]"
@@ -1106,7 +1169,13 @@ export default function ListsView({
 						title="General (Unfiled Items only)"
 					>
 						<span>General</span>
-						<span className="text-[9px] font-mono text-stone-500 tabular-nums ml-0.5">
+						<span
+							className={`text-[10px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded-md leading-none ${
+								selectedFolderTab === "unfiled"
+									? "bg-white/15 text-white"
+									: "bg-black/15 dark:bg-white/5 text-stone-400"
+							}`}
+						>
 							{rootTasks.length}
 						</span>
 					</button>
@@ -1118,36 +1187,163 @@ export default function ListsView({
 						ref={setTabFlatNodeRef}
 						type="button"
 						onClick={() => handleSelectFolderTab("flat")}
-						className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-mono font-semibold transition-all cursor-pointer border shrink-0 ${
+						className={`h-7.5 inline-flex items-center gap-1.5 px-2.5 rounded-xl text-[11px] font-mono font-semibold transition-all cursor-pointer border shrink-0 leading-none ${
 							selectedFolderTab === "flat"
 								? "bg-white/[0.1] border-white/20 text-white shadow-sm font-bold"
 								: "bg-white/[0.03] border-white/[0.08] text-stone-400 hover:text-stone-200 hover:bg-white/[0.06]"
 						} ${isOverTabFlat ? "ring-2 ring-amber-400 bg-amber-500/20" : ""}`}
 						title="All Items (Flat view without folder sections)"
 					>
-						<FolderMinus className="w-3 h-3 text-stone-400 shrink-0" />
-						<span className="text-[9px] font-mono text-stone-500 tabular-nums">
+						<FolderMinus className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+						<span
+							className={`text-[10px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded-md leading-none ${
+								selectedFolderTab === "flat"
+									? "bg-white/15 text-white"
+									: "bg-black/15 dark:bg-white/5 text-stone-400"
+							}`}
+						>
 							{displayedTasks.length}
 						</span>
 					</button>
 				)}
 
-				{/* Individual Folder Tabs */}
-				{currentListFolders.map((folder) => {
-					const fTasks = folderTasksMap[folder.id] ?? [];
-					return (
-						<FolderTabChip
-							key={folder.id}
-							folder={folder}
-							isActive={selectedFolderTab === folder.id}
-							count={fTasks.length}
-							onSelect={() => handleSelectFolderTab(folder.id)}
-							onRename={handleRenameFolder}
-							onChangeColor={handleChangeFolderColor}
-							onDelete={handleDeleteFolder}
-						/>
-					);
-				})}
+				{/* MOBILE ONLY: Grouped Folder Selector Dropdown (if folders exist) */}
+				{currentListFolders.length > 0 && (
+					<div className="md:hidden relative shrink-0">
+						<button
+							type="button"
+							onClick={handleToggleMobileFolderDropdown}
+							className={`h-7.5 inline-flex items-center gap-1.5 px-2.5 rounded-xl text-[11px] font-mono font-semibold transition-all cursor-pointer border shrink-0 leading-none ${
+								activeMobileFolder
+									? "bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-sm font-bold"
+									: "bg-white/[0.03] border-white/[0.08] text-stone-400 hover:text-stone-200 hover:bg-white/[0.06]"
+							}`}
+							title="Select folder"
+						>
+							<Folder
+								className={`w-3.5 h-3.5 ${
+									activeMobileFolder ? "text-amber-400" : "text-stone-400"
+								} shrink-0`}
+							/>
+							<span className="truncate max-w-[100px] leading-none">
+								{activeMobileFolder ? activeMobileFolder.name : "Folders"}
+							</span>
+							<span
+								className={`text-[10px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded-md leading-none ${
+									activeMobileFolder
+										? "bg-amber-500/25 text-amber-200"
+										: "bg-black/15 dark:bg-white/5 text-stone-400"
+								}`}
+							>
+								{activeMobileFolder
+									? folderTasksMap[activeMobileFolder.id]?.length ?? 0
+									: currentListFolders.length}
+							</span>
+							<ChevronDown
+								className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
+									isMobileFolderDropdownOpen
+										? "rotate-180 text-amber-400"
+										: "text-stone-500"
+								}`}
+							/>
+						</button>
+
+						<AnimatePresence>
+							{isMobileFolderDropdownOpen && mobileDropdownCoords && (
+								<motion.div
+									ref={mobileFolderDropdownMenuRef}
+									initial={{ opacity: 0, y: -4, scale: 0.96 }}
+									animate={{ opacity: 1, y: 0, scale: 1 }}
+									exit={{ opacity: 0, y: -4, scale: 0.96 }}
+									transition={{ duration: 0.12 }}
+									style={{
+										position: "fixed",
+										top: `${mobileDropdownCoords.top}px`,
+										left: `${mobileDropdownCoords.left}px`,
+										zIndex: 9999,
+									}}
+									className="w-56 bg-[#141414] dark:bg-[#141414] border border-stone-700/80 rounded-xl p-1 shadow-2xl backdrop-blur-xl select-none font-mono max-h-64 overflow-y-auto"
+								>
+									<div className="px-2.5 py-1.5 border-b border-stone-800/80 mb-1 flex items-center justify-between">
+										<span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">
+											Folders
+										</span>
+										<button
+											type="button"
+											onClick={() => {
+												setIsMobileFolderDropdownOpen(false);
+												handleCreateFolder();
+											}}
+											className="text-[10px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer"
+										>
+											<Plus className="w-3 h-3" />
+											<span>New Folder</span>
+										</button>
+									</div>
+
+									<div className="space-y-0.5">
+										{currentListFolders.map((f) => {
+											const fCount = folderTasksMap[f.id]?.length ?? 0;
+											const isSelected = selectedFolderTab === f.id;
+											return (
+												<button
+													key={f.id}
+													type="button"
+													onClick={() => {
+														handleSelectFolderTab(f.id);
+														setIsMobileFolderDropdownOpen(false);
+													}}
+													className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left text-xs transition-colors cursor-pointer ${
+														isSelected
+															? "bg-amber-500/20 text-amber-300 font-bold"
+															: "text-stone-300 hover:bg-stone-800/80 hover:text-white"
+													}`}
+												>
+													<div className="flex items-center gap-2 min-w-0">
+														<Folder
+															className={`w-3.5 h-3.5 ${
+																isSelected ? "text-amber-400" : "text-stone-400"
+															} shrink-0`}
+														/>
+														<span className="truncate">{f.name}</span>
+													</div>
+													<span
+														className={`text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded-md ${
+															isSelected
+																? "bg-amber-500/30 text-amber-200 font-bold"
+																: "bg-stone-800 text-stone-400"
+														}`}
+													>
+														{fCount}
+													</span>
+												</button>
+											);
+										})}
+									</div>
+								</motion.div>
+							)}
+						</AnimatePresence>
+					</div>
+				)}
+
+				{/* DESKTOP ONLY: Individual Folder Tabs */}
+				<div className="hidden md:flex items-center gap-1.5">
+					{currentListFolders.map((folder) => {
+						const fTasks = folderTasksMap[folder.id] ?? [];
+						return (
+							<FolderTabChip
+								key={folder.id}
+								folder={folder}
+								isActive={selectedFolderTab === folder.id}
+								count={fTasks.length}
+								onSelect={() => handleSelectFolderTab(folder.id)}
+								onRename={handleRenameFolder}
+								onChangeColor={handleChangeFolderColor}
+								onDelete={handleDeleteFolder}
+							/>
+						);
+					})}
+				</div>
 			</div>
 		);
 
