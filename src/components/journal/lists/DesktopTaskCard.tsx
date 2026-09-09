@@ -14,6 +14,7 @@ import {
   Calendar,
   Clock,
   Play,
+  Folder,
 } from 'lucide-react';
 import { db } from '../../../db';
 import { Task, Category, ListFolder, TimelineEntry } from '../../../types';
@@ -78,6 +79,10 @@ export default function DesktopTaskCard({
   const taskCategories = (task.category_ids ?? [])
     .map((id) => taskLists.find((list) => list.id === id))
     .filter((list): list is Category => !!list && list.id !== selectedListId);
+
+  const taskFolder = task.folder_id
+    ? availableFolders?.find((f) => f.id === task.folder_id)
+    : null;
 
   const hasTimeSpent = (task.time_spent ?? 0) > 0;
   const achievementsCount = task.achievements?.length ?? 0;
@@ -235,6 +240,38 @@ export default function DesktopTaskCard({
                   day: 'numeric',
                 })}
               </span>
+            )}
+
+            {/* Folder Tag / Move Trigger */}
+            {taskFolder ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenFolderPicker?.(task);
+                }}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-mono font-semibold bg-stone-900/90 border border-stone-800 text-amber-400/90 hover:border-amber-500/40 hover:text-amber-300 transition-all cursor-pointer shrink-0 max-w-[110px]"
+                title={`Folder: ${taskFolder.name} (Click to change)`}
+              >
+                <Folder className="w-2.5 h-2.5 shrink-0" />
+                <span className="truncate">{taskFolder.name}</span>
+              </button>
+            ) : (
+              availableFolders &&
+              availableFolders.length > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenFolderPicker?.(task);
+                  }}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-mono bg-stone-900/60 border border-stone-800/80 text-stone-500 hover:text-stone-300 hover:border-stone-700 hover:bg-stone-850 transition-all cursor-pointer shrink-0"
+                  title="Move to folder"
+                >
+                  <Folder className="w-2.5 h-2.5" />
+                  <span>+ Folder</span>
+                </button>
+              )
             )}
 
             {/* Category Lists */}

@@ -16,6 +16,7 @@ import {
 import { Task, Category, ListFolder, TimelineEntry } from '../../../types';
 import { STATUS_GROUPS } from '../ListsView';
 import DesktopTaskCard from './DesktopTaskCard';
+import DesktopTaskRow from './DesktopTaskRow';
 import MobileTaskItem from './MobileTaskItem';
 
 interface FolderCardProps {
@@ -45,6 +46,7 @@ interface FolderCardProps {
   onAddTaskToFolder: (folderId: string) => void;
   onToggleAccomplishment?: (task: Task) => void;
   isDesktop?: boolean;
+  viewLayout?: 'grid' | 'list';
   gridClass?: string;
   showContent?: boolean;
   statusFilter?: "all" | "todo" | "in_progress" | "done" | "dropped" | "maybe";
@@ -78,6 +80,7 @@ export default function FolderCard({
   onAddTaskToFolder,
   onToggleAccomplishment,
   isDesktop = false,
+  viewLayout = 'grid',
   gridClass = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5',
   showContent = true,
   statusFilter = 'all',
@@ -288,32 +291,61 @@ export default function FolderCard({
                         strategy={verticalListSortingStrategy}
                       >
                         {isDesktop ? (
-                          <div className={gridClass}>
-                            {groupTasks.map((task) => (
-                              <DesktopTaskCard
-                                key={task.id}
-                                task={task}
-                                activeTaskId={activeTaskId}
-                                deletingId={deletingId}
-                                taskLists={taskLists}
-                                selectedListId={selectedListId}
-                                availableFolders={availableFolders}
-                                isSelected={selectedTaskIds?.has(task.id)}
-                                onClickCard={onClickCard}
-                                onDeleteEntry={onDeleteEntry}
-                                onOpenDetail={onOpenDetail}
-                                onToggleTaskStatus={onToggleTaskStatus}
-                                onOpenStatusModal={onOpenStatusModal}
-                                onActivateTask={onActivateTask}
-                                onOpenScheduleModal={onOpenScheduleModal}
-                                onOpenListPicker={onOpenListPicker}
-                                onOpenFolderPicker={onOpenFolderPicker}
-                                onToggleAccomplishment={onToggleAccomplishment}
-                                showContent={showContent}
-                                onContextMenu={onContextMenu}
-                              />
-                            ))}
-                          </div>
+                          viewLayout === 'list' ? (
+                            <div className="space-y-1.5">
+                              {groupTasks.map((task) => (
+                                <DesktopTaskRow
+                                  key={task.id}
+                                  task={task}
+                                  activeTaskId={activeTaskId}
+                                  deletingId={deletingId}
+                                  taskLists={taskLists}
+                                  selectedListId={selectedListId}
+                                  availableFolders={availableFolders}
+                                  isSelected={selectedTaskIds?.has(task.id)}
+                                  onClickCard={onClickCard}
+                                  onDeleteEntry={onDeleteEntry}
+                                  onOpenDetail={onOpenDetail}
+                                  onToggleTaskStatus={onToggleTaskStatus}
+                                  onOpenStatusModal={onOpenStatusModal}
+                                  onActivateTask={onActivateTask}
+                                  onOpenScheduleModal={onOpenScheduleModal}
+                                  onOpenListPicker={onOpenListPicker}
+                                  onOpenFolderPicker={onOpenFolderPicker}
+                                  onToggleAccomplishment={onToggleAccomplishment}
+                                  showContent={showContent}
+                                  onContextMenu={onContextMenu}
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <div className={gridClass}>
+                              {groupTasks.map((task) => (
+                                <DesktopTaskCard
+                                  key={task.id}
+                                  task={task}
+                                  activeTaskId={activeTaskId}
+                                  deletingId={deletingId}
+                                  taskLists={taskLists}
+                                  selectedListId={selectedListId}
+                                  availableFolders={availableFolders}
+                                  isSelected={selectedTaskIds?.has(task.id)}
+                                  onClickCard={onClickCard}
+                                  onDeleteEntry={onDeleteEntry}
+                                  onOpenDetail={onOpenDetail}
+                                  onToggleTaskStatus={onToggleTaskStatus}
+                                  onOpenStatusModal={onOpenStatusModal}
+                                  onActivateTask={onActivateTask}
+                                  onOpenScheduleModal={onOpenScheduleModal}
+                                  onOpenListPicker={onOpenListPicker}
+                                  onOpenFolderPicker={onOpenFolderPicker}
+                                  onToggleAccomplishment={onToggleAccomplishment}
+                                  showContent={showContent}
+                                  onContextMenu={onContextMenu}
+                                />
+                              ))}
+                            </div>
+                          )
                         ) : (
                           <div className="space-y-1.5">
                             {groupTasks.map((task) => (
@@ -358,32 +390,61 @@ export default function FolderCard({
               strategy={verticalListSortingStrategy}
             >
               {isDesktop ? (
-                <div className={gridClass}>
-                  {tasks.map((task) => (
-                    <DesktopTaskCard
-                      key={task.id}
-                      task={task}
-                      activeTaskId={activeTaskId}
-                      deletingId={deletingId}
-                      taskLists={taskLists}
-                      selectedListId={selectedListId}
-                      availableFolders={availableFolders}
-                      isSelected={selectedTaskIds?.has(task.id)}
-                      onClickCard={onClickCard}
-                      onDeleteEntry={onDeleteEntry}
-                      onOpenDetail={onOpenDetail}
-                      onToggleTaskStatus={onToggleTaskStatus}
-                      onOpenStatusModal={onOpenStatusModal}
-                      onActivateTask={onActivateTask}
-                      onOpenScheduleModal={onOpenScheduleModal}
-                      onOpenListPicker={onOpenListPicker}
-                      onOpenFolderPicker={onOpenFolderPicker}
-                      onToggleAccomplishment={onToggleAccomplishment}
-                      showContent={showContent}
-                      onContextMenu={onContextMenu}
-                    />
-                  ))}
-                </div>
+                viewLayout === 'list' ? (
+                  <div className="space-y-1.5">
+                    {tasks.map((task) => (
+                      <DesktopTaskRow
+                        key={task.id}
+                        task={task}
+                        activeTaskId={activeTaskId}
+                        deletingId={deletingId}
+                        taskLists={taskLists}
+                        selectedListId={selectedListId}
+                        availableFolders={availableFolders}
+                        isSelected={selectedTaskIds?.has(task.id)}
+                        onClickCard={onClickCard}
+                        onDeleteEntry={onDeleteEntry}
+                        onOpenDetail={onOpenDetail}
+                        onToggleTaskStatus={onToggleTaskStatus}
+                        onOpenStatusModal={onOpenStatusModal}
+                        onActivateTask={onActivateTask}
+                        onOpenScheduleModal={onOpenScheduleModal}
+                        onOpenListPicker={onOpenListPicker}
+                        onOpenFolderPicker={onOpenFolderPicker}
+                        onToggleAccomplishment={onToggleAccomplishment}
+                        showContent={showContent}
+                        onContextMenu={onContextMenu}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className={gridClass}>
+                    {tasks.map((task) => (
+                      <DesktopTaskCard
+                        key={task.id}
+                        task={task}
+                        activeTaskId={activeTaskId}
+                        deletingId={deletingId}
+                        taskLists={taskLists}
+                        selectedListId={selectedListId}
+                        availableFolders={availableFolders}
+                        isSelected={selectedTaskIds?.has(task.id)}
+                        onClickCard={onClickCard}
+                        onDeleteEntry={onDeleteEntry}
+                        onOpenDetail={onOpenDetail}
+                        onToggleTaskStatus={onToggleTaskStatus}
+                        onOpenStatusModal={onOpenStatusModal}
+                        onActivateTask={onActivateTask}
+                        onOpenScheduleModal={onOpenScheduleModal}
+                        onOpenListPicker={onOpenListPicker}
+                        onOpenFolderPicker={onOpenFolderPicker}
+                        onToggleAccomplishment={onToggleAccomplishment}
+                        showContent={showContent}
+                        onContextMenu={onContextMenu}
+                      />
+                    ))}
+                  </div>
+                )
               ) : (
                 <div className="space-y-1.5">
                   {tasks.map((task) => (

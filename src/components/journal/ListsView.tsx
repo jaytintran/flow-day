@@ -30,6 +30,10 @@ import {
 	Palette,
 	Edit2,
 	Star,
+	LayoutGrid,
+	List,
+	FolderMinus,
+	FolderTree,
 } from "lucide-react";
 import {
 	DndContext,
@@ -73,7 +77,9 @@ import ListPickerPopover from "./lists/ListPickerPopover";
 import MoveToFolderModal from "./lists/MoveToFolderModal";
 import MobileTaskItem from "./lists/MobileTaskItem";
 import DesktopTaskCard from "./lists/DesktopTaskCard";
+import DesktopTaskRow from "./lists/DesktopTaskRow";
 import FolderCard from "./lists/FolderCard";
+import FolderTabChip from "./lists/FolderTabChip";
 import TrophyView from "./lists/TrophyView";
 import PaperListView from "./lists/PaperListView";
 import SortableSidebarListItem from "./lists/SortableSidebarListItem";
@@ -222,6 +228,36 @@ export default function ListsView({
 		return localStorage.getItem("flowday-tasks-selected-list") ?? "all";
 	});
 
+	// Per-List Active Folder Tab Filter: 'all' | 'unfiled' | folderId
+	const [selectedFolderTab, setSelectedFolderTab] = useState<string>(() => {
+		const initialList = localStorage.getItem("flowday-tasks-selected-list") ?? "all";
+		return localStorage.getItem(`flowday-tasks-folder-tab-${initialList}`) ?? "all";
+	});
+
+	const handleSelectFolderTab = (tabId: string) => {
+		setSelectedFolderTab(tabId);
+		localStorage.setItem(`flowday-tasks-folder-tab-${selectedView}`, tabId);
+	};
+
+	// Desktop Workspace Layout Mode: 'grid' (cards) | 'list' (compact rows)
+	const [viewLayout, setViewLayout] = useState<"grid" | "list">(() => {
+		try {
+			return (
+				(localStorage.getItem("flowday_lists_view_layout") as "grid" | "list") ||
+				"grid"
+			);
+		} catch {
+			return "grid";
+		}
+	});
+
+	const handleToggleViewLayout = (layout: "grid" | "list") => {
+		setViewLayout(layout);
+		try {
+			localStorage.setItem("flowday_lists_view_layout", layout);
+		} catch {}
+	};
+
 	// Sidebar Direct List Creation State
 	const [isCreatingList, setIsCreatingList] = useState(false);
 	const [newListName, setNewListName] = useState("");
@@ -255,6 +291,15 @@ export default function ListsView({
 			targetCategoryIds.push(selectedView);
 		}
 
+		// Contextual folder assignment: if viewing a specific folder tab, default to it
+		const contextualFolderId =
+			targetFolderId ??
+			(selectedFolderTab !== "all" &&
+			selectedFolderTab !== "unfiled" &&
+			selectedFolderTab !== "flat"
+				? selectedFolderTab
+				: undefined);
+
 		const newTaskId = crypto.randomUUID();
 		const newTask: Task = {
 			id: newTaskId,
@@ -267,7 +312,7 @@ export default function ListsView({
 			...(targetCategoryIds.length > 0
 				? { category_ids: targetCategoryIds }
 				: {}),
-			...(targetFolderId ? { folder_id: targetFolderId } : {}),
+			...(contextualFolderId ? { folder_id: contextualFolderId } : {}),
 		};
 
 		await db.entries.add(newTask);
@@ -613,6 +658,9 @@ export default function ListsView({
 	const handleSelectView = (view: string) => {
 		setSelectedView(view);
 		localStorage.setItem("flowday-tasks-selected-list", view);
+		const savedFolder =
+			localStorage.getItem(`flowday-tasks-folder-tab-${view}`) ?? "all";
+		setSelectedFolderTab(savedFolder);
 	};
 
 	// ─── Filter Tasks for the Selected View ──────────────────────────────────
@@ -741,10 +789,15 @@ export default function ListsView({
 			created_at: new Date(),
 		};
 		await db.list_folders.add(newFolder);
+		handleSelectFolderTab(newFolder.id);
 	};
 
 	const handleRenameFolder = async (folderId: string, newName: string) => {
 		await db.list_folders.update(folderId, { name: newName });
+	};
+
+	const handleChangeFolderColor = async (folderId: string, newColor: string) => {
+		await db.list_folders.update(folderId, { color: newColor } as any);
 	};
 
 	const handleDeleteFolder = async (folderId: string) => {
@@ -755,6 +808,9 @@ export default function ListsView({
 				await db.entries.update(t.id, { folder_id: undefined } as any);
 			}
 		});
+		if (selectedFolderTab === folderId) {
+			handleSelectFolderTab("all");
+		}
 	};
 
 	const toggleFolderCollapse = (folderId: string) => {
@@ -795,6 +851,21 @@ export default function ListsView({
 		if (!draggedTask) return;
 
 		const overIdStr = String(over.id);
+		// Dragged onto top tab chips
+		if (overIdStr.startsWith("folder-tab-drop-")) {
+			const targetTab = overIdStr.replace("folder-tab-drop-", "");
+			if (targetTab === "unfiled" || targetTab === "root") {
+				if (draggedTask.folder_id !== undefined) {
+					await db.entries.update(activeTaskId, { folder_id: undefined } as any);
+				}
+				return;
+			}
+			if (targetTab !== "all" && draggedTask.folder_id !== targetTab) {
+				await db.entries.update(activeTaskId, { folder_id: targetTab } as any);
+				return;
+			}
+		}
+
 		if (overIdStr.startsWith("folder-drop-")) {
 			const targetFolderId = overIdStr.replace("folder-drop-", "");
 			if (draggedTask.folder_id !== targetFolderId) {
@@ -882,65 +953,111 @@ export default function ListsView({
 		</div>
 	);
 
-	// ─── Folder Strip Panel ───────────────────────────────────────────────────
+	// Droppable refs for All and Unfiled top tabs
+	const { setNodeRef: setTabAllNodeRef, isOver: isOverTabAll } = useDroppable({
+		id: "folder-tab-drop-all",
+		data: { folderId: "all" },
+	});
+
+	const { setNodeRef: setTabUnfiledNodeRef, isOver: isOverTabUnfiled } =
+		useDroppable({
+			id: "folder-tab-drop-unfiled",
+			data: { folderId: undefined },
+		});
+
+	const { setNodeRef: setTabFlatNodeRef, isOver: isOverTabFlat } =
+		useDroppable({
+			id: "folder-tab-drop-flat",
+			data: { folderId: "flat" },
+		});
+
+	// ─── Interactive Folder Tab / Filter Strip Panel ──────────────────────────
 	const folderStripPanel = selectedView !== "paper" &&
 		selectedView !== "trophy" && (
 			<div className="flex items-center gap-1.5 overflow-x-auto py-1.5 scrollbar-none shrink-0 mb-3">
 				<button
+					type="button"
 					onClick={handleCreateFolder}
-					className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all cursor-pointer shrink-0 active:scale-95"
+					className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all cursor-pointer shrink-0 active:scale-95"
+					title="Create new folder"
 				>
 					<FolderPlus className="w-3.5 h-3.5" />
 					<span>+ Folder</span>
 				</button>
 
+				{/* All Tasks Tab (Hierarchical with Folders) */}
+				<button
+					ref={setTabAllNodeRef}
+					type="button"
+					onClick={() => handleSelectFolderTab("all")}
+					className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-mono font-semibold transition-all cursor-pointer border shrink-0 ${
+						selectedFolderTab === "all"
+							? "bg-white/[0.1] border-white/20 text-white shadow-sm font-bold"
+							: "bg-white/[0.03] border-white/[0.08] text-stone-400 hover:text-stone-200 hover:bg-white/[0.06]"
+					} ${isOverTabAll ? "ring-2 ring-amber-400 bg-amber-500/20" : ""}`}
+					title="All Items (Grouped with Folder sections)"
+				>
+					<FolderTree className="w-3 h-3 text-stone-400 shrink-0" />
+					<span>All</span>
+					<span className="text-[9px] font-mono text-stone-500 tabular-nums ml-0.5">
+						{displayedTasks.length}
+					</span>
+				</button>
+
+				{/* Unfiled / General Tab (if folders exist) */}
+				{currentListFolders.length > 0 && (
+					<button
+						ref={setTabUnfiledNodeRef}
+						type="button"
+						onClick={() => handleSelectFolderTab("unfiled")}
+						className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-mono font-semibold transition-all cursor-pointer border shrink-0 ${
+							selectedFolderTab === "unfiled"
+								? "bg-white/[0.1] border-white/20 text-white shadow-sm font-bold"
+								: "bg-white/[0.03] border-white/[0.08] text-stone-400 hover:text-stone-200 hover:bg-white/[0.06]"
+						} ${isOverTabUnfiled ? "ring-2 ring-amber-400 bg-amber-500/20" : ""}`}
+						title="General (Unfiled Items only)"
+					>
+						<span>General</span>
+						<span className="text-[9px] font-mono text-stone-500 tabular-nums ml-0.5">
+							{rootTasks.length}
+						</span>
+					</button>
+				)}
+
+				{/* No Folders (Flat All Items View) Tab (if folders exist) */}
+				{currentListFolders.length > 0 && (
+					<button
+						ref={setTabFlatNodeRef}
+						type="button"
+						onClick={() => handleSelectFolderTab("flat")}
+						className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-mono font-semibold transition-all cursor-pointer border shrink-0 ${
+							selectedFolderTab === "flat"
+								? "bg-white/[0.1] border-white/20 text-white shadow-sm font-bold"
+								: "bg-white/[0.03] border-white/[0.08] text-stone-400 hover:text-stone-200 hover:bg-white/[0.06]"
+						} ${isOverTabFlat ? "ring-2 ring-amber-400 bg-amber-500/20" : ""}`}
+						title="All Items (Flat view without folder sections)"
+					>
+						<FolderMinus className="w-3 h-3 text-stone-400 shrink-0" />
+						<span className="text-[9px] font-mono text-stone-500 tabular-nums">
+							{displayedTasks.length}
+						</span>
+					</button>
+				)}
+
+				{/* Individual Folder Tabs */}
 				{currentListFolders.map((folder) => {
 					const fTasks = folderTasksMap[folder.id] ?? [];
-					if (statusFilter !== "all" && fTasks.length === 0) return null;
-
 					return (
-						<button
+						<FolderTabChip
 							key={folder.id}
-							onClick={() => {
-								const scrollToFolder = () => {
-									const el = document.getElementById(`folder-${folder.id}`);
-									if (el) {
-										const scrollContainer = el.closest(".overflow-y-auto") as HTMLElement | null;
-										if (scrollContainer) {
-											const containerRect = scrollContainer.getBoundingClientRect();
-											const elRect = el.getBoundingClientRect();
-											const targetScrollTop =
-												scrollContainer.scrollTop +
-												(elRect.top - containerRect.top) -
-												16;
-											scrollContainer.scrollTo({
-												top: Math.max(0, targetScrollTop),
-												behavior: "smooth",
-											});
-										} else {
-											el.scrollIntoView({ behavior: "smooth", block: "start" });
-										}
-									}
-								};
-
-								if (collapsedFolders[folder.id]) {
-									setCollapsedFolders((prev) => ({
-										...prev,
-										[folder.id]: false,
-									}));
-									setTimeout(scrollToFolder, 50);
-								} else {
-									scrollToFolder();
-								}
-							}}
-							className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-mono font-semibold bg-stone-900/60 border border-stone-800 text-stone-300 hover:border-amber-500/40 hover:text-amber-300 transition-all cursor-pointer shrink-0"
-						>
-							<Folder className="w-3 h-3 text-amber-400" />
-							<span className="truncate max-w-[120px]">{folder.name}</span>
-							<span className="text-[9px] font-mono text-stone-500 font-bold tabular-nums">
-								{fTasks.length}
-							</span>
-						</button>
+							folder={folder}
+							isActive={selectedFolderTab === folder.id}
+							count={fTasks.length}
+							onSelect={() => handleSelectFolderTab(folder.id)}
+							onRename={handleRenameFolder}
+							onChangeColor={handleChangeFolderColor}
+							onDelete={handleDeleteFolder}
+						/>
 					);
 				})}
 			</div>
@@ -981,281 +1098,442 @@ export default function ListsView({
 		}
 	}, [cardsPerRow]);
 
-	const renderTaskContent = (isDesktop: boolean) => (
-		<DndContext
-			sensors={sensors}
-			collisionDetection={closestCenter}
-			onDragEnd={handleDragEnd}
-		>
-			<div className="space-y-6">
-				{/* 1. Root / Unfolderized Items Section (Shown First) */}
-				<div
-					ref={setRootNodeRef}
-					className={`rounded-2xl transition-all duration-150 ${
-						currentListFolders.length > 0
-							? "border border-stone-800/60 bg-[#111]/40 p-3"
-							: ""
-					} ${
-						isOverRoot ? "border-amber-500/50 bg-amber-500/[0.03]" : ""
-					}`}
-				>
-					{currentListFolders.length > 0 && rootTasks.length > 0 && (
-						<div className="flex items-center justify-between mb-2.5 px-1">
-							<span className="text-[10px] font-mono uppercase tracking-widest text-stone-500 font-bold">
-								General Items ({rootTasks.length})
-							</span>
-						</div>
-					)}
+	const renderTaskGroupList = (tasksToRender: Task[], isDesktop: boolean) => {
+		if (statusFilter === "all") {
+			return (
+				<div className="space-y-4">
+					{STATUS_GROUPS.map((group) => {
+						const groupTasks = tasksToRender.filter(group.filterFn);
+						if (groupTasks.length === 0) return null;
+						const isGroupCollapsed = !!collapsedStatusGroups[group.key];
 
-					<div>
-						{statusFilter === "all" ? (
-							<div className="space-y-4">
-								{STATUS_GROUPS.map((group) => {
-									const groupTasks = rootTasks.filter(group.filterFn);
-									if (groupTasks.length === 0) return null;
-									const isGroupCollapsed = !!collapsedStatusGroups[group.key];
+						return (
+							<div key={group.key} className="space-y-2">
+								<button
+									type="button"
+									onClick={() => toggleStatusGroup(group.key)}
+									className="w-full flex items-center justify-between py-1 px-1.5 rounded-lg text-left hover:bg-stone-900/40 transition-colors cursor-pointer group"
+								>
+									<div className="flex items-center gap-2">
+										<ChevronDown
+											className={`w-3.5 h-3.5 text-stone-500 transition-transform duration-200 ${
+												isGroupCollapsed ? "-rotate-90" : "rotate-0"
+											}`}
+										/>
+										<span
+											className={`w-2 h-2 rounded-full ${group.dotColor}`}
+										/>
+										<span
+											className={`text-[11px] font-mono font-bold uppercase tracking-wider ${group.textColor}`}
+										>
+											{group.label}
+										</span>
+									</div>
+									<span className="text-[10px] font-mono font-bold text-stone-500 tabular-nums">
+										{groupTasks.length}
+									</span>
+								</button>
 
-									return (
-										<div key={group.key} className="space-y-2">
-											<button
-												type="button"
-												onClick={() => toggleStatusGroup(group.key)}
-												className="w-full flex items-center justify-between py-1 px-1.5 rounded-lg text-left hover:bg-stone-900/40 transition-colors cursor-pointer group"
-											>
-												<div className="flex items-center gap-2">
-													<ChevronDown
-														className={`w-3.5 h-3.5 text-stone-500 transition-transform duration-200 ${
-															isGroupCollapsed ? "-rotate-90" : "rotate-0"
-														}`}
-													/>
-													<span
-														className={`w-2 h-2 rounded-full ${group.dotColor}`}
-													/>
-													<span
-														className={`text-[11px] font-mono font-bold uppercase tracking-wider ${group.textColor}`}
-													>
-														{group.label}
-													</span>
+								{!isGroupCollapsed && (
+									<SortableContext
+										items={groupTasks.map((t) => t.id)}
+										strategy={verticalListSortingStrategy}
+									>
+										{isDesktop ? (
+											viewLayout === "list" ? (
+												<div className="space-y-1.5">
+													{groupTasks.map((task) => (
+														<DesktopTaskRow
+															key={task.id}
+															task={task}
+															activeTaskId={activeTaskId}
+															deletingId={deletingId}
+															taskLists={taskLists}
+															selectedListId={selectedView}
+															availableFolders={availableFoldersForPicker}
+															isSelected={selectedTaskIds.has(task.id)}
+															onClickCard={handleTaskClick}
+															onDeleteEntry={onDeleteEntry}
+															onOpenDetail={onOpenDetail}
+															onToggleTaskStatus={onToggleTaskStatus}
+															onOpenStatusModal={setStatusPickerTask}
+															onActivateTask={onActivateTask}
+															onOpenScheduleModal={setScheduleModalTask}
+															onOpenListPicker={(t) =>
+																setListPickerTaskId(t.id)
+															}
+															onOpenFolderPicker={setFolderPickerTask}
+															onToggleAccomplishment={
+																handleToggleAccomplishment
+															}
+															showContent={showContent}
+															onContextMenu={handleTaskContextMenu}
+														/>
+													))}
 												</div>
-												<span className="text-[10px] font-mono font-bold text-stone-500 tabular-nums">
-													{groupTasks.length}
-												</span>
-											</button>
-
-											{!isGroupCollapsed && (
-												<SortableContext
-													items={groupTasks.map((t) => t.id)}
-													strategy={verticalListSortingStrategy}
-												>
-													{isDesktop ? (
-														<div className={gridClass}>
-															{groupTasks.map((task) => (
-																<DesktopTaskCard
-																	key={task.id}
-																	task={task}
-																	activeTaskId={activeTaskId}
-																	deletingId={deletingId}
-																	taskLists={taskLists}
-																	selectedListId={selectedView}
-																	availableFolders={availableFoldersForPicker}
-																	isSelected={selectedTaskIds.has(task.id)}
-																	onClickCard={handleTaskClick}
-																	onDeleteEntry={onDeleteEntry}
-																	onOpenDetail={onOpenDetail}
-																	onToggleTaskStatus={onToggleTaskStatus}
-																	onOpenStatusModal={setStatusPickerTask}
-																	onActivateTask={onActivateTask}
-																	onOpenScheduleModal={setScheduleModalTask}
-																	onOpenListPicker={(t) =>
-																		setListPickerTaskId(t.id)
-																	}
-																	onOpenFolderPicker={setFolderPickerTask}
-																	onToggleAccomplishment={
-																		handleToggleAccomplishment
-																	}
-																	showContent={showContent}
-																	onContextMenu={handleTaskContextMenu}
-																/>
-															))}
-														</div>
-													) : (
-														<div className="space-y-1.5">
-															{groupTasks.map((task) => (
-																<MobileTaskItem
-																	key={task.id}
-																	task={task}
-																	activeTaskId={activeTaskId}
-																	deletingId={deletingId}
-																	taskLists={taskLists}
-																	selectedListId={selectedView}
-																	availableFolders={availableFoldersForPicker}
-																	isSelected={selectedTaskIds.has(task.id)}
-																	onClickCard={handleTaskClick}
-																	isSwiped={activeSwipedTaskId === task.id}
-																	onSetSwiped={(swiped) =>
-																		setActiveSwipedTaskId(
-																			swiped ? task.id : null,
-																		)
-																	}
-																	onDeleteEntry={onDeleteEntry}
-																	onOpenDetail={onOpenDetail}
-																	onToggleTaskStatus={onToggleTaskStatus}
-																	onOpenStatusModal={setStatusPickerTask}
-																	onActivateTask={onActivateTask}
-																	onOpenScheduleModal={setScheduleModalTask}
-																	onOpenListPicker={(t) =>
-																		setListPickerTaskId(t.id)
-																	}
-																	onOpenFolderPicker={setFolderPickerTask}
-																	onToggleAccomplishment={
-																		handleToggleAccomplishment
-																	}
-																	showContent={showContent}
-																	onContextMenu={handleTaskContextMenu}
-																/>
-															))}
-														</div>
-													)}
-												</SortableContext>
-											)}
-										</div>
-									);
-								})}
-							</div>
-						) : (
-							<SortableContext
-								items={rootTasks.map((t) => t.id)}
-								strategy={verticalListSortingStrategy}
-							>
-								{isDesktop ? (
-									<div className={gridClass}>
-										{rootTasks.map((task) => (
-											<DesktopTaskCard
-												key={task.id}
-												task={task}
-												activeTaskId={activeTaskId}
-												deletingId={deletingId}
-												taskLists={taskLists}
-												selectedListId={selectedView}
-												availableFolders={availableFoldersForPicker}
-												isSelected={selectedTaskIds.has(task.id)}
-												onClickCard={handleTaskClick}
-												onDeleteEntry={onDeleteEntry}
-												onOpenDetail={onOpenDetail}
-												onToggleTaskStatus={onToggleTaskStatus}
-												onOpenStatusModal={setStatusPickerTask}
-												onActivateTask={onActivateTask}
-												onOpenScheduleModal={setScheduleModalTask}
-												onOpenListPicker={(t) => setListPickerTaskId(t.id)}
-												onOpenFolderPicker={setFolderPickerTask}
-												onToggleAccomplishment={handleToggleAccomplishment}
-												showContent={showContent}
-												onContextMenu={handleTaskContextMenu}
-											/>
-										))}
-									</div>
-								) : (
-									<div className="space-y-1.5">
-										{rootTasks.map((task) => (
-											<MobileTaskItem
-												key={task.id}
-												task={task}
-												activeTaskId={activeTaskId}
-												deletingId={deletingId}
-												taskLists={taskLists}
-												selectedListId={selectedView}
-												availableFolders={availableFoldersForPicker}
-												isSelected={selectedTaskIds.has(task.id)}
-												onClickCard={handleTaskClick}
-												isSwiped={activeSwipedTaskId === task.id}
-												onSetSwiped={(swiped) =>
-													setActiveSwipedTaskId(
-														swiped ? task.id : null,
-													)
-												}
-												onDeleteEntry={onDeleteEntry}
-												onOpenDetail={onOpenDetail}
-												onToggleTaskStatus={onToggleTaskStatus}
-												onOpenStatusModal={setStatusPickerTask}
-												onActivateTask={onActivateTask}
-												onOpenScheduleModal={setScheduleModalTask}
-												onOpenListPicker={(t) => setListPickerTaskId(t.id)}
-												onOpenFolderPicker={setFolderPickerTask}
-												onToggleAccomplishment={handleToggleAccomplishment}
-												showContent={showContent}
-												onContextMenu={handleTaskContextMenu}
-											/>
-										))}
-									</div>
+											) : (
+												<div className={gridClass}>
+													{groupTasks.map((task) => (
+														<DesktopTaskCard
+															key={task.id}
+															task={task}
+															activeTaskId={activeTaskId}
+															deletingId={deletingId}
+															taskLists={taskLists}
+															selectedListId={selectedView}
+															availableFolders={availableFoldersForPicker}
+															isSelected={selectedTaskIds.has(task.id)}
+															onClickCard={handleTaskClick}
+															onDeleteEntry={onDeleteEntry}
+															onOpenDetail={onOpenDetail}
+															onToggleTaskStatus={onToggleTaskStatus}
+															onOpenStatusModal={setStatusPickerTask}
+															onActivateTask={onActivateTask}
+															onOpenScheduleModal={setScheduleModalTask}
+															onOpenListPicker={(t) =>
+																setListPickerTaskId(t.id)
+															}
+															onOpenFolderPicker={setFolderPickerTask}
+															onToggleAccomplishment={
+																handleToggleAccomplishment
+															}
+															showContent={showContent}
+															onContextMenu={handleTaskContextMenu}
+														/>
+													))}
+												</div>
+											)
+										) : (
+											<div className="space-y-1.5">
+												{groupTasks.map((task) => (
+													<MobileTaskItem
+														key={task.id}
+														task={task}
+														activeTaskId={activeTaskId}
+														deletingId={deletingId}
+														taskLists={taskLists}
+														selectedListId={selectedView}
+														availableFolders={availableFoldersForPicker}
+														isSelected={selectedTaskIds.has(task.id)}
+														onClickCard={handleTaskClick}
+														isSwiped={activeSwipedTaskId === task.id}
+														onSetSwiped={(swiped) =>
+															setActiveSwipedTaskId(
+																swiped ? task.id : null,
+															)
+														}
+														onDeleteEntry={onDeleteEntry}
+														onOpenDetail={onOpenDetail}
+														onToggleTaskStatus={onToggleTaskStatus}
+														onOpenStatusModal={setStatusPickerTask}
+														onActivateTask={onActivateTask}
+														onOpenScheduleModal={setScheduleModalTask}
+														onOpenListPicker={(t) =>
+															setListPickerTaskId(t.id)
+														}
+														onOpenFolderPicker={setFolderPickerTask}
+														onToggleAccomplishment={
+															handleToggleAccomplishment
+														}
+														showContent={showContent}
+														onContextMenu={handleTaskContextMenu}
+													/>
+												))}
+											</div>
+										)}
+									</SortableContext>
 								)}
-							</SortableContext>
-						)}
-					</div>
+							</div>
+						);
+					})}
 				</div>
+			);
+		}
 
-				{/* 2. Folders List Section (Moved Below General Items) */}
-				{currentListFolders.map((folder) => {
-					const fTasks = folderTasksMap[folder.id] ?? [];
-					if (statusFilter !== "all" && fTasks.length === 0) return null;
-
-					return (
-						<FolderCard
-							key={folder.id}
-							folder={folder}
-							tasks={fTasks}
-							isCollapsed={!!collapsedFolders[folder.id]}
-							onToggleCollapse={() => toggleFolderCollapse(folder.id)}
-							onRenameFolder={handleRenameFolder}
-							onDeleteFolder={handleDeleteFolder}
-							activeTaskId={activeTaskId}
-							deletingId={deletingId}
-							taskLists={taskLists}
-							selectedListId={selectedView}
-							availableFolders={availableFoldersForPicker}
-							selectedTaskIds={selectedTaskIds}
-							onClickCard={handleTaskClick}
-							activeSwipedTaskId={activeSwipedTaskId}
-							onSetSwipedTaskId={setActiveSwipedTaskId}
-							onDeleteEntry={onDeleteEntry}
-							onOpenDetail={onOpenDetail}
-							onToggleTaskStatus={onToggleTaskStatus}
-							onOpenStatusModal={setStatusPickerTask}
-							onActivateTask={onActivateTask}
-							onOpenScheduleModal={setScheduleModalTask}
-							onOpenListPicker={(t) => setListPickerTaskId(t.id)}
-							onOpenFolderPicker={setFolderPickerTask}
-							onAddTaskToFolder={(fId) => {
-								setTargetFolderId(fId);
-								const input = document.getElementById("quick-task-input");
-								if (input) input.focus();
-							}}
-							onToggleAccomplishment={handleToggleAccomplishment}
-							isDesktop={isDesktop}
-							gridClass={gridClass}
-							showContent={showContent}
-							statusFilter={statusFilter}
-							onContextMenu={handleTaskContextMenu}
-						/>
-					);
-				})}
-
-				{/* Empty State when no root items and no folders */}
-				{rootTasks.length === 0 && currentListFolders.length === 0 && (
-					<div className="py-20 text-center text-stone-500 select-none">
-						<ListTodo className="w-10 h-10 text-stone-800 mx-auto mb-3" />
-						<h4 className="font-mono font-medium text-xs text-stone-400 mb-1">
-							{searchQuery.trim()
-								? "No matching items found."
-								: "List is empty."}
-						</h4>
-						<p className="text-[11px] font-mono text-stone-600 max-w-sm mx-auto">
-							Create an item using the input engine or add a folder to organize your backlog.
-						</p>
+		return (
+			<SortableContext
+				items={tasksToRender.map((t) => t.id)}
+				strategy={verticalListSortingStrategy}
+			>
+				{isDesktop ? (
+					viewLayout === "list" ? (
+						<div className="space-y-1.5">
+							{tasksToRender.map((task) => (
+								<DesktopTaskRow
+									key={task.id}
+									task={task}
+									activeTaskId={activeTaskId}
+									deletingId={deletingId}
+									taskLists={taskLists}
+									selectedListId={selectedView}
+									availableFolders={availableFoldersForPicker}
+									isSelected={selectedTaskIds.has(task.id)}
+									onClickCard={handleTaskClick}
+									onDeleteEntry={onDeleteEntry}
+									onOpenDetail={onOpenDetail}
+									onToggleTaskStatus={onToggleTaskStatus}
+									onOpenStatusModal={setStatusPickerTask}
+									onActivateTask={onActivateTask}
+									onOpenScheduleModal={setScheduleModalTask}
+									onOpenListPicker={(t) => setListPickerTaskId(t.id)}
+									onOpenFolderPicker={setFolderPickerTask}
+									onToggleAccomplishment={handleToggleAccomplishment}
+									showContent={showContent}
+									onContextMenu={handleTaskContextMenu}
+								/>
+							))}
+						</div>
+					) : (
+						<div className={gridClass}>
+							{tasksToRender.map((task) => (
+								<DesktopTaskCard
+									key={task.id}
+									task={task}
+									activeTaskId={activeTaskId}
+									deletingId={deletingId}
+									taskLists={taskLists}
+									selectedListId={selectedView}
+									availableFolders={availableFoldersForPicker}
+									isSelected={selectedTaskIds.has(task.id)}
+									onClickCard={handleTaskClick}
+									onDeleteEntry={onDeleteEntry}
+									onOpenDetail={onOpenDetail}
+									onToggleTaskStatus={onToggleTaskStatus}
+									onOpenStatusModal={setStatusPickerTask}
+									onActivateTask={onActivateTask}
+									onOpenScheduleModal={setScheduleModalTask}
+									onOpenListPicker={(t) => setListPickerTaskId(t.id)}
+									onOpenFolderPicker={setFolderPickerTask}
+									onToggleAccomplishment={handleToggleAccomplishment}
+									showContent={showContent}
+									onContextMenu={handleTaskContextMenu}
+								/>
+							))}
+						</div>
+					)
+				) : (
+					<div className="space-y-1.5">
+						{tasksToRender.map((task) => (
+							<MobileTaskItem
+								key={task.id}
+								task={task}
+								activeTaskId={activeTaskId}
+								deletingId={deletingId}
+								taskLists={taskLists}
+								selectedListId={selectedView}
+								availableFolders={availableFoldersForPicker}
+								isSelected={selectedTaskIds.has(task.id)}
+								onClickCard={handleTaskClick}
+								isSwiped={activeSwipedTaskId === task.id}
+								onSetSwiped={(swiped) =>
+									setActiveSwipedTaskId(swiped ? task.id : null)
+								}
+								onDeleteEntry={onDeleteEntry}
+								onOpenDetail={onOpenDetail}
+								onToggleTaskStatus={onToggleTaskStatus}
+								onOpenStatusModal={setStatusPickerTask}
+								onActivateTask={onActivateTask}
+								onOpenScheduleModal={setScheduleModalTask}
+								onOpenListPicker={(t) => setListPickerTaskId(t.id)}
+								onOpenFolderPicker={setFolderPickerTask}
+								onToggleAccomplishment={handleToggleAccomplishment}
+								showContent={showContent}
+								onContextMenu={handleTaskContextMenu}
+							/>
+						))}
 					</div>
 				)}
-			</div>
-		</DndContext>
-	);
+			</SortableContext>
+		);
+	};
+
+	const renderTaskContent = (isDesktop: boolean) => {
+		// Flat All Items (without Folder sections)
+		if (selectedFolderTab === "flat") {
+			return (
+				<DndContext
+					sensors={sensors}
+					collisionDetection={closestCenter}
+					onDragEnd={handleDragEnd}
+				>
+					<div className="space-y-4">
+						{displayedTasks.length > 0 ? (
+							renderTaskGroupList(displayedTasks, isDesktop)
+						) : (
+							<div className="py-20 text-center text-stone-500 select-none">
+								<ListTodo className="w-10 h-10 text-stone-800 mx-auto mb-3" />
+								<h4 className="font-mono font-medium text-xs text-stone-400 mb-1">
+									{searchQuery.trim()
+										? "No matching items found."
+										: "List is empty."}
+								</h4>
+							</div>
+						)}
+					</div>
+				</DndContext>
+			);
+		}
+
+		// Specific Folder Tab Active
+		if (selectedFolderTab !== "all" && selectedFolderTab !== "unfiled") {
+			const activeFolder = currentListFolders.find(
+				(f) => f.id === selectedFolderTab,
+			);
+			const fTasks = folderTasksMap[selectedFolderTab] ?? [];
+
+			return (
+				<DndContext
+					sensors={sensors}
+					collisionDetection={closestCenter}
+					onDragEnd={handleDragEnd}
+				>
+					<div className="space-y-4">
+						{fTasks.length > 0 ? (
+							renderTaskGroupList(fTasks, isDesktop)
+						) : (
+							<div
+								onClick={() => {
+									const input = document.getElementById("quick-task-input");
+									if (input) input.focus();
+								}}
+								className="py-16 text-center text-stone-500 border border-dashed border-stone-800/80 rounded-2xl hover:border-amber-500/40 hover:text-stone-400 transition-all cursor-pointer select-none"
+							>
+								<Folder className="w-10 h-10 text-stone-800 mx-auto mb-2" />
+								<p className="font-mono text-xs text-stone-300 font-medium">
+									"{activeFolder?.name || "Folder"}" is empty
+								</p>
+								<p className="text-[11px] font-mono text-stone-600 mt-1">
+									Type below and press Enter, or drag items into this folder.
+								</p>
+							</div>
+						)}
+					</div>
+				</DndContext>
+			);
+		}
+
+		// Unfiled Items Tab Active
+		if (selectedFolderTab === "unfiled") {
+			return (
+				<DndContext
+					sensors={sensors}
+					collisionDetection={closestCenter}
+					onDragEnd={handleDragEnd}
+				>
+					<div ref={setRootNodeRef} className="space-y-4">
+						{rootTasks.length > 0 ? (
+							renderTaskGroupList(rootTasks, isDesktop)
+						) : (
+							<div className="py-16 text-center text-stone-500 border border-dashed border-stone-800/80 rounded-2xl select-none">
+								<Layers className="w-10 h-10 text-stone-800 mx-auto mb-2" />
+								<p className="font-mono text-xs text-stone-300 font-medium">
+									No unfiled items
+								</p>
+								<p className="text-[11px] font-mono text-stone-600 mt-1">
+									All items in this list have been organized into folders.
+								</p>
+							</div>
+						)}
+					</div>
+				</DndContext>
+			);
+		}
+
+		// All Items Tab Active
+		return (
+			<DndContext
+				sensors={sensors}
+				collisionDetection={closestCenter}
+				onDragEnd={handleDragEnd}
+			>
+				<div className="space-y-6">
+					{/* 1. Root / Unfolderized Items Section */}
+					<div
+						ref={setRootNodeRef}
+						className={`rounded-2xl transition-all duration-150 ${
+							currentListFolders.length > 0
+								? "border border-stone-800/60 bg-[#111]/40 p-3"
+								: ""
+						} ${
+							isOverRoot ? "border-amber-500/50 bg-amber-500/[0.03]" : ""
+						}`}
+					>
+						{currentListFolders.length > 0 && rootTasks.length > 0 && (
+							<div className="flex items-center justify-between mb-2.5 px-1">
+								<span className="text-[10px] font-mono uppercase tracking-widest text-stone-500 font-bold">
+									General Items ({rootTasks.length})
+								</span>
+							</div>
+						)}
+
+						{rootTasks.length > 0 && renderTaskGroupList(rootTasks, isDesktop)}
+					</div>
+
+					{/* 2. Folders List Section */}
+					{currentListFolders.map((folder) => {
+						const fTasks = folderTasksMap[folder.id] ?? [];
+						if (statusFilter !== "all" && fTasks.length === 0) return null;
+
+						return (
+							<FolderCard
+								key={folder.id}
+								folder={folder}
+								tasks={fTasks}
+								isCollapsed={!!collapsedFolders[folder.id]}
+								onToggleCollapse={() => toggleFolderCollapse(folder.id)}
+								onRenameFolder={handleRenameFolder}
+								onDeleteFolder={handleDeleteFolder}
+								activeTaskId={activeTaskId}
+								deletingId={deletingId}
+								taskLists={taskLists}
+								selectedListId={selectedView}
+								availableFolders={availableFoldersForPicker}
+								selectedTaskIds={selectedTaskIds}
+								onClickCard={handleTaskClick}
+								activeSwipedTaskId={activeSwipedTaskId}
+								onSetSwipedTaskId={setActiveSwipedTaskId}
+								onDeleteEntry={onDeleteEntry}
+								onOpenDetail={onOpenDetail}
+								onToggleTaskStatus={onToggleTaskStatus}
+								onOpenStatusModal={setStatusPickerTask}
+								onActivateTask={onActivateTask}
+								onOpenScheduleModal={setScheduleModalTask}
+								onOpenListPicker={(t) => setListPickerTaskId(t.id)}
+								onOpenFolderPicker={setFolderPickerTask}
+								onAddTaskToFolder={(fId) => {
+									setTargetFolderId(fId);
+									const input = document.getElementById("quick-task-input");
+									if (input) input.focus();
+								}}
+								onToggleAccomplishment={handleToggleAccomplishment}
+								isDesktop={isDesktop}
+								viewLayout={viewLayout}
+								gridClass={gridClass}
+								showContent={showContent}
+								statusFilter={statusFilter}
+								onContextMenu={handleTaskContextMenu}
+							/>
+						);
+					})}
+
+					{/* Empty State when no root items and no folders */}
+					{rootTasks.length === 0 && currentListFolders.length === 0 && (
+						<div className="py-20 text-center text-stone-500 select-none">
+							<ListTodo className="w-10 h-10 text-stone-800 mx-auto mb-3" />
+							<h4 className="font-mono font-medium text-xs text-stone-400 mb-1">
+								{searchQuery.trim()
+									? "No matching items found."
+									: "List is empty."}
+							</h4>
+							<p className="text-[11px] font-mono text-stone-600 max-w-sm mx-auto">
+								Create an item using the input engine or add a folder to organize your backlog.
+							</p>
+						</div>
+					)}
+				</div>
+			</DndContext>
+		);
+	};
 
 	const activeViewInfo = useMemo(() => {
 		if (selectedView === "all") {
@@ -1310,7 +1588,11 @@ export default function ListsView({
 
 	const activeFolder = targetFolderId
 		? allFolders.find((f) => f.id === targetFolderId)
-		: null;
+		: selectedFolderTab !== "all" &&
+			  selectedFolderTab !== "unfiled" &&
+			  selectedFolderTab !== "flat"
+			? allFolders.find((f) => f.id === selectedFolderTab)
+			: null;
 
 	const quickTaskInputBar = (
 		<div className="pt-2 pb-1 shrink-0">
@@ -1791,15 +2073,45 @@ export default function ListsView({
 					) : (
 						<>
 							<div className="z-20 pb-2.5 flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap shrink-0">
-								<div className="relative flex items-center flex-1 max-w-[200px] sm:max-w-xs">
-									<Search className="absolute left-3 w-3.5 h-3.5 text-stone-400 pointer-events-none" />
-									<input
-										type="text"
-										value={searchQuery}
-										onChange={(e) => setSearchQuery(e.target.value)}
-										placeholder="Search items..."
-										className="w-full sm:w-64 pl-8 pr-3 py-1.5 text-xs font-mono bg-white/[0.03] border border-white/[0.08] rounded-xl text-stone-200 placeholder-stone-500 focus:outline-none focus:border-indigo-400/50 focus:bg-white/[0.05] transition-all"
-									/>
+								<div className="flex items-center gap-2 flex-1 max-w-[280px] sm:max-w-sm">
+									<div className="relative flex items-center flex-1">
+										<Search className="absolute left-3 w-3.5 h-3.5 text-stone-400 pointer-events-none" />
+										<input
+											type="text"
+											value={searchQuery}
+											onChange={(e) => setSearchQuery(e.target.value)}
+											placeholder="Search items..."
+											className="w-full pl-8 pr-3 py-1.5 text-xs font-mono bg-white/[0.03] border border-white/[0.08] rounded-xl text-stone-200 placeholder-stone-500 focus:outline-none focus:border-indigo-400/50 focus:bg-white/[0.05] transition-all"
+										/>
+									</div>
+
+									{/* Grid vs List View Mode Switcher */}
+									<div className="flex items-center bg-white/[0.03] border border-white/[0.08] rounded-xl p-0.5 shrink-0">
+										<button
+											type="button"
+											onClick={() => handleToggleViewLayout("grid")}
+											className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+												viewLayout === "grid"
+													? "bg-white/[0.12] text-white shadow-sm"
+													: "text-stone-500 hover:text-stone-300"
+											}`}
+											title="Grid View (Cards)"
+										>
+											<LayoutGrid className="w-3.5 h-3.5" />
+										</button>
+										<button
+											type="button"
+											onClick={() => handleToggleViewLayout("list")}
+											className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+												viewLayout === "list"
+													? "bg-white/[0.12] text-white shadow-sm"
+													: "text-stone-500 hover:text-stone-300"
+											}`}
+											title="Compact List View"
+										>
+											<List className="w-3.5 h-3.5" />
+										</button>
+									</div>
 								</div>
 
 								<div className="flex gap-2 shrink-0">{statusSwitcher}</div>
@@ -2436,35 +2748,6 @@ export default function ListsView({
 						setFolderPickerTask(null);
 					}}
 				/>
-			)}
-
-			{/* Floating Selection Action Bar */}
-			{selectedTaskIds.size > 0 && (
-				<motion.div
-					initial={{ opacity: 0, y: 20 }}
-					animate={{ opacity: 1, y: 0 }}
-					exit={{ opacity: 0, y: 20 }}
-					className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-2 px-4 py-2 bg-[#141414]/95 border border-amber-500/40 rounded-2xl shadow-2xl backdrop-blur-md"
-				>
-					<span className="text-xs font-mono font-bold text-amber-400">
-						{selectedTaskIds.size} selected
-					</span>
-					<div className="h-4 w-px bg-stone-700 mx-1" />
-					<button
-						type="button"
-						onClick={handleClearSelection}
-						className="px-2.5 py-1 text-[11px] font-mono font-semibold text-stone-300 hover:text-white bg-stone-800/80 hover:bg-stone-700 rounded-lg transition-colors cursor-pointer"
-					>
-						Clear (Esc)
-					</button>
-					<button
-						type="button"
-						onClick={handleBatchDelete}
-						className="px-2.5 py-1 text-[11px] font-mono font-semibold text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 rounded-lg transition-colors cursor-pointer"
-					>
-						Delete
-					</button>
-				</motion.div>
 			)}
 
 			{contextMenu && (
