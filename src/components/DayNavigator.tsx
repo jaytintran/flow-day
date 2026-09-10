@@ -30,10 +30,9 @@ import {
 import HabitConsistencyModal from './HabitConsistencyModal';
 import AnimatedFireIcon from './AnimatedFireIcon';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../db';
 import { Task, Habit, HabitLog, TaskAchievement, DayRange, ViewMode } from '../types';
-import { formatDateLabel, isSameDay, toLocalDateString } from '../utils';
+import { formatDateLabel, isSameDay, toLocalDateString, getPrimaryDate } from '../utils';
 import { getRoutineSlotForCurrentTime } from '../lib/habitUtils';
 
 interface DayNavigatorProps {
@@ -297,31 +296,28 @@ export default function DayNavigator({
     return stats;
   }, [sortedActiveHabits, habitLogsByHabitMap, activeDateStr, habitWeekDays]);
 
-  // Lazy-load calendar entries ONLY when calendar drawer is open, scoped to the displayed month
+  // Truly lazy-load calendar entries ONLY when calendar drawer is open,
+  // scoped to the current displayed month and previous month (+ grid buffer)
   const displayedYear = displayedMonth.getFullYear();
   const displayedMonthIndex = displayedMonth.getMonth(); // 0-11
 
   const calendarEntries = useLiveQuery(
     async () => {
       if (!isCalendarOpen) return [];
-      // Pull entries for the visible month +/- 1 week buffer
-      const monthStart = new Date(displayedYear, displayedMonthIndex, 1);
-      monthStart.setDate(monthStart.getDate() - 7);
-      const monthEnd = new Date(displayedYear, displayedMonthIndex + 1, 0, 23, 59, 59);
-      monthEnd.setDate(monthEnd.getDate() + 7);
+      // Range: from 1st of previous month to end of displayed month (+ 7 days grid buffer)
+      const rangeStart = new Date(displayedYear, displayedMonthIndex - 1, 1, 0, 0, 0);
+      const rangeEnd = new Date(displayedYear, displayedMonthIndex + 1, 7, 23, 59, 59);
 
-      const all = await db.entries.toArray();
-      return all.filter((e) => {
-        const d =
-          e.type === 'time-block'
-            ? e.start_at
-            : e.type === 'event' || e.type === 'note'
-              ? e.timestamp
-              : (e as any).scheduled_at || e.created_at;
-        if (!d) return false;
-        const entryDate = new Date(d);
-        return entryDate >= monthStart && entryDate <= monthEnd;
-      });
+      const entries = await db.entries
+        .where('type')
+        .anyOf(['task', 'event', 'note', 'time-block', 'log'])
+        .filter((e) => {
+          const d = getPrimaryDate(e);
+          return d >= rangeStart && d <= rangeEnd;
+        })
+        .toArray();
+
+      return entries;
     },
     [isCalendarOpen, displayedYear, displayedMonthIndex],
   ) || [];
@@ -337,14 +333,9 @@ export default function DayNavigator({
     } = {};
 
     calendarEntries.forEach((e) => {
-      const d =
-        e.type === 'time-block'
-          ? e.start_at
-          : e.type === 'event' || e.type === 'note'
-            ? e.timestamp
-            : (e as any).scheduled_at || e.created_at;
+      const d = getPrimaryDate(e);
       if (!d) return;
-      const dayStr = toLocalDateString(new Date(d));
+      const dayStr = toLocalDateString(d);
 
       if (!map[dayStr]) {
         map[dayStr] = {
@@ -360,7 +351,7 @@ export default function DayNavigator({
         } else {
           map[dayStr].incompleteTasks++;
         }
-      } else if (e.type === 'event' || e.type === 'note') {
+      } else if (e.type === 'event' || e.type === 'note' || e.type === 'log') {
         map[dayStr].recordsCount++;
       }
     });
@@ -1089,148 +1080,140 @@ export default function DayNavigator({
 
       </div>
 
-      {/* FULL-WIDTH CALENDAR DRAWER */}
-      <AnimatePresence initial={false}>
-        {isCalendarOpen && (
-          <motion.div
-            id="calendar-drawer"
-            key="calendar-drawer"
-            initial={{ height: 0, opacity: 0, scaleY: 0.98 }}
-            animate={{ height: 'auto', opacity: 1, scaleY: 1 }}
-            exit={{ height: 0, opacity: 0, scaleY: 0.98 }}
-            transition={{
-              height: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
-              opacity: { duration: 0.2, ease: 'easeOut' },
-              scaleY: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
-            }}
-            style={{ overflow: 'hidden', transformOrigin: 'top' }}
-            className="border-t border-stone-800/60 bg-[#0e0e0e]"
-          >
-            <div className="max-w-4xl mx-auto px-5 md:px-6 py-4">
-              {/* Month header */}
-              <div className="flex items-center justify-between mb-4">
-                <button
-                  id="calendar-prev-month"
-                  onClick={handlePrevMonth}
-                  className="p-1.5 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-white transition-colors cursor-pointer"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="font-mono text-xs text-stone-300 uppercase tracking-widest font-bold">
-                  {monthLabel}
-                </span>
-                <button
-                  id="calendar-next-month"
-                  onClick={handleNextMonth}
-                  className="p-1.5 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-white transition-colors cursor-pointer"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Day grid */}
-              <div className="grid grid-cols-7 text-center text-xs gap-1.5">
-                {/* Weekday labels */}
-                {weekdays.map((wd) => (
-                  <span
-                    key={wd}
-                    className="text-stone-600 font-mono font-semibold py-1 text-[10px] uppercase tracking-widest"
-                  >
-                    {wd}
-                  </span>
-                ))}
-
-                {/* Day cells */}
-                {dayCells.map((day, dIdx) => {
-                  if (day === null) {
-                    return <span key={`blank-${dIdx}`} />;
-                  }
-
-                  const cellDate = new Date(year, month, day);
-                  const cellDayStr = toLocalDateString(cellDate);
-                  const isCurrentDay = isSameDay(cellDate, activeDate);
-                  const isToday = isSameDay(cellDate, new Date());
-                  const stats = dayStatsMap[cellDayStr];
-                  const hasStats =
-                    stats &&
-                    (stats.completedTasks > 0 ||
-                      stats.incompleteTasks > 0 ||
-                      stats.recordsCount > 0);
-
-                  return (
-                    <button
-                      key={`day-${day}`}
-                      id={`calendar-day-btn-${day}`}
-                      onClick={() => handleSelectCalendarDay(day)}
-                      className={`py-1.5 min-h-[52px] flex flex-col justify-between items-center text-xs font-mono rounded-lg border transition-all cursor-pointer active:scale-95 ${
-                        isCurrentDay
-                          ? 'bg-amber-500 border-amber-400 text-stone-950 font-semibold shadow-[0_0_12px_rgba(245,158,11,0.3)]'
-                          : isToday
-                            ? 'border-amber-500/30 bg-stone-900/40 text-amber-400 font-semibold'
-                            : 'border-stone-800/50 text-stone-400 hover:bg-stone-800/60 hover:text-stone-200 hover:border-stone-700'
-                      }`}
-                    >
-                      <span className="text-xs mt-1">{day}</span>
-
-                      {hasStats ? (
-                        <div className="w-full flex flex-row justify-center gap-1 mb-0.5 text-[9px] select-none leading-none">
-                          {(stats.completedTasks > 0 || stats.incompleteTasks > 0) && (
-                            <div className="flex items-center gap-0.5 justify-center">
-                              {stats.completedTasks > 0 && (
-                                <span
-                                  className={
-                                    isCurrentDay
-                                      ? 'text-stone-900 font-extrabold'
-                                      : 'text-emerald-500 font-bold'
-                                  }
-                                  title={`${stats.completedTasks} tasks complete`}
-                                >
-                                  <span className="mr-0.5">●</span>
-                                  {stats.completedTasks}
-                                </span>
-                              )}
-                              {stats.incompleteTasks > 0 && (
-                                <span
-                                  className={
-                                    isCurrentDay
-                                      ? 'text-stone-700 font-bold'
-                                      : 'text-stone-500 font-bold'
-                                  }
-                                  title={`${stats.incompleteTasks} tasks incomplete`}
-                                >
-                                  <span className="mr-0.5">○</span>
-                                  {stats.incompleteTasks}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          {stats.recordsCount > 0 && (
-                            <span
-                              className={
-                                isCurrentDay
-                                  ? 'text-indigo-950 font-extrabold'
-                                  : 'text-indigo-400 font-bold'
-                              }
-                              title={`${stats.recordsCount} events/notes`}
-                            >
-                              <span className="mr-0.5">◆</span>
-                              {stats.recordsCount}
-                            </span>
-                          )}
-                        </div>
-                      ) : isToday && !isCurrentDay ? (
-                        <span className="w-1.5 h-1.5 bg-amber-500 rounded-full mb-1" />
-                      ) : (
-                        <div className="h-1.5 w-1 mb-1" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+      {/* FULL-WIDTH CALENDAR DRAWER (Pure Tailwind CSS slide-down animation) */}
+      <div
+        id="calendar-drawer"
+        className={`grid transition-[grid-template-rows,opacity] duration-250 ease-out border-stone-800/60 bg-[#0e0e0e] ${
+          isCalendarOpen
+            ? 'grid-rows-[1fr] opacity-100 border-t'
+            : 'grid-rows-[0fr] opacity-0 border-t-0 pointer-events-none'
+        }`}
+      >
+        <div className="overflow-hidden">
+          <div className="max-w-4xl mx-auto px-5 md:px-6 py-4">
+            {/* Month header */}
+            <div className="flex items-center justify-between mb-4">
+              <button
+                id="calendar-prev-month"
+                onClick={handlePrevMonth}
+                className="p-1.5 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="font-mono text-xs text-stone-300 uppercase tracking-widest font-bold">
+                {monthLabel}
+              </span>
+              <button
+                id="calendar-next-month"
+                onClick={handleNextMonth}
+                className="p-1.5 hover:bg-stone-800 rounded-lg text-stone-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
+            {/* Day grid */}
+            <div className="grid grid-cols-7 text-center text-xs gap-1.5">
+              {/* Weekday labels */}
+              {weekdays.map((wd) => (
+                <span
+                  key={wd}
+                  className="text-stone-600 font-mono font-semibold py-1 text-[10px] uppercase tracking-widest"
+                >
+                  {wd}
+                </span>
+              ))}
+
+              {/* Day cells */}
+              {dayCells.map((day, dIdx) => {
+                if (day === null) {
+                  return <span key={`blank-${dIdx}`} />;
+                }
+
+                const cellDate = new Date(year, month, day);
+                const cellDayStr = toLocalDateString(cellDate);
+                const isCurrentDay = isSameDay(cellDate, activeDate);
+                const isToday = isSameDay(cellDate, new Date());
+                const stats = dayStatsMap[cellDayStr];
+                const hasStats =
+                  stats &&
+                  (stats.completedTasks > 0 ||
+                    stats.incompleteTasks > 0 ||
+                    stats.recordsCount > 0);
+
+                return (
+                  <button
+                    key={`day-${day}`}
+                    id={`calendar-day-btn-${day}`}
+                    onClick={() => handleSelectCalendarDay(day)}
+                    className={`py-1.5 min-h-[52px] flex flex-col justify-between items-center text-xs font-mono rounded-lg border transition-all cursor-pointer active:scale-95 ${
+                      isCurrentDay
+                        ? 'bg-amber-500 border-amber-400 text-stone-950 font-semibold shadow-[0_0_12px_rgba(245,158,11,0.3)]'
+                        : isToday
+                          ? 'border-amber-500/30 bg-stone-900/40 text-amber-400 font-semibold'
+                          : 'border-stone-800/50 text-stone-400 hover:bg-stone-800/60 hover:text-stone-200 hover:border-stone-700'
+                    }`}
+                  >
+                    <span className="text-xs mt-1">{day}</span>
+
+                    {hasStats ? (
+                      <div className="w-full flex flex-row justify-center gap-1 mb-0.5 text-[9px] select-none leading-none">
+                        {(stats.completedTasks > 0 || stats.incompleteTasks > 0) && (
+                          <div className="flex items-center gap-0.5 justify-center">
+                            {stats.completedTasks > 0 && (
+                              <span
+                                className={
+                                  isCurrentDay
+                                    ? 'text-stone-900 font-extrabold'
+                                    : 'text-emerald-500 font-bold'
+                                }
+                                title={`${stats.completedTasks} tasks complete`}
+                              >
+                                <span className="mr-0.5">●</span>
+                                {stats.completedTasks}
+                              </span>
+                            )}
+                            {stats.incompleteTasks > 0 && (
+                              <span
+                                className={
+                                  isCurrentDay
+                                    ? 'text-stone-700 font-bold'
+                                    : 'text-stone-500 font-bold'
+                                }
+                                title={`${stats.incompleteTasks} tasks incomplete`}
+                              >
+                                <span className="mr-0.5">○</span>
+                                {stats.incompleteTasks}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {stats.recordsCount > 0 && (
+                          <span
+                            className={
+                              isCurrentDay
+                                ? 'text-indigo-950 font-extrabold'
+                                : 'text-indigo-400 font-bold'
+                            }
+                            title={`${stats.recordsCount} events/notes`}
+                          >
+                            <span className="mr-0.5">◆</span>
+                            {stats.recordsCount}
+                          </span>
+                        )}
+                      </div>
+                    ) : isToday && !isCurrentDay ? (
+                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full mb-1" />
+                    ) : (
+                      <div className="h-1.5 w-1 mb-1" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, Reorder, useDragControls } from 'motion/react';
 import { db } from '../../db';
-import { Task, ViewMode } from '../../types';
+import { Task, Log, ViewMode } from '../../types';
 import {
   StickyNote,
   X,
@@ -25,6 +25,7 @@ export interface ScratchpadItem {
   completedAt?: string;
   isConverted?: boolean;
   convertedTaskId?: string;
+  completedLogId?: string;
 }
 
 export interface Scratchpad {
@@ -124,6 +125,7 @@ function savePads(pads: Scratchpad[]) {
 interface PadTabProps {
   pad: Scratchpad;
   isActive: boolean;
+  isDragTarget?: boolean;
   editingPadId: string | null;
   editingPadName: string;
   deletingPadId: string | null;
@@ -140,6 +142,7 @@ interface PadTabProps {
 function PadTab({
   pad,
   isActive,
+  isDragTarget,
   editingPadId,
   editingPadName,
   deletingPadId,
@@ -156,22 +159,36 @@ function PadTab({
     (i) => !i.isCompleted && !i.isConverted && i.text.trim().length > 0,
   ).length;
 
+  const isEditing = editingPadId === pad.id;
+
   return (
     <Reorder.Item
       key={pad.id}
       value={pad}
-      onClick={() => onSelect(pad.id)}
-      className={`group flex items-center gap-1.5 ${
-        isMobile ? 'px-3 py-1' : 'px-2.5 py-1'
+      as="div"
+      layout="position"
+      data-pad-id={pad.id}
+      dragListener={!isEditing}
+      whileDrag={{ scale: 1.04, zIndex: 50, cursor: 'grabbing', opacity: 0.95 }}
+      transition={{ layout: { duration: 0.15, ease: 'easeOut' } }}
+      onClick={() => {
+        if (!isEditing) {
+          onSelect(pad.id);
+        }
+      }}
+      className={`group flex items-center h-7 gap-1.5 ${
+        isMobile ? 'px-3' : 'px-2.5'
       } rounded-lg text-xs font-mono transition-all cursor-pointer shrink-0 border select-none ${
-        isActive
-          ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 font-bold shadow-sm'
+        isDragTarget
+          ? 'bg-amber-500/30 border-amber-400 text-amber-300 ring-2 ring-amber-500/60 scale-105 shadow-md font-bold'
+          : isActive
+          ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 font-bold shadow-xs'
           : isMobile
           ? 'bg-stone-900/60 border-stone-850 text-stone-400 hover:text-stone-200'
-          : 'bg-stone-900/40 border-transparent text-stone-500 hover:text-stone-300 hover:bg-stone-900/80'
+          : 'bg-stone-900/40 border-stone-850/50 text-stone-500 hover:text-stone-300 hover:bg-stone-900/80'
       }`}
     >
-      {editingPadId === pad.id ? (
+      {isEditing ? (
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <input
             autoFocus
@@ -199,7 +216,7 @@ function PadTab({
                 onStartRename(pad, e);
               }
             }}
-            className="cursor-pointer select-none"
+            className="cursor-pointer select-none truncate max-w-[130px]"
             title="Click to rename, drag to reorder"
           >
             {pad.name}
@@ -242,6 +259,8 @@ interface MobileScratchpadItemProps {
   onToggleComplete: (item: ScratchpadItem) => void;
   onConvertToTask: (item: ScratchpadItem) => void;
   onDeleteItem: (id: string) => void;
+  onDrag?: (e: any, info: { point: { x: number; y: number } }) => void;
+  onDragEnd?: (item: ScratchpadItem, e: any, info: { point: { x: number; y: number } }) => void;
 }
 
 function MobileScratchpadItem({
@@ -253,6 +272,8 @@ function MobileScratchpadItem({
   onToggleComplete,
   onConvertToTask,
   onDeleteItem,
+  onDrag,
+  onDragEnd,
 }: MobileScratchpadItemProps) {
   const dragControls = useDragControls();
 
@@ -260,8 +281,13 @@ function MobileScratchpadItem({
     <Reorder.Item
       key={item.id}
       value={item}
+      as="div"
+      layout="position"
       dragListener={false}
       dragControls={dragControls}
+      onDrag={onDrag}
+      onDragEnd={(e, info) => onDragEnd?.(item, e, info)}
+      transition={{ layout: { duration: 0.15 } }}
       className="flex items-start gap-1.5 bg-[#1b1b1b] border border-stone-850/80 rounded-lg px-2.5 py-1.5 focus-within:border-amber-500/40 transition-colors"
     >
       <button
@@ -437,6 +463,75 @@ export default function DayScratchpad({
     }
   };
 
+  const [dragOverPadId, setDragOverPadId] = useState<string | null>(null);
+  const dragOverPadIdRef = useRef<string | null>(null);
+
+  const handleMoveItemToPad = (
+    itemId: string,
+    sourcePadId: string,
+    targetPadId: string,
+  ) => {
+    const sourcePad = pads.find((p) => p.id === sourcePadId);
+    const itemToMove = sourcePad?.items.find((i) => i.id === itemId);
+    if (!itemToMove) return;
+
+    const updatedPads = pads.map((p) => {
+      if (p.id === sourcePadId) {
+        return {
+          ...p,
+          items: p.items.filter((i) => i.id !== itemId),
+        };
+      }
+      if (p.id === targetPadId) {
+        return {
+          ...p,
+          items: [itemToMove, ...p.items],
+        };
+      }
+      return p;
+    });
+
+    setPads(updatedPads);
+    savePads(updatedPads);
+  };
+
+  const handleItemDrag = (_: any, info: { point: { x: number; y: number } }) => {
+    const el = document.elementFromPoint(info.point.x, info.point.y);
+    const padTabEl = el?.closest('[data-pad-id]');
+    const padId = padTabEl?.getAttribute('data-pad-id');
+
+    if (padId && padId !== activePadId) {
+      if (dragOverPadIdRef.current !== padId) {
+        dragOverPadIdRef.current = padId;
+        setDragOverPadId(padId);
+      }
+    } else {
+      if (dragOverPadIdRef.current !== null) {
+        dragOverPadIdRef.current = null;
+        setDragOverPadId(null);
+      }
+    }
+  };
+
+  const handleItemDragEnd = (
+    item: ScratchpadItem,
+    _: any,
+    info: { point: { x: number; y: number } },
+  ) => {
+    const el = document.elementFromPoint(info.point.x, info.point.y);
+    const padTabEl = el?.closest('[data-pad-id]');
+    const directPadId = padTabEl?.getAttribute('data-pad-id');
+
+    const targetPadId =
+      directPadId && directPadId !== activePadId ? directPadId : dragOverPadIdRef.current;
+    dragOverPadIdRef.current = null;
+    setDragOverPadId(null);
+
+    if (targetPadId && targetPadId !== activePadId) {
+      handleMoveItemToPad(item.id, activePadId, targetPadId);
+    }
+  };
+
   const toggleOpen = () => {
     if (controlledOnToggle) {
       controlledOnToggle();
@@ -463,13 +558,25 @@ export default function DayScratchpad({
     handleUpdateItems([...newActiveItems, ...completedItems]);
   };
 
-  const handleTextChange = (id: string, text: string, targetEl?: HTMLTextAreaElement) => {
+  const handleTextChange = async (id: string, text: string, targetEl?: HTMLTextAreaElement) => {
     if (targetEl) {
       targetEl.style.height = 'auto';
       targetEl.style.height = `${targetEl.scrollHeight}px`;
     }
     const updated = items.map((item) => (item.id === id ? { ...item, text } : item));
     handleUpdateItems(updated);
+
+    const targetItem = items.find((i) => i.id === id);
+    if (targetItem?.convertedTaskId && text.trim()) {
+      try {
+        await db.entries.update(targetItem.convertedTaskId, { title: text.trim() } as any);
+      } catch {}
+    }
+    if (targetItem?.completedLogId && text.trim()) {
+      try {
+        await db.entries.update(targetItem.completedLogId, { title: text.trim() } as any);
+      } catch {}
+    }
   };
 
   const handleAddItem = (afterId?: string) => {
@@ -516,12 +623,47 @@ export default function DayScratchpad({
 
   const handleToggleComplete = async (item: ScratchpadItem) => {
     const nextCompleted = !item.isCompleted;
+    let logId = item.completedLogId;
+
+    if (nextCompleted) {
+      // 1. If checking off and item has text:
+      // If it wasn't already converted to a task, create a Log entry in DB
+      if (!item.convertedTaskId && item.text.trim()) {
+        try {
+          logId = crypto.randomUUID();
+          const now = new Date();
+          const newLog: Log = {
+            id: logId,
+            type: 'log',
+            title: item.text.trim(),
+            timestamp: now,
+            created_at: now,
+          };
+          await db.entries.add(newLog);
+        } catch (e) {
+          console.error('Failed to create log entry for scratchpad item:', e);
+        }
+      }
+    } else {
+      // 2. If unchecking:
+      // If a linked Log entry was created, delete it from Dexie DB
+      if (item.completedLogId) {
+        try {
+          await db.entries.delete(item.completedLogId);
+          logId = undefined;
+        } catch (e) {
+          console.error('Failed to remove log entry for uncompleted scratchpad item:', e);
+        }
+      }
+    }
+
     const updated = items.map((i) =>
       i.id === item.id
         ? {
             ...i,
             isCompleted: nextCompleted,
             completedAt: nextCompleted ? new Date().toISOString() : undefined,
+            completedLogId: nextCompleted ? logId : undefined,
           }
         : i,
     );
@@ -649,110 +791,115 @@ export default function DayScratchpad({
       <AnimatePresence>
         {isOpen &&
           (isMobile ? (
-            /* MOBILE DRAWER */
-            <div className="fixed inset-0 z-50 flex items-end justify-center font-sans">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                onClick={toggleOpen}
-                className="absolute inset-0 bg-black/70"
-              />
-              <motion.div
-                initial={{ y: '100%' }}
-                animate={{ y: 0 }}
-                exit={{ y: '100%' }}
-                drag="y"
-                dragConstraints={{ top: 0 }}
-                dragElastic={{ top: 0, bottom: 0.4 }}
-                onDragEnd={(_, info) => {
-                  if (info.offset.y > 100 || info.velocity.y > 300) {
-                    toggleOpen();
-                  }
-                }}
-                transition={{ type: 'spring', damping: 30, stiffness: 320, mass: 0.7 }}
-                className="relative w-full min-h-[60vh] max-h-[88vh] bg-[#141414] border-t border-stone-800 rounded-t-2xl shadow-2xl z-10 flex flex-col overflow-hidden pb-6"
-              >
-                {/* Mobile Handle & Header */}
-                <div className="flex-none flex flex-col items-center pt-3 pb-2 border-b border-stone-850">
+            /* MOBILE FULL-SCREEN MODAL */
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 16 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="fixed inset-0 z-50 bg-[#141414] flex flex-col font-sans overflow-hidden"
+              style={{
+                paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0.5rem))',
+                paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0.5rem))',
+              }}
+            >
+              {/* Mobile Header */}
+              <div className="flex-none flex items-center justify-between px-4 py-3 bg-[#181818] border-b border-stone-850">
+                <div className="flex items-center gap-2">
+                  <StickyNote className="w-4.5 h-4.5 text-amber-500" />
+                  <h3 className="text-base font-serif font-bold text-stone-100">Scratchpad</h3>
+                  <span className="text-[11px] font-mono text-stone-400 bg-stone-900 px-2 py-0.5 rounded border border-stone-800">
+                    {uncompletedCount} active
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {hasDoneItems && (
+                    <button
+                      type="button"
+                      onClick={handleClearDone}
+                      className="text-xs font-mono text-stone-400 hover:text-stone-200 px-2.5 py-1 bg-stone-900 border border-stone-800 rounded-lg cursor-pointer transition-colors"
+                    >
+                      Clear Done
+                    </button>
+                  )}
+                  {items.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearAll}
+                      title="Clear all items in this pad"
+                      className={`text-xs font-mono px-2.5 py-1 border rounded-lg transition-colors cursor-pointer ${
+                        isClearConfirming
+                          ? 'bg-red-950/80 border-red-800 text-red-400 animate-pulse'
+                          : 'text-stone-500 hover:text-red-400 bg-stone-900 border-stone-800'
+                      }`}
+                    >
+                      {isClearConfirming ? 'Sure?' : 'Clear'}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={toggleOpen}
-                    className="p-2 -my-2 flex items-center justify-center cursor-pointer group"
+                    className="p-1.5 text-stone-400 hover:text-stone-200 hover:bg-stone-850 rounded-xl cursor-pointer transition-colors"
                   >
-                    <div className="w-12 h-1.5 bg-stone-700 group-hover:bg-stone-500 rounded-full transition-colors" />
+                    <X className="w-5 h-5" />
                   </button>
-                  <div className="w-full px-4 flex justify-between items-center mt-2">
-                    <div className="flex items-center gap-2">
-                      <StickyNote className="w-4 h-4 text-amber-500" />
-                      <h3 className="text-sm font-serif font-bold text-stone-100">Scratchpad</h3>
-                      <span className="text-[10px] font-mono text-stone-500">
-                        {uncompletedCount} active
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {hasDoneItems && (
-                        <button
-                          type="button"
-                          onClick={handleClearDone}
-                          className="text-[10px] font-mono text-stone-400 hover:text-stone-200 px-2 py-1 bg-stone-900 border border-stone-800 rounded-md cursor-pointer"
-                        >
-                          Clear Done
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={toggleOpen}
-                        className="p-1 text-stone-400 hover:text-stone-200 hover:bg-stone-850 rounded-lg cursor-pointer"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Multi-Pad Tabs Row (Mobile) */}
-                  <div className="w-full px-3 mt-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-                    <Reorder.Group
-                      axis="x"
-                      values={pads}
-                      onReorder={handleReorderPads}
-                      className="flex items-center gap-1.5"
-                    >
-                      {pads.map((pad) => (
-                        <PadTab
-                          key={pad.id}
-                          pad={pad}
-                          isActive={pad.id === currentPad.id}
-                          editingPadId={editingPadId}
-                          editingPadName={editingPadName}
-                          deletingPadId={deletingPadId}
-                          canDelete={pads.length > 1}
-                          onSelect={handleSelectPad}
-                          onStartRename={handleStartRenamePad}
-                          onRenameChange={setEditingPadName}
-                          onSaveRename={handleSaveRenamePad}
-                          onCancelRename={() => setEditingPadId(null)}
-                          onDelete={handleDeletePad}
-                          isMobile={true}
-                        />
-                      ))}
-                    </Reorder.Group>
-
-                    <button
-                      type="button"
-                      onClick={handleCreateNewPad}
-                      className="p-1 px-2 rounded-lg bg-stone-900 border border-stone-850 text-stone-400 hover:text-amber-400 flex items-center gap-1 text-xs shrink-0 cursor-pointer"
-                      title="Create New Pad"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
                 </div>
+              </div>
 
-                {/* Mobile Items List */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {/* Multi-Pad Tabs Row (Mobile) */}
+              <div className="flex-none px-3 py-2 bg-[#121212] border-b border-stone-850/80 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                <Reorder.Group
+                  as="div"
+                  axis="x"
+                  values={pads}
+                  onReorder={handleReorderPads}
+                  className="flex items-center gap-1.5 shrink-0"
+                >
+                  {pads.map((pad) => (
+                    <PadTab
+                      key={pad.id}
+                      pad={pad}
+                      isActive={pad.id === currentPad.id}
+                      isDragTarget={pad.id === dragOverPadId}
+                      editingPadId={editingPadId}
+                      editingPadName={editingPadName}
+                      deletingPadId={deletingPadId}
+                      canDelete={pads.length > 1}
+                      onSelect={handleSelectPad}
+                      onStartRename={handleStartRenamePad}
+                      onRenameChange={setEditingPadName}
+                      onSaveRename={handleSaveRenamePad}
+                      onCancelRename={() => setEditingPadId(null)}
+                      onDelete={handleDeletePad}
+                      isMobile={true}
+                    />
+                  ))}
+                </Reorder.Group>
+
+                <button
+                  type="button"
+                  onClick={handleCreateNewPad}
+                  className="h-7 px-2.5 rounded-lg bg-stone-900/80 border border-stone-800 text-stone-400 hover:text-amber-400 flex items-center gap-1 text-xs shrink-0 cursor-pointer transition-colors"
+                  title="Create New Pad"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span className="text-[11px] font-mono">New</span>
+                </button>
+              </div>
+
+              {/* Mobile Items List */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                {items.length === 0 ? (
+                  <div className="py-16 text-center text-stone-600 text-xs font-mono flex flex-col items-center gap-2">
+                    <StickyNote className="w-8 h-8 stroke-1 text-stone-700" />
+                    <span>No scratch ideas in "{currentPad.name}".</span>
+                    <span className="text-[11px] text-stone-700">
+                      Jot down micro-tasks or thoughts freely.
+                    </span>
+                  </div>
+                ) : (
                   <Reorder.Group
+                    as="div"
                     axis="y"
                     values={activeItems}
                     onReorder={handleReorderActiveItems}
@@ -777,91 +924,93 @@ export default function DayScratchpad({
                         onToggleComplete={handleToggleComplete}
                         onConvertToTask={handleConvertToTask}
                         onDeleteItem={handleDeleteItem}
+                        onDrag={handleItemDrag}
+                        onDragEnd={handleItemDragEnd}
                       />
                     ))}
                   </Reorder.Group>
+                )}
 
-                  <button
-                    type="button"
-                    onClick={() => handleAddItem()}
-                    className="w-full py-2 px-2.5 border border-dashed border-stone-800 hover:border-amber-500/40 rounded-lg text-stone-400 hover:text-amber-400 text-xs font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Item
-                  </button>
+                <button
+                  type="button"
+                  onClick={() => handleAddItem()}
+                  className="w-full py-2.5 px-3 border border-dashed border-stone-800 hover:border-amber-500/40 rounded-xl text-stone-400 hover:text-amber-400 text-xs font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer mt-2"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Item
+                </button>
 
-                  {/* Collapsible Completed Section (Mobile) */}
-                  {completedItems.length > 0 && (
-                    <div className="pt-2.5 border-t border-stone-850 mt-2.5">
-                      <div className="flex items-center justify-between py-0.5 px-1">
-                        <button
-                          type="button"
-                          onClick={() => setIsCompletedOpen((prev) => !prev)}
-                          className="flex items-center gap-1.5 text-xs font-mono text-stone-400 hover:text-stone-200 cursor-pointer select-none"
+                {/* Collapsible Completed Section (Mobile) */}
+                {completedItems.length > 0 && (
+                  <div className="pt-3 border-t border-stone-850 mt-3">
+                    <div className="flex items-center justify-between py-1 px-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsCompletedOpen((prev) => !prev)}
+                        className="flex items-center gap-1.5 text-xs font-mono text-stone-400 hover:text-stone-200 cursor-pointer select-none"
+                      >
+                        {isCompletedOpen ? (
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        ) : (
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        )}
+                        <span>Completed ({completedItems.length})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleClearDone}
+                        className="text-[10px] font-mono text-stone-500 hover:text-rose-400 px-2 py-0.5 rounded cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    </div>
+
+                    <AnimatePresence>
+                      {isCompletedOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="space-y-1.5 mt-2 overflow-hidden"
                         >
-                          {isCompletedOpen ? (
-                            <ChevronDown className="w-3 h-3" />
-                          ) : (
-                            <ChevronRight className="w-3 h-3" />
-                          )}
-                          <span>Completed ({completedItems.length})</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleClearDone}
-                          className="text-[9px] font-mono text-stone-500 hover:text-rose-400 px-1 py-0.5 rounded cursor-pointer"
-                        >
-                          Clear
-                        </button>
-                      </div>
-
-                      <AnimatePresence>
-                        {isCompletedOpen && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="space-y-1 mt-1.5 overflow-hidden"
-                          >
-                            {completedItems.map((item) => (
-                              <div
-                                key={item.id}
-                                className="flex items-start gap-1.5 bg-[#171717] border border-stone-850/60 rounded-lg px-2.5 py-1.5 opacity-75"
+                          {completedItems.map((item) => (
+                            <div
+                              key={item.id}
+                              className="flex items-start gap-1.5 bg-[#171717] border border-stone-850/60 rounded-lg px-2.5 py-2 opacity-75"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => handleToggleComplete(item)}
+                                title="Mark as active"
+                                className="w-4 h-4 rounded-full border bg-emerald-500/20 border-emerald-500/60 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 cursor-pointer"
                               >
+                                <Check className="w-2.5 h-2.5 stroke-[3]" />
+                              </button>
+                              <span className="flex-1 text-xs text-stone-500 select-text break-words py-0.5 leading-normal">
+                                {item.text}
+                              </span>
+                              <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                                {item.isConverted && (
+                                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400/70 border border-amber-500/20">
+                                    Task
+                                  </span>
+                                )}
                                 <button
                                   type="button"
-                                  onClick={() => handleToggleComplete(item)}
-                                  title="Mark as active"
-                                  className="w-3.5 h-3.5 rounded-full border bg-emerald-500/20 border-emerald-500/60 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 cursor-pointer"
+                                  onClick={() => handleDeleteItem(item.id)}
+                                  className="p-1 text-stone-500 hover:text-rose-400 rounded cursor-pointer"
                                 >
-                                  <Check className="w-2 h-2 stroke-[3]" />
+                                  <X className="w-3.5 h-3.5" />
                                 </button>
-                                <span className="flex-1 text-xs text-stone-500 select-text break-words py-0.5 leading-normal">
-                                  {item.text}
-                                </span>
-                                <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
-                                  {item.isConverted && (
-                                    <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-amber-500/10 text-amber-400/70 border border-amber-500/20">
-                                      Task
-                                    </span>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteItem(item.id)}
-                                    className="p-0.5 text-stone-500 hover:text-rose-400 rounded cursor-pointer"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                </div>
                               </div>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            </div>
+                            </div>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
+              </div>
+            </motion.div>
           ) : (
             /* DESKTOP FLOATING DRAGGABLE WINDOW */
             <motion.div
@@ -879,10 +1028,10 @@ export default function DayScratchpad({
               animate={{ opacity: 1, scale: 1, x: position.x, y: position.y }}
               exit={{ opacity: 0, scale: 0.95, x: position.x, y: position.y + 15 }}
               transition={{ duration: 0.2 }}
-              className="fixed z-50 bottom-20 right-8 w-[420px] max-w-[90vw] max-h-[620px] bg-[#141414]/95 border border-stone-800 rounded-2xl shadow-2xl backdrop-blur-md flex flex-col overflow-hidden font-sans"
+              className="fixed z-50 bottom-20 right-8 w-[480px] max-w-[90vw] h-[520px] max-h-[85vh] bg-[#141414]/95 border border-stone-800 rounded-2xl shadow-2xl backdrop-blur-md flex flex-col overflow-hidden font-sans"
             >
               {/* Window Header (Drag Handle) */}
-              <div className="flex items-center justify-between px-4 py-2.5 bg-[#181818] border-b border-stone-850 cursor-grab active:cursor-grabbing select-none">
+              <div className="flex-none flex items-center justify-between px-4 py-2.5 bg-[#181818] border-b border-stone-850 cursor-grab active:cursor-grabbing select-none">
                 <div className="flex items-center gap-2">
                   <GripVertical className="w-4 h-4 text-stone-600" />
                   <StickyNote className="w-4 h-4 text-amber-500" />
@@ -928,18 +1077,20 @@ export default function DayScratchpad({
               </div>
 
               {/* Multi-Pad Tabs Row (Desktop) */}
-              <div className="flex items-center gap-1 px-3 py-1.5 bg-[#121212] border-b border-stone-850/70 overflow-x-auto no-scrollbar">
+              <div className="flex-none flex items-center gap-1 px-3 py-1.5 bg-[#121212] border-b border-stone-850/70 overflow-x-auto no-scrollbar">
                 <Reorder.Group
+                  as="div"
                   axis="x"
                   values={pads}
                   onReorder={handleReorderPads}
-                  className="flex items-center gap-1"
+                  className="flex items-center gap-1 shrink-0"
                 >
                   {pads.map((pad) => (
                     <PadTab
                       key={pad.id}
                       pad={pad}
                       isActive={pad.id === currentPad.id}
+                      isDragTarget={pad.id === dragOverPadId}
                       editingPadId={editingPadId}
                       editingPadName={editingPadName}
                       deletingPadId={deletingPadId}
@@ -958,7 +1109,7 @@ export default function DayScratchpad({
                 <button
                   type="button"
                   onClick={handleCreateNewPad}
-                  className="p-1 px-2 rounded-lg bg-stone-900/60 border border-stone-850/80 text-stone-500 hover:text-amber-400 hover:bg-stone-900 flex items-center gap-1 text-xs shrink-0 cursor-pointer transition-colors"
+                  className="h-7 px-2 rounded-lg bg-stone-900/60 border border-stone-850/80 text-stone-500 hover:text-amber-400 hover:bg-stone-900 flex items-center gap-1 text-xs shrink-0 cursor-pointer transition-colors"
                   title="Create New Pad"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -967,7 +1118,7 @@ export default function DayScratchpad({
               </div>
 
               {/* Items List */}
-              <div className="flex-1 overflow-y-auto p-3.5 space-y-2 max-h-[460px]">
+              <div className="flex-1 overflow-y-auto p-3.5 space-y-2">
                 {items.length === 0 ? (
                   <div className="py-8 text-center text-stone-600 text-xs font-mono flex flex-col items-center gap-2">
                     <StickyNote className="w-6 h-6 stroke-1 text-stone-700" />
@@ -978,6 +1129,7 @@ export default function DayScratchpad({
                   </div>
                 ) : (
                   <Reorder.Group
+                    as="div"
                     axis="y"
                     values={activeItems}
                     onReorder={handleReorderActiveItems}
@@ -987,7 +1139,12 @@ export default function DayScratchpad({
                       <Reorder.Item
                         key={item.id}
                         value={item}
-                        className="group flex items-start gap-1.5 bg-[#1b1b1b]/80 hover:bg-[#1f1f1f] border border-stone-850 rounded-lg px-2.5 py-1.5 focus-within:border-amber-500/40 focus-within:bg-[#202020] transition-colors"
+                        as="div"
+                        layout="position"
+                        onDrag={handleItemDrag}
+                        onDragEnd={(e, info) => handleItemDragEnd(item, e, info)}
+                        transition={{ layout: { duration: 0.15 } }}
+                        className="group relative flex items-start gap-1.5 bg-[#1b1b1b]/80 hover:bg-[#1f1f1f] border border-stone-850 rounded-lg px-2.5 py-1.5 focus-within:border-amber-500/40 focus-within:bg-[#202020] transition-colors"
                       >
                         <GripVertical className="w-3 h-3 text-stone-600 group-hover:text-stone-400 shrink-0 cursor-grab active:cursor-grabbing mt-0.5" />
                         
@@ -1015,19 +1172,21 @@ export default function DayScratchpad({
                           onChange={(e) => handleTextChange(item.id, e.target.value, e.target)}
                           onKeyDown={(e) => handleKeyDown(e, item, index)}
                           placeholder="Jot idea / action..."
-                          className={`flex-1 bg-transparent text-xs focus:outline-none placeholder-stone-600 resize-none overflow-hidden leading-normal ${
+                          className={`flex-1 w-full min-w-0 bg-transparent text-xs focus:outline-none placeholder-stone-600 resize-none overflow-hidden leading-normal pr-1 ${
                             item.isConverted
                               ? 'text-stone-500'
                               : 'text-stone-200'
                           }`}
                         />
-                        <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
+
+                        {/* Action buttons overlaid on top of text on hover (pure solid background) */}
+                        <div className="absolute right-1.5 top-1 flex items-center gap-1 z-10 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto focus-within:pointer-events-auto bg-[#1b1b1b] group-hover:bg-[#1f1f1f] group-focus-within:bg-[#202020] pl-1.5 py-0.5 rounded-md">
                           {!item.isConverted && item.text.trim() && (
                             <button
                               type="button"
                               onClick={() => handleConvertToTask(item)}
                               title="Convert to Task for Today"
-                              className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-0.5 px-1.5 text-stone-400 hover:text-amber-400 hover:bg-stone-800 border border-stone-800 rounded-md shrink-0 text-[9px] font-mono flex items-center gap-0.5 transition-opacity cursor-pointer"
+                              className="p-0.5 px-1.5 text-stone-400 hover:text-amber-400 bg-stone-900 hover:bg-stone-850 border border-stone-800 rounded-md shrink-0 text-[9px] font-mono flex items-center gap-0.5 transition-colors cursor-pointer"
                             >
                               <Sparkles className="w-2.5 h-2.5 text-amber-500" />
                               <span>Task</span>
@@ -1037,7 +1196,7 @@ export default function DayScratchpad({
                             type="button"
                             onClick={() => handleDeleteItem(item.id)}
                             title="Delete item"
-                            className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-0.5 text-stone-500 hover:text-rose-400 rounded transition-opacity cursor-pointer shrink-0"
+                            className="p-0.5 text-stone-500 hover:text-rose-400 bg-stone-900 hover:bg-stone-850 border border-stone-800 rounded-md transition-colors cursor-pointer shrink-0"
                           >
                             <X className="w-3 h-3" />
                           </button>
@@ -1092,7 +1251,7 @@ export default function DayScratchpad({
                           {completedItems.map((item) => (
                             <div
                               key={item.id}
-                              className="group flex items-start gap-1.5 bg-stone-900/30 border border-stone-850/50 rounded-lg px-2.5 py-1.5 transition-colors opacity-75 hover:opacity-100"
+                              className="group relative flex items-start gap-1.5 bg-stone-900/30 hover:bg-stone-900/60 border border-stone-850/50 rounded-lg px-2.5 py-1.5 transition-colors opacity-75 hover:opacity-100"
                             >
                               <button
                                 type="button"
@@ -1102,10 +1261,10 @@ export default function DayScratchpad({
                               >
                                 <Check className="w-2 h-2 stroke-[3]" />
                               </button>
-                              <span className="flex-1 text-xs text-stone-500 select-text break-words py-0.5 leading-normal">
+                              <span className="flex-1 w-full min-w-0 text-xs text-stone-500 select-text break-words py-0.5 leading-normal pr-1">
                                 {item.text}
                               </span>
-                              <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
+                              <div className="absolute right-1.5 top-1 flex items-center gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-stone-900 pl-1.5 py-0.5 rounded-md">
                                 {item.isConverted && (
                                   <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-amber-500/10 text-amber-400/70 border border-amber-500/20">
                                     Task
@@ -1115,7 +1274,7 @@ export default function DayScratchpad({
                                   type="button"
                                   onClick={() => handleDeleteItem(item.id)}
                                   title="Delete item"
-                                  className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-0.5 text-stone-600 hover:text-rose-400 rounded transition-opacity cursor-pointer shrink-0"
+                                  className="p-0.5 text-stone-600 hover:text-rose-400 bg-stone-950 border border-stone-800 rounded cursor-pointer shrink-0 transition-colors"
                                 >
                                   <X className="w-3 h-3" />
                                 </button>
@@ -1130,7 +1289,7 @@ export default function DayScratchpad({
               </div>
 
               {/* Window Footer hint */}
-              <div className="px-4 py-2 bg-[#121212] border-t border-stone-850/60 text-[10px] font-mono text-stone-500 flex justify-between items-center">
+              <div className="flex-none px-4 py-2 bg-[#121212] border-t border-stone-850/60 text-[10px] font-mono text-stone-500 flex justify-between items-center">
                 <span>Enter = new line • Ctrl+Enter = complete</span>
                 <span>Click tab title to rename</span>
               </div>

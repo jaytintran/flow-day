@@ -280,62 +280,55 @@ export default function DayHighlights({
     <AnimatePresence>
       {isOpen &&
         (isMobile ? (
-          /* MOBILE DRAWER */
-          <div className="fixed inset-0 z-50 flex items-end justify-center font-sans">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              onClick={onToggle}
-              className="absolute inset-0 bg-black/70"
-            />
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              drag="y"
-              dragConstraints={{ top: 0 }}
-              dragElastic={{ top: 0, bottom: 0.4 }}
-              onDragEnd={(_, info) => {
-                if (info.offset.y > 100 || info.velocity.y > 300) {
-                  onToggle();
-                }
-              }}
-              transition={{ type: 'spring', damping: 30, stiffness: 320, mass: 0.7 }}
-              className="relative w-full min-h-[60vh] max-h-[88vh] bg-[#141414] border-t border-stone-800 rounded-t-2xl shadow-2xl z-10 flex flex-col overflow-hidden pb-6"
-            >
-              {/* Header */}
-              <div className="flex-none flex flex-col items-center pt-3 pb-2 border-b border-stone-850">
-                <button
-                  type="button"
-                  onClick={onToggle}
-                  className="p-2 -my-2 flex items-center justify-center cursor-pointer group"
-                >
-                  <div className="w-12 h-1.5 bg-stone-700 group-hover:bg-stone-500 rounded-full transition-colors" />
-                </button>
-                <div className="w-full px-4 flex justify-between items-center mt-2">
-                  <div className="flex items-center gap-2">
-                    <Star className="w-4 h-4 text-amber-400 fill-amber-400/30" />
-                    <h3 className="text-sm font-serif font-bold text-stone-100">Highlights of Days</h3>
-                    <span className="text-[10px] font-mono text-stone-500">
-                      {starredEntries.length} starred
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={onToggle}
-                    className="p-1 text-stone-400 hover:text-stone-200 hover:bg-stone-850 rounded-lg"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
+          /* MOBILE FULL-SCREEN MODAL */
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="fixed inset-0 z-50 bg-[#141414] flex flex-col font-sans overflow-hidden"
+            style={{
+              paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0.5rem))',
+              paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0.5rem))',
+            }}
+          >
+            {/* Header */}
+            <div className="flex-none flex items-center justify-between px-4 py-3 bg-[#181818] border-b border-stone-850">
+              <div className="flex items-center gap-2">
+                <Star className="w-4.5 h-4.5 text-amber-400 fill-amber-400/30" />
+                <h3 className="text-base font-serif font-bold text-stone-100">Highlights of Days</h3>
+                <span className="text-[11px] font-mono text-stone-400 bg-stone-900 px-2 py-0.5 rounded border border-stone-850">
+                  {starredEntries.length} starred
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={onToggle}
+                className="p-1.5 text-stone-400 hover:text-stone-200 hover:bg-stone-850 rounded-xl cursor-pointer transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-                {/* Filter Pill Strip */}
-                <div className="w-full px-4 mt-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+            {/* Filter / Search Bar (Mobile) */}
+            <div className="flex-none px-4 py-2.5 bg-[#121212] border-b border-stone-850/80 flex flex-col gap-2">
+              <div className="relative w-full">
+                <Search className="w-3.5 h-3.5 text-stone-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search highlights..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-stone-950 border border-stone-850 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-stone-200 placeholder-stone-600 focus:outline-none focus:border-amber-500/40 font-mono"
+                />
+              </div>
+
+              {/* Filter Pill Strip */}
+              <div className="w-full flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={() => setFilterType('all')}
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-mono shrink-0 ${
+                    className={`px-2.5 py-1 rounded-full text-xs font-mono shrink-0 transition-colors ${
                       filterType === 'all'
                         ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold'
                         : 'bg-stone-900 border border-stone-850 text-stone-400'
@@ -343,170 +336,191 @@ export default function DayHighlights({
                   >
                     All
                   </button>
-                  {['task', 'note', 'event', 'time-block'].map((t) => (
+                  {['task', 'note', 'event', 'time-block', 'log'].map((t) => (
                     <button
                       key={t}
                       onClick={() => setFilterType(t)}
-                      className={`px-2.5 py-0.5 rounded-full text-xs font-mono shrink-0 capitalize ${
+                      className={`px-2.5 py-1 rounded-full text-xs font-mono shrink-0 capitalize transition-colors ${
                         filterType === t
                           ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold'
                           : 'bg-stone-900 border border-stone-850 text-stone-400'
                       }`}
                     >
-                      {t}s
+                      {t === 'time-block' ? 'Blocks' : `${t}s`}
                     </button>
                   ))}
                 </div>
-              </div>
 
-              {/* Feed List */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {groupedHighlights.length === 0 ? (
-                  <div className="py-12 text-center text-stone-500 text-xs font-mono flex flex-col items-center gap-2">
-                    <Star className="w-6 h-6 stroke-1 text-stone-700" />
-                    <span>No highlights starred yet.</span>
-                    <span className="text-[10px] text-stone-600">
-                      Star notes, tasks, events, and work sessions to showcase them here!
-                    </span>
-                  </div>
-                ) : (
-                  groupedHighlights.map((group) => (
-                    <div key={group.label} className="space-y-2">
-                      <div className="flex items-center justify-between border-b border-stone-850 pb-1">
-                        <span className="text-[11px] font-mono uppercase tracking-wider text-amber-500 font-bold">
-                          {group.label}
-                        </span>
-                        <span className="text-[10px] font-mono text-stone-600">
-                          {group.entries.length} items
-                        </span>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        {group.entries.map((entry) => {
-                          const dateObj = new Date(
-                            (entry as any).completed_at ||
-                              (entry as any).timestamp ||
-                              (entry as any).start_at ||
-                              (entry as any).scheduled_at ||
-                              entry.created_at,
-                          );
-                          const dateFormatted = dateObj.toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: '2-digit',
-                          });
-
-                          const isTask = entry.type === 'task';
-                          const isAccomplishment = isTask && (entry as Task).is_accomplishment;
-
-                          const isEditingThis = editingEntryId === entry.id;
-
-                          return (
-                            <div
-                              key={entry.id}
-                              onClick={() => {
-                                if (!isEditingThis) {
-                                  handleStartEdit(entry);
-                                }
-                              }}
-                              className="bg-[#1b1b1b] border border-stone-850 rounded-lg p-2.5 flex flex-col gap-1.5 cursor-pointer"
-                            >
-                              <div className="flex items-center justify-between gap-1.5">
-                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                  {getTypeIconBadge(entry.type)}
-                                  {isEditingThis ? (
-                                    <input
-                                      type="text"
-                                      value={editingTitle}
-                                      onChange={(e) => setEditingTitle(e.target.value)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleSaveEdit(entry.id);
-                                        if (e.key === 'Escape') handleCancelEdit();
-                                      }}
-                                      onBlur={() => handleSaveEdit(entry.id)}
-                                      onClick={(e) => e.stopPropagation()}
-                                      autoFocus
-                                      className="bg-[#101010] border border-amber-500/40 rounded px-1.5 py-0.5 text-xs text-stone-100 font-sans w-full focus:outline-none focus:ring-1 focus:ring-amber-500/40"
-                                    />
-                                  ) : (
-                                    <span className="text-xs font-medium text-stone-200 truncate select-none">
-                                      {entry.title || 'Untitled'}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <span className="text-[9px] font-mono text-stone-500 bg-stone-900 px-1 py-0.5 rounded border border-stone-850">
-                                    {dateFormatted}
-                                  </span>
-                                  {(isTask || entry.type === 'log') && (
-                                    <button
-                                      type="button"
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        await db.entries.update(entry.id, {
-                                          is_accomplishment: !isAccomplishment,
-                                        } as any);
-                                      }}
-                                      title={
-                                        isAccomplishment
-                                          ? 'Marked as Accomplishment'
-                                          : 'Mark as Accomplishment (Trophy)'
-                                      }
-                                      className={`p-0.5 rounded transition-colors ${
-                                        isAccomplishment
-                                          ? 'text-amber-400 bg-amber-500/10 border border-amber-500/30'
-                                          : 'text-stone-500 hover:text-amber-400 bg-stone-900 border border-stone-850'
-                                      }`}
-                                    >
-                                      <Trophy
-                                        className={`w-3 h-3 ${
-                                          isAccomplishment ? 'fill-current' : ''
-                                        }`}
-                                      />
-                                    </button>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={(e) => handleDelete(entry.id, e)}
-                                    title="Delete entry"
-                                    className="p-0.5 text-stone-500 hover:text-rose-400 rounded cursor-pointer transition-colors"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              </div>
-                              {(entry as any).content && (
-                                <p className="text-[10px] text-stone-400 font-serif line-clamp-1 leading-normal pl-4">
-                                  {(entry as any).content}
-                                </p>
-                              )}
-                              {(() => {
-                                const wins =
-                                  entry.micro_wins || (entry as any).achievements || [];
-                                if (wins.length === 0) return null;
-                                return (
-                                  <div className="flex items-center gap-1.5 pl-4 pt-1 border-t border-stone-850/60 overflow-hidden">
-                                    {wins.slice(0, 2).map((w: any) => (
-                                      <span
-                                        key={w.id}
-                                        className="text-[9px] font-mono text-stone-400 flex items-center gap-1 truncate"
-                                      >
-                                        <Sparkles className="w-2 h-2 text-amber-500/70 shrink-0" />
-                                        <span className="truncate">{w.text}</span>
-                                      </span>
-                                    ))}
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))
+                {availableYears.length > 1 && (
+                  <select
+                    value={filterYear}
+                    onChange={(e) => setFilterYear(e.target.value)}
+                    className="bg-stone-900 border border-stone-850 rounded-lg px-2 py-1 text-[11px] font-mono text-stone-300 focus:outline-none cursor-pointer shrink-0"
+                  >
+                    <option value="all">All Years</option>
+                    {availableYears.map((y) => (
+                      <option key={y} value={y.toString()}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
                 )}
               </div>
-            </motion.div>
-          </div>
+            </div>
+
+            {/* Feed List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {groupedHighlights.length === 0 ? (
+                <div className="py-16 text-center text-stone-500 text-xs font-mono flex flex-col items-center gap-2">
+                  <Star className="w-8 h-8 stroke-1 text-stone-700" />
+                  <span>No highlights found.</span>
+                  <span className="text-[11px] text-stone-600">
+                    Star notes, tasks, events, and work sessions to showcase them here!
+                  </span>
+                </div>
+              ) : (
+                groupedHighlights.map((group) => (
+                  <div key={group.label} className="space-y-2">
+                    <div className="flex items-center justify-between border-b border-stone-850 pb-1">
+                      <span className="text-[11px] font-mono uppercase tracking-wider text-amber-500 font-bold">
+                        {group.label}
+                      </span>
+                      <span className="text-[10px] font-mono text-stone-600">
+                        {group.entries.length} items
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {group.entries.map((entry) => {
+                        const dateObj = new Date(
+                          (entry as any).completed_at ||
+                            (entry as any).timestamp ||
+                            (entry as any).start_at ||
+                            (entry as any).scheduled_at ||
+                            entry.created_at,
+                        );
+                        const dateFormatted = dateObj.toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: '2-digit',
+                        });
+
+                        const isTask = entry.type === 'task';
+                        const isAccomplishment = isTask && (entry as Task).is_accomplishment;
+
+                        const isEditingThis = editingEntryId === entry.id;
+
+                        return (
+                          <div
+                            key={entry.id}
+                            onClick={() => {
+                              if (!isEditingThis) {
+                                handleStartEdit(entry);
+                              }
+                            }}
+                            className="bg-[#1b1b1b] border border-stone-850 rounded-lg p-2.5 flex flex-col gap-1.5 cursor-pointer"
+                          >
+                            <div className="flex items-center justify-between gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                {getTypeIconBadge(entry.type)}
+                                {isEditingThis ? (
+                                  <input
+                                    type="text"
+                                    value={editingTitle}
+                                    onChange={(e) => setEditingTitle(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleSaveEdit(entry.id);
+                                      if (e.key === 'Escape') handleCancelEdit();
+                                    }}
+                                    onBlur={() => handleSaveEdit(entry.id)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    autoFocus
+                                    className="bg-[#101010] border border-amber-500/40 rounded px-1.5 py-0.5 text-xs text-stone-100 font-sans w-full focus:outline-none focus:ring-1 focus:ring-amber-500/40"
+                                  />
+                                ) : (
+                                  <span className="text-xs font-medium text-stone-200 truncate select-none">
+                                    {entry.title || 'Untitled'}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className="text-[9px] font-mono text-stone-500 bg-stone-900 px-1 py-0.5 rounded border border-stone-850">
+                                  {dateFormatted}
+                                </span>
+                                {(isTask || entry.type === 'log') && (
+                                  <button
+                                    type="button"
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      await db.entries.update(entry.id, {
+                                        is_accomplishment: !isAccomplishment,
+                                      } as any);
+                                    }}
+                                    title={
+                                      isAccomplishment
+                                        ? 'Marked as Accomplishment'
+                                        : 'Mark as Accomplishment (Trophy)'
+                                    }
+                                    className={`p-0.5 rounded transition-colors ${
+                                      isAccomplishment
+                                        ? 'text-amber-400 bg-amber-500/10 border border-amber-500/30'
+                                        : 'text-stone-500 hover:text-amber-400 bg-stone-900 border border-stone-850'
+                                    }`}
+                                  >
+                                    <Trophy
+                                      className={`w-3 h-3 ${
+                                        isAccomplishment ? 'fill-current' : ''
+                                      }`}
+                                    />
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleDelete(entry.id, e)}
+                                  title="Delete entry"
+                                  className="p-0.5 text-stone-500 hover:text-rose-400 rounded cursor-pointer transition-colors"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                            {(entry as any).content && (
+                              <p className="text-[10px] text-stone-400 font-serif line-clamp-1 leading-normal pl-4">
+                                {(entry as any).content}
+                              </p>
+                            )}
+                            {(() => {
+                              const wins =
+                                entry.micro_wins || (entry as any).achievements || [];
+                              if (wins.length === 0) return null;
+                              return (
+                                <div className="flex items-center gap-1.5 pl-4 pt-1 border-t border-stone-850/60 overflow-hidden">
+                                  {wins.slice(0, 2).map((w: any) => (
+                                    <span
+                                      key={w.id}
+                                      className="text-[9px] font-mono text-stone-400 flex items-center gap-1 truncate"
+                                    >
+                                      <Sparkles className="w-2 h-2 text-amber-500/70 shrink-0" />
+                                      <span className="truncate">{w.text}</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Mobile Footer */}
+            <div className="flex-none px-4 py-2.5 bg-[#121212] border-t border-stone-850/80 text-[11px] font-mono text-stone-500 flex justify-between items-center">
+              <span>Tap entry to edit title</span>
+              <span>⭐ Starred memories</span>
+            </div>
+          </motion.div>
         ) : (
           /* DESKTOP FLOATING DRAGGABLE WINDOW */
           <motion.div
