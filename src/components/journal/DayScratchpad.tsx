@@ -16,6 +16,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Trash2,
 } from 'lucide-react';
 
 export interface ScratchpadItem {
@@ -56,15 +57,9 @@ interface Position {
 function loadSavedPosition(): Position {
   try {
     const raw = localStorage.getItem(STORAGE_POS_KEY);
-    if (!raw) return { x: 0, y: 0 };
-    const parsed = JSON.parse(raw);
-    if (typeof parsed?.x === 'number' && typeof parsed?.y === 'number') {
-      return parsed;
-    }
-    return { x: 0, y: 0 };
-  } catch {
-    return { x: 0, y: 0 };
-  }
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { x: 0, y: 0 };
 }
 
 function savePosition(pos: Position) {
@@ -76,7 +71,7 @@ function savePosition(pos: Position) {
 function createDefaultPad(): Scratchpad {
   return {
     id: 'default-inbox',
-    name: 'Inbox',
+    name: 'Main',
     items: [],
     created_at: new Date().toISOString(),
   };
@@ -86,20 +81,18 @@ function loadSavedPads(): Scratchpad[] {
   try {
     const raw = localStorage.getItem(STORAGE_PADS_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw);
+      const parsed = JSON.parse(raw) as Scratchpad[];
       if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed;
       }
     }
-
-    // Migration from legacy flat items if available
     const legacyRaw = localStorage.getItem(STORAGE_LEGACY_ITEMS_KEY);
     if (legacyRaw) {
-      const legacyItems = JSON.parse(legacyRaw);
+      const legacyItems = JSON.parse(legacyRaw) as ScratchpadItem[];
       if (Array.isArray(legacyItems) && legacyItems.length > 0) {
         const initialPad: Scratchpad = {
           id: 'default-inbox',
-          name: 'Inbox',
+          name: 'Main',
           items: legacyItems,
           created_at: new Date().toISOString(),
         };
@@ -107,18 +100,17 @@ function loadSavedPads(): Scratchpad[] {
         return [initialPad];
       }
     }
+  } catch {}
 
-    const initial = [createDefaultPad()];
-    savePads(initial);
-    return initial;
-  } catch {
-    return [createDefaultPad()];
-  }
+  const defaultPad = createDefaultPad();
+  savePads([defaultPad]);
+  return [defaultPad];
 }
 
 function savePads(pads: Scratchpad[]) {
   try {
     localStorage.setItem(STORAGE_PADS_KEY, JSON.stringify(pads));
+    window.dispatchEvent(new CustomEvent('scratchpad_sync_update'));
   } catch {}
 }
 
@@ -128,14 +120,11 @@ interface PadTabProps {
   isDragTarget?: boolean;
   editingPadId: string | null;
   editingPadName: string;
-  deletingPadId: string | null;
-  canDelete: boolean;
   onSelect: (id: string) => void;
   onStartRename: (pad: Scratchpad, e?: React.MouseEvent) => void;
   onRenameChange: (val: string) => void;
   onSaveRename: () => void;
   onCancelRename: () => void;
-  onDelete: (id: string, e: React.MouseEvent) => void;
   isMobile?: boolean;
 }
 
@@ -145,14 +134,11 @@ function PadTab({
   isDragTarget,
   editingPadId,
   editingPadName,
-  deletingPadId,
-  canDelete,
   onSelect,
   onStartRename,
   onRenameChange,
   onSaveRename,
   onCancelRename,
-  onDelete,
   isMobile,
 }: PadTabProps) {
   const activeItemCount = pad.items.filter(
@@ -166,11 +152,10 @@ function PadTab({
       key={pad.id}
       value={pad}
       as="div"
-      layout="position"
       data-pad-id={pad.id}
       dragListener={!isEditing}
-      whileDrag={{ scale: 1.04, zIndex: 50, cursor: 'grabbing', opacity: 0.95 }}
-      transition={{ layout: { duration: 0.15, ease: 'easeOut' } }}
+      whileDrag={{ zIndex: 50, cursor: 'grabbing', opacity: 0.85 }}
+      transition={{ duration: 0.15 }}
       onClick={() => {
         if (!isEditing) {
           onSelect(pad.id);
@@ -178,9 +163,9 @@ function PadTab({
       }}
       className={`group flex items-center h-7 gap-1.5 ${
         isMobile ? 'px-3' : 'px-2.5'
-      } rounded-lg text-xs font-mono transition-all cursor-pointer shrink-0 border select-none ${
+      } rounded-lg text-xs font-mono transition-colors cursor-pointer shrink-0 border select-none ${
         isDragTarget
-          ? 'bg-amber-500/30 border-amber-400 text-amber-300 ring-2 ring-amber-500/60 scale-105 shadow-md font-bold'
+          ? 'bg-amber-500/30 border-amber-400 text-amber-300 ring-2 ring-amber-500/60 shadow-md font-bold'
           : isActive
           ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 font-bold shadow-xs'
           : isMobile
@@ -225,24 +210,6 @@ function PadTab({
             <span className="text-[9px] opacity-70 bg-stone-950/60 px-1 rounded-full">
               {activeItemCount}
             </span>
-          )}
-          {canDelete && (
-            <button
-              type="button"
-              onClick={(e) => onDelete(pad.id, e)}
-              className={`p-0.5 ml-0.5 rounded transition-colors cursor-pointer ${
-                deletingPadId === pad.id
-                  ? 'bg-rose-950/90 text-rose-300 border border-rose-800 animate-pulse px-1'
-                  : 'text-stone-500 hover:text-rose-400'
-              }`}
-              title={deletingPadId === pad.id ? 'Click again to confirm delete' : 'Delete Pad'}
-            >
-              {deletingPadId === pad.id ? (
-                <span className="text-[9px] font-mono font-bold leading-none">Sure?</span>
-              ) : (
-                <X className="w-3 h-3" />
-              )}
-            </button>
           )}
         </>
       )}
@@ -374,9 +341,10 @@ export default function DayScratchpad({
 
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [isClearConfirming, setIsClearConfirming] = useState(false);
-  const [deletingPadId, setDeletingPadId] = useState<string | null>(null);
+  const [isDeletePadConfirming, setIsDeletePadConfirming] = useState(false);
   const [isCompletedOpen, setIsCompletedOpen] = useState<boolean>(false);
   const textareaRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
+  const windowDragControls = useDragControls();
 
   // Ensure valid active pad
   const currentPad = pads.find((p) => p.id === activePadId) || pads[0] || createDefaultPad();
@@ -404,6 +372,8 @@ export default function DayScratchpad({
 
   const handleSelectPad = (id: string) => {
     setActivePadId(id);
+    setIsDeletePadConfirming(false);
+    setIsClearConfirming(false);
     try {
       localStorage.setItem(STORAGE_ACTIVE_PAD_ID_KEY, id);
     } catch {}
@@ -442,25 +412,22 @@ export default function DayScratchpad({
     savePads(newPads);
   };
 
-  const handleDeletePad = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDeleteCurrentPad = () => {
     if (pads.length <= 1) return; // Keep at least one pad
 
-    if (deletingPadId !== id) {
-      setDeletingPadId(id);
+    if (!isDeletePadConfirming) {
+      setIsDeletePadConfirming(true);
       setTimeout(() => {
-        setDeletingPadId((curr) => (curr === id ? null : curr));
+        setIsDeletePadConfirming(false);
       }, 3000);
       return;
     }
 
-    setDeletingPadId(null);
-    const updated = pads.filter((p) => p.id !== id);
+    setIsDeletePadConfirming(false);
+    const updated = pads.filter((p) => p.id !== currentPad.id);
     setPads(updated);
     savePads(updated);
-    if (activePadId === id) {
-      handleSelectPad(updated[0].id);
-    }
+    handleSelectPad(updated[0].id);
   };
 
   const [dragOverPadId, setDragOverPadId] = useState<string | null>(null);
@@ -785,6 +752,68 @@ export default function DayScratchpad({
 
   const hasDoneItems = items.some((i) => i.isCompleted || i.isConverted);
 
+  const renderHeaderActions = (isMobileView: boolean) => (
+    <div className="flex items-center gap-1.5" onPointerDown={(e) => e.stopPropagation()}>
+      {(hasDoneItems || items.length > 0 || pads.length > 1) && (
+        <div className="flex items-center gap-1 bg-stone-900/90 border border-stone-800/80 rounded-lg p-0.5 shadow-inner">
+          {hasDoneItems && (
+            <button
+              type="button"
+              onClick={handleClearDone}
+              title="Remove completed items from this pad"
+              className="text-[10px] font-mono font-medium text-stone-400 hover:text-stone-200 hover:bg-stone-800 px-2 py-0.5 rounded transition-colors cursor-pointer"
+            >
+              Clear Done
+            </button>
+          )}
+
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClearAll}
+              title="Clear all items in this pad"
+              className={`text-[10px] font-mono px-2 py-0.5 rounded transition-all cursor-pointer ${
+                isClearConfirming
+                  ? 'bg-red-950 text-red-300 border border-red-800/80 animate-pulse font-bold'
+                  : 'text-stone-400 hover:text-red-400 hover:bg-stone-800'
+              }`}
+            >
+              {isClearConfirming ? 'Sure?' : 'Clear'}
+            </button>
+          )}
+
+          {pads.length > 1 && (
+            <button
+              type="button"
+              onClick={handleDeleteCurrentPad}
+              title={`Delete "${currentPad.name}"`}
+              className={`text-[10px] font-mono px-2 py-0.5 rounded transition-all cursor-pointer flex items-center gap-1 ${
+                isDeletePadConfirming
+                  ? 'bg-rose-950 text-rose-300 border border-rose-800/80 animate-pulse font-bold'
+                  : 'text-stone-500 hover:text-rose-400 hover:bg-stone-800'
+              }`}
+            >
+              <Trash2 className="w-3 h-3" />
+              <span>{isDeletePadConfirming ? 'Sure?' : 'Delete Pad'}</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Close Button */}
+      <button
+        type="button"
+        onClick={toggleOpen}
+        title="Close Scratchpad"
+        className={`text-stone-400 hover:text-stone-200 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer ${
+          isMobileView ? 'p-1.5' : 'p-1'
+        }`}
+      >
+        <X className={isMobileView ? 'w-5 h-5' : 'w-4 h-4'} />
+      </button>
+    </div>
+  );
+
   return (
     <>
       {/* SCRATCHPAD MODAL / WINDOW */}
@@ -812,38 +841,7 @@ export default function DayScratchpad({
                     {uncompletedCount} active
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  {hasDoneItems && (
-                    <button
-                      type="button"
-                      onClick={handleClearDone}
-                      className="text-xs font-mono text-stone-400 hover:text-stone-200 px-2.5 py-1 bg-stone-900 border border-stone-800 rounded-lg cursor-pointer transition-colors"
-                    >
-                      Clear Done
-                    </button>
-                  )}
-                  {items.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={handleClearAll}
-                      title="Clear all items in this pad"
-                      className={`text-xs font-mono px-2.5 py-1 border rounded-lg transition-colors cursor-pointer ${
-                        isClearConfirming
-                          ? 'bg-red-950/80 border-red-800 text-red-400 animate-pulse'
-                          : 'text-stone-500 hover:text-red-400 bg-stone-900 border-stone-800'
-                      }`}
-                    >
-                      {isClearConfirming ? 'Sure?' : 'Clear'}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={toggleOpen}
-                    className="p-1.5 text-stone-400 hover:text-stone-200 hover:bg-stone-850 rounded-xl cursor-pointer transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
+                {renderHeaderActions(true)}
               </div>
 
               {/* Multi-Pad Tabs Row (Mobile) */}
@@ -863,14 +861,11 @@ export default function DayScratchpad({
                       isDragTarget={pad.id === dragOverPadId}
                       editingPadId={editingPadId}
                       editingPadName={editingPadName}
-                      deletingPadId={deletingPadId}
-                      canDelete={pads.length > 1}
                       onSelect={handleSelectPad}
                       onStartRename={handleStartRenamePad}
                       onRenameChange={setEditingPadName}
                       onSaveRename={handleSaveRenamePad}
                       onCancelRename={() => setEditingPadId(null)}
-                      onDelete={handleDeletePad}
                       isMobile={true}
                     />
                   ))}
@@ -1015,6 +1010,8 @@ export default function DayScratchpad({
             /* DESKTOP FLOATING DRAGGABLE WINDOW */
             <motion.div
               drag
+              dragListener={false}
+              dragControls={windowDragControls}
               dragMomentum={false}
               onDragEnd={(_, info) => {
                 const newPos = {
@@ -1031,7 +1028,10 @@ export default function DayScratchpad({
               className="fixed z-50 bottom-20 right-8 w-[480px] max-w-[90vw] h-[520px] max-h-[85vh] bg-[#141414]/95 border border-stone-800 rounded-2xl shadow-2xl backdrop-blur-md flex flex-col overflow-hidden font-sans"
             >
               {/* Window Header (Drag Handle) */}
-              <div className="flex-none flex items-center justify-between px-4 py-2.5 bg-[#181818] border-b border-stone-850 cursor-grab active:cursor-grabbing select-none">
+              <div
+                onPointerDown={(e) => windowDragControls.start(e)}
+                className="flex-none flex items-center justify-between px-4 py-2.5 bg-[#181818] border-b border-stone-850 cursor-grab active:cursor-grabbing select-none"
+              >
                 <div className="flex items-center gap-2">
                   <GripVertical className="w-4 h-4 text-stone-600" />
                   <StickyNote className="w-4 h-4 text-amber-500" />
@@ -1040,40 +1040,7 @@ export default function DayScratchpad({
                     {uncompletedCount} active
                   </span>
                 </div>
-                <div className="flex items-center gap-1">
-                  {hasDoneItems && (
-                    <button
-                      type="button"
-                      onClick={handleClearDone}
-                      title="Remove completed/converted items"
-                      className="text-[10px] font-mono text-stone-400 hover:text-stone-200 px-2 py-0.5 bg-stone-900 border border-stone-800 hover:bg-stone-850 rounded transition-colors cursor-pointer"
-                    >
-                      Clear Done
-                    </button>
-                  )}
-                  {items.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={handleClearAll}
-                      title="Clear all items in this pad"
-                      className={`text-[10px] font-mono px-2 py-0.5 border rounded transition-colors cursor-pointer ${
-                        isClearConfirming
-                          ? 'bg-red-950/80 border-red-800 text-red-400 animate-pulse'
-                          : 'text-stone-500 hover:text-red-400 bg-stone-900 border-stone-800'
-                      }`}
-                    >
-                      {isClearConfirming ? 'Sure?' : 'Clear'}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={toggleOpen}
-                    title="Close"
-                    className="p-1 text-stone-400 hover:text-stone-200 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer ml-1"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
+                {renderHeaderActions(false)}
               </div>
 
               {/* Multi-Pad Tabs Row (Desktop) */}
@@ -1093,14 +1060,11 @@ export default function DayScratchpad({
                       isDragTarget={pad.id === dragOverPadId}
                       editingPadId={editingPadId}
                       editingPadName={editingPadName}
-                      deletingPadId={deletingPadId}
-                      canDelete={pads.length > 1}
                       onSelect={handleSelectPad}
                       onStartRename={handleStartRenamePad}
                       onRenameChange={setEditingPadName}
                       onSaveRename={handleSaveRenamePad}
                       onCancelRename={() => setEditingPadId(null)}
-                      onDelete={handleDeletePad}
                       isMobile={false}
                     />
                   ))}
