@@ -34,6 +34,8 @@ export default function QuickSyncSheet({
     status,
     statusMsg,
     isDirty,
+    isAutoSyncEnabled,
+    setAutoSyncEnabled,
     pushToCloud,
     pullFromCloud,
   } = useGistSync();
@@ -135,6 +137,23 @@ export default function QuickSyncSheet({
                   )}
                 </span>
               </div>
+
+              {isConfigured && (
+                <div className="flex items-center justify-between text-xs border-t border-stone-900 pt-1.5 mt-0.5">
+                  <span className="text-stone-400 font-mono">Ambient Auto-Sync:</span>
+                  <button
+                    type="button"
+                    onClick={() => setAutoSyncEnabled(!isAutoSyncEnabled)}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold transition-all cursor-pointer ${
+                      isAutoSyncEnabled
+                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25'
+                        : 'bg-stone-800 text-stone-400 border border-stone-700 hover:bg-stone-750'
+                    }`}
+                  >
+                    {isAutoSyncEnabled ? 'ENABLED' : 'DISABLED'}
+                  </button>
+                </div>
+              )}
 
               {lastSync && (
                 <div className="flex items-center justify-between text-[11px] text-stone-500 font-mono border-t border-stone-900 pt-1.5 mt-0.5">

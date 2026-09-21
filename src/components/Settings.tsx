@@ -252,6 +252,8 @@ export default function Settings({
     status,
     statusMsg,
     isConfigured,
+    isAutoSyncEnabled,
+    setAutoSyncEnabled,
     reload,
     pushToCloud,
     pullFromCloud,
@@ -746,6 +748,53 @@ export default function Settings({
                         <span className="flex-1">{statusMsg}</span>
                       </motion.div>
                     )}
+
+                    {/* Auto-Sync (Ambient) Mode Toggle */}
+                    <div
+                      className={`p-3.5 bg-stone-950/60 border rounded-2xl flex items-center justify-between transition-colors ${
+                        isConfigured ? 'border-stone-850' : 'border-stone-850/50 opacity-60'
+                      }`}
+                    >
+                      <div className="flex flex-col gap-0.5 pr-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-stone-200 font-semibold">
+                            Auto-Sync (Ambient)
+                          </span>
+                          {isAutoSyncEnabled && isConfigured && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              ACTIVE
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] font-mono text-stone-500 leading-normal">
+                          {isConfigured
+                            ? 'Auto-saves changes after 20s idle and pulls updates when returning to this tab.'
+                            : 'Requires PAT and Gist ID setup first.'}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={!isConfigured}
+                        onClick={() => setAutoSyncEnabled(!isAutoSyncEnabled)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          !isConfigured
+                            ? 'opacity-40 cursor-not-allowed bg-stone-800'
+                            : isAutoSyncEnabled
+                              ? 'bg-emerald-500'
+                              : 'bg-stone-800 hover:bg-stone-700'
+                        }`}
+                        role="switch"
+                        aria-checked={isAutoSyncEnabled}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            isAutoSyncEnabled && isConfigured ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
 
                     {/* Push / Pull Big Action Cards */}
                     {isConfigured && (
