@@ -85,8 +85,11 @@ export default function DesktopTaskRow({
     .map((id) => taskLists.find((list) => list.id === id))
     .filter((list): list is Category => !!list && list.id !== selectedListId);
 
-  const taskFolder = task.folder_id
-    ? availableFolders?.find((f) => f.id === task.folder_id)
+  const effectiveFolderId =
+    (selectedListId && task.folder_ids?.[selectedListId]) ?? task.folder_id;
+
+  const taskFolder = effectiveFolderId
+    ? availableFolders?.find((f) => f.id === effectiveFolderId)
     : null;
 
   const hasTimeSpent = (task.time_spent ?? 0) > 0;

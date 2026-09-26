@@ -49,11 +49,13 @@ export interface Task extends BaseEntry {
   objective_id?: string; // link to an objective
   achievements?: TaskAchievement[];
   content?: string;
-  sort_order?: number; // display ordering (used by ListsView DnD)
+  sort_order?: number; // display ordering (legacy global fallback)
+  sort_orders?: Record<string, number>; // per-list display ordering: [listId]: orderIndex
   category_ids?: string[]; // add this
   starred?: boolean;
   is_accomplishment?: boolean; // marks a completed task as an accomplishment for the Trophy view
-  folder_id?: string; // links to a ListFolder
+  folder_id?: string; // links to a ListFolder (legacy global fallback)
+  folder_ids?: Record<string, string>; // per-list folder mapping: [listId]: folderId
   has_explicit_time?: boolean; // true if user explicitly scheduled an exact hour/minute or span
 }
 

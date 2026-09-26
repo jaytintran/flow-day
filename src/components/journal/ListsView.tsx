@@ -360,6 +360,35 @@ export default function ListsView({
 				? selectedFolderTab
 				: undefined);
 
+		// If a contextual folder was selected, ensure its parent list is attached to targetCategoryIds
+		if (contextualFolderId) {
+			const parentFolder = allFolders.find((f) => f.id === contextualFolderId);
+			if (
+				parentFolder &&
+				parentFolder.list_id &&
+				parentFolder.list_id !== "all" &&
+				parentFolder.list_id !== "none"
+			) {
+				if (!targetCategoryIds.includes(parentFolder.list_id)) {
+					targetCategoryIds.push(parentFolder.list_id);
+				}
+			}
+		}
+
+		const folderIdsMap: Record<string, string> = {};
+		if (contextualFolderId) {
+			const parentFolder = allFolders.find((f) => f.id === contextualFolderId);
+			const ownerListId =
+				parentFolder?.list_id && parentFolder.list_id !== "all"
+					? parentFolder.list_id
+					: selectedView !== "all"
+						? selectedView
+						: undefined;
+			if (ownerListId) {
+				folderIdsMap[ownerListId] = contextualFolderId;
+			}
+		}
+
 		const newTaskId = crypto.randomUUID();
 		const newTask: Task = {
 			id: newTaskId,
@@ -374,6 +403,9 @@ export default function ListsView({
 				? { category_ids: targetCategoryIds }
 				: {}),
 			...(contextualFolderId ? { folder_id: contextualFolderId } : {}),
+			...(Object.keys(folderIdsMap).length > 0
+				? { folder_ids: folderIdsMap }
+				: {}),
 		};
 
 		await db.entries.add(newTask);
@@ -420,8 +452,58 @@ export default function ListsView({
 	};
 
 	const handleDeleteList = async (listId: string) => {
-		await migrateTasksOnListDelete(listId);
-		await db.categories.delete(listId);
+		await db.transaction(
+			"rw",
+			[db.categories, db.list_folders, db.entries],
+			async () => {
+				await migrateTasksOnListDelete(listId);
+				await db.categories.delete(listId);
+
+				// Delete all folders belonging to this list
+				const foldersToDelete = await db.list_folders
+					.where("list_id")
+					.equals(listId)
+					.toArray();
+				const folderIdsToDelete = new Set(foldersToDelete.map((f) => f.id));
+				for (const f of foldersToDelete) {
+					await db.list_folders.delete(f.id);
+				}
+
+				// Clean up task references for this list
+				const all = (await db.entries.toArray()) as Task[];
+				for (const t of all) {
+					if (t.type !== "task") continue;
+					let changed = false;
+					const updates: any = {};
+					if (t.folder_id && folderIdsToDelete.has(t.folder_id)) {
+						updates.folder_id = undefined;
+						changed = true;
+					}
+					if (t.folder_ids && t.folder_ids[listId]) {
+						const nextFolderIds = { ...t.folder_ids };
+						delete nextFolderIds[listId];
+						updates.folder_ids =
+							Object.keys(nextFolderIds).length > 0 ? nextFolderIds : undefined;
+						changed = true;
+					}
+					if (t.sort_orders && t.sort_orders[listId]) {
+						const nextSortOrders = { ...t.sort_orders };
+						delete nextSortOrders[listId];
+						updates.sort_orders =
+							Object.keys(nextSortOrders).length > 0
+								? nextSortOrders
+								: undefined;
+						changed = true;
+					}
+					if (changed) {
+						await db.entries.update(t.id, updates);
+					}
+				}
+			},
+		);
+		try {
+			localStorage.removeItem(`flowday-tasks-folder-tab-${listId}`);
+		} catch {}
 		if (selectedView === listId) {
 			setSelectedView("all");
 			localStorage.setItem("flowday-tasks-selected-list", "all");
@@ -553,12 +635,55 @@ export default function ListsView({
 		});
 	};
 
+	// Helper to resolve the active folder ID for a task within a specific list view
+	const getTaskFolderId = (
+		task: Task,
+		listId?: string,
+		validFolderIds?: Set<string>,
+	): string | undefined => {
+		if (listId && listId !== "all" && task.folder_ids?.[listId] !== undefined) {
+			const fId = task.folder_ids[listId];
+			if (!validFolderIds || validFolderIds.has(fId)) return fId;
+			return undefined;
+		}
+		if (task.folder_id && (!validFolderIds || validFolderIds.has(task.folder_id))) {
+			return task.folder_id;
+		}
+		return undefined;
+	};
+
+	const buildUpdatedFolderIds = (
+		currentFolderIds: Record<string, string> | undefined,
+		listId: string | undefined,
+		targetFolderId: string | undefined,
+	): Record<string, string> | undefined => {
+		const next = { ...(currentFolderIds ?? {}) };
+		if (listId && listId !== "all") {
+			if (targetFolderId) {
+				next[listId] = targetFolderId;
+			} else {
+				delete next[listId];
+			}
+		}
+		return Object.keys(next).length > 0 ? next : undefined;
+	};
+
 	const handleBatchMoveFolder = async (folderId: string | undefined) => {
 		const ids = Array.from(selectedTaskIds);
 		if (ids.length === 0) return;
 		await db.transaction("rw", db.entries, async () => {
 			for (const id of ids) {
-				await db.entries.update(id, { folder_id: folderId } as any);
+				const item = (await db.entries.get(id)) as Task | undefined;
+				if (!item) continue;
+				const nextFolderIds = buildUpdatedFolderIds(
+					item.folder_ids,
+					selectedView,
+					folderId,
+				);
+				await db.entries.update(id, {
+					folder_id: folderId,
+					folder_ids: nextFolderIds,
+				} as any);
 			}
 		});
 		setBatchFolderPickerOpen(false);
@@ -647,7 +772,17 @@ export default function ListsView({
 		taskId: string,
 		folderId: string | undefined,
 	) => {
-		await db.entries.update(taskId, { folder_id: folderId } as any);
+		const item = (await db.entries.get(taskId)) as Task | undefined;
+		if (!item) return;
+		const nextFolderIds = buildUpdatedFolderIds(
+			item.folder_ids,
+			selectedView,
+			folderId,
+		);
+		await db.entries.update(taskId, {
+			folder_id: folderId,
+			folder_ids: nextFolderIds,
+		} as any);
 	};
 
 	// Folder collapsed state (map of folderId -> boolean)
@@ -688,7 +823,7 @@ export default function ListsView({
 	// Available folders to pick when moving a task on mobile/desktop
 	const availableFoldersForPicker = useMemo(() => {
 		if (selectedView === "all") return allFolders;
-		return currentListFolders.length > 0 ? currentListFolders : allFolders;
+		return currentListFolders;
 	}, [selectedView, allFolders, currentListFolders]);
 
 	// Dateless backlog tasks only for ListsView (excludes scheduled tasks)
@@ -754,10 +889,16 @@ export default function ListsView({
 			});
 		}
 
-		// Sort by sort_order then created_at
+		// Sort by per-list sort_orders (or global sort_order fallback) then created_at
 		return [...tasks].sort((a, b) => {
-			const aSort = a.sort_order ?? Infinity;
-			const bSort = b.sort_order ?? Infinity;
+			const aSort =
+				(selectedView && a.sort_orders?.[selectedView]) ??
+				a.sort_order ??
+				Infinity;
+			const bSort =
+				(selectedView && b.sort_orders?.[selectedView]) ??
+				b.sort_order ??
+				Infinity;
 			if (aSort !== bSort) return aSort - bSort;
 			return (
 				new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -785,15 +926,20 @@ export default function ListsView({
 		const root: Task[] = [];
 
 		displayedTasks.forEach((task) => {
-			if (task.folder_id && validFolderIds.has(task.folder_id)) {
-				map[task.folder_id].push(task);
+			const effectiveFolderId = getTaskFolderId(
+				task,
+				selectedView,
+				validFolderIds,
+			);
+			if (effectiveFolderId && validFolderIds.has(effectiveFolderId)) {
+				map[effectiveFolderId].push(task);
 			} else {
 				root.push(task);
 			}
 		});
 
 		return { folderTasksMap: map, rootTasks: root };
-	}, [displayedTasks, currentListFolders]);
+	}, [displayedTasks, currentListFolders, selectedView]);
 
 	// ─── Per-list task counts for sidebar ────────────────────────────────────
 	const listTaskCounts = useMemo(() => {
@@ -866,9 +1012,35 @@ export default function ListsView({
 	const handleDeleteFolder = async (folderId: string) => {
 		await db.transaction("rw", db.list_folders, db.entries, async () => {
 			await db.list_folders.delete(folderId);
-			const folderTasks = allTasks.filter((t) => t.folder_id === folderId);
-			for (const t of folderTasks) {
-				await db.entries.update(t.id, { folder_id: undefined } as any);
+			const all = (await db.entries.toArray()) as Task[];
+			for (const t of all) {
+				if (t.type !== "task") continue;
+				let changed = false;
+				const updates: any = {};
+				if (t.folder_id === folderId) {
+					updates.folder_id = undefined;
+					changed = true;
+				}
+				if (t.folder_ids) {
+					const nextFolderIds = { ...t.folder_ids };
+					let mapChanged = false;
+					for (const [lId, fId] of Object.entries(nextFolderIds)) {
+						if (fId === folderId) {
+							delete nextFolderIds[lId];
+							mapChanged = true;
+						}
+					}
+					if (mapChanged) {
+						updates.folder_ids =
+							Object.keys(nextFolderIds).length > 0
+								? nextFolderIds
+								: undefined;
+						changed = true;
+					}
+				}
+				if (changed) {
+					await db.entries.update(t.id, updates);
+				}
 			}
 		});
 		if (selectedFolderTab === folderId) {
@@ -978,7 +1150,17 @@ export default function ListsView({
 			) {
 				await db.transaction("rw", db.entries, async () => {
 					for (const id of targetTaskIds) {
-						await db.entries.update(id, { folder_id: undefined } as any);
+						const item = (await db.entries.get(id)) as Task | undefined;
+						if (!item) continue;
+						const nextFolderIds = buildUpdatedFolderIds(
+							item.folder_ids,
+							selectedView,
+							undefined,
+						);
+						await db.entries.update(id, {
+							folder_id: undefined,
+							folder_ids: nextFolderIds,
+						} as any);
 					}
 				});
 				return;
@@ -986,7 +1168,17 @@ export default function ListsView({
 			if (targetTab !== "all") {
 				await db.transaction("rw", db.entries, async () => {
 					for (const id of targetTaskIds) {
-						await db.entries.update(id, { folder_id: targetTab } as any);
+						const item = (await db.entries.get(id)) as Task | undefined;
+						if (!item) continue;
+						const nextFolderIds = buildUpdatedFolderIds(
+							item.folder_ids,
+							selectedView,
+							targetTab,
+						);
+						await db.entries.update(id, {
+							folder_id: targetTab,
+							folder_ids: nextFolderIds,
+						} as any);
 					}
 				});
 				return;
@@ -998,7 +1190,17 @@ export default function ListsView({
 			const targetFolderId = overIdStr.replace("folder-drop-", "");
 			await db.transaction("rw", db.entries, async () => {
 				for (const id of targetTaskIds) {
-					await db.entries.update(id, { folder_id: targetFolderId } as any);
+					const item = (await db.entries.get(id)) as Task | undefined;
+					if (!item) continue;
+					const nextFolderIds = buildUpdatedFolderIds(
+						item.folder_ids,
+						selectedView,
+						targetFolderId,
+					);
+					await db.entries.update(id, {
+						folder_id: targetFolderId,
+						folder_ids: nextFolderIds,
+					} as any);
 				}
 			});
 			return;
@@ -1008,7 +1210,17 @@ export default function ListsView({
 		if (overIdStr === "root-tasks-area") {
 			await db.transaction("rw", db.entries, async () => {
 				for (const id of targetTaskIds) {
-					await db.entries.update(id, { folder_id: undefined } as any);
+					const item = (await db.entries.get(id)) as Task | undefined;
+					if (!item) continue;
+					const nextFolderIds = buildUpdatedFolderIds(
+						item.folder_ids,
+						selectedView,
+						undefined,
+					);
+					await db.entries.update(id, {
+						folder_id: undefined,
+						folder_ids: nextFolderIds,
+					} as any);
 				}
 			});
 			return;
@@ -1018,24 +1230,40 @@ export default function ListsView({
 		if (active.id !== over.id) {
 			const overTask = allTasks.find((t) => t.id === over.id);
 			if (overTask) {
+				const overFolderId = getTaskFolderId(overTask, selectedView);
 				if (isMultiDrag) {
 					await db.transaction("rw", db.entries, async () => {
 						for (const id of targetTaskIds) {
+							const item = (await db.entries.get(id)) as Task | undefined;
+							if (!item) continue;
+							const nextFolderIds = buildUpdatedFolderIds(
+								item.folder_ids,
+								selectedView,
+								overFolderId,
+							);
 							await db.entries.update(id, {
-								folder_id: overTask.folder_id,
+								folder_id: overFolderId,
+								folder_ids: nextFolderIds,
 							} as any);
 						}
 					});
 				} else {
-					const sameFolder = draggedTask.folder_id === overTask.folder_id;
+					const draggedFolderId = getTaskFolderId(draggedTask, selectedView);
+					const sameFolder = draggedFolderId === overFolderId;
 					if (!sameFolder) {
+						const nextFolderIds = buildUpdatedFolderIds(
+							draggedTask.folder_ids,
+							selectedView,
+							overFolderId,
+						);
 						await db.entries.update(activeTaskId, {
-							folder_id: overTask.folder_id,
+							folder_id: overFolderId,
+							folder_ids: nextFolderIds,
 						} as any);
 					}
 
 					const containerTasks = displayedTasks.filter(
-						(t) => t.folder_id === overTask.folder_id,
+						(t) => getTaskFolderId(t, selectedView) === overFolderId,
 					);
 					const oldIdx = containerTasks.findIndex((t) => t.id === active.id);
 					const newIdx = containerTasks.findIndex((t) => t.id === over.id);
@@ -1043,8 +1271,17 @@ export default function ListsView({
 						const reordered = arrayMove(containerTasks, oldIdx, newIdx);
 						await db.transaction("rw", db.entries, async () => {
 							for (let i = 0; i < reordered.length; i++) {
-								await db.entries.update(reordered[i].id, {
+								const t = reordered[i];
+								const nextSortOrders = { ...(t.sort_orders ?? {}) };
+								if (selectedView && selectedView !== "all") {
+									nextSortOrders[selectedView] = i;
+								}
+								await db.entries.update(t.id, {
 									sort_order: i,
+									sort_orders:
+										Object.keys(nextSortOrders).length > 0
+											? nextSortOrders
+											: undefined,
 								} as any);
 							}
 						});
@@ -2468,8 +2705,10 @@ export default function ListsView({
 				<MoveToFolderModal
 					task={folderPickerTask}
 					folders={availableFoldersForPicker}
+					currentListId={selectedView}
 					onClose={() => setFolderPickerTask(null)}
 					onSelectFolder={handleMoveTaskToFolder}
+					onCreateFolder={handleCreateFolder}
 				/>
 			)}
 
@@ -2497,8 +2736,10 @@ export default function ListsView({
 						} as Task
 					}
 					folders={availableFoldersForPicker}
+					currentListId={selectedView}
 					onClose={() => setBatchFolderPickerOpen(false)}
 					onSelectFolder={(_, folderId) => handleBatchMoveFolder(folderId)}
+					onCreateFolder={handleCreateFolder}
 				/>
 			)}
 
