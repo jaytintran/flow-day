@@ -144,13 +144,18 @@ export function useGistSync() {
     const entities = await db.entities.toArray();
     const entity_types = await db.entity_types.toArray();
 
-    // Include Day Scratchpad data in backup (both pads and legacy items)
+    // Include Day Scratchpad data in backup (pads, today_pad, and legacy items)
     let scratchpadPads = [];
     let scratchpadItems = [];
+    let todayPad = null;
     try {
       const rawPads = localStorage.getItem('flowday_scratchpad_pads_v1');
       if (rawPads) {
         scratchpadPads = JSON.parse(rawPads);
+      }
+      const rawToday = localStorage.getItem('flowday_today_pad_v1');
+      if (rawToday) {
+        todayPad = JSON.parse(rawToday);
       }
       const rawScratch = localStorage.getItem('flowday_day_scratchpad_items_v1');
       if (rawScratch) {
@@ -170,6 +175,7 @@ export function useGistSync() {
       entities,
       entity_types,
       scratchpad_pads: scratchpadPads,
+      today_pad: todayPad,
       scratchpad_items: scratchpadItems,
     };
   };
@@ -188,6 +194,13 @@ export function useGistSync() {
     isImportingRef.current = true;
 
     try {
+      // Restore Today Pad data if present in backup
+      if (data.today_pad) {
+        try {
+          localStorage.setItem('flowday_today_pad_v1', JSON.stringify(data.today_pad));
+        } catch {}
+      }
+
       // Restore Day Scratchpad pads/items if present in backup
       if (Array.isArray(data.scratchpad_pads)) {
         try {
@@ -461,12 +474,15 @@ export function useGistSync() {
       t.hook('deleting', onWrite);
     });
 
+    window.addEventListener('scratchpad_sync_update', onWrite);
+
     return () => {
       tables.forEach((t) => {
         t.hook('creating').unsubscribe(onWrite);
         t.hook('updating').unsubscribe(onWrite);
         t.hook('deleting').unsubscribe(onWrite);
       });
+      window.removeEventListener('scratchpad_sync_update', onWrite);
       if (autoPushTimerRef.current) {
         clearTimeout(autoPushTimerRef.current);
       }
