@@ -198,6 +198,7 @@ export function useGistSync() {
       if (data.today_pad) {
         try {
           localStorage.setItem('flowday_today_pad_v1', JSON.stringify(data.today_pad));
+          window.dispatchEvent(new CustomEvent('scratchpad_sync_update'));
         } catch {}
       }
 

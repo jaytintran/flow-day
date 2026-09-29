@@ -1436,9 +1436,11 @@ export default function DayScratchpad({
       setTodayPad(loadTodayPad());
     };
     window.addEventListener('scratchpad_sync_update', handleSyncUpdate);
+    window.addEventListener('storage', handleSyncUpdate);
     return () => {
       window.removeEventListener('resize', checkMobile);
       window.removeEventListener('scratchpad_sync_update', handleSyncUpdate);
+      window.removeEventListener('storage', handleSyncUpdate);
     };
   }, []);
 
