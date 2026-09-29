@@ -13,6 +13,7 @@ import {
   X,
   Plus,
   GripVertical,
+  ArrowLeftRight,
   Sparkles,
   Check,
   ChevronDown,
@@ -86,6 +87,8 @@ const STORAGE_POS_KEY = 'flowday_day_scratchpad_pos_v1';
 const STORAGE_TODAY_PAD_KEY = 'flowday_today_pad_v1';
 const TODAY_PAD_ID = '__today__';
 const TODAY_PAD_MAX_ITEMS = 5;
+/** Tabs shown in the strip before overflow collapses into the pad menu (includes pinned Today) */
+const MAX_VISIBLE_TABS = 5;
 
 interface Position { x: number; y: number; }
 
@@ -100,16 +103,12 @@ function formatDateKey(key: string): string {
   } catch { return key; }
 }
 
-/** Format header title: Anchors Monday 28/09/26 */
-function formatAnchorsHeaderDate(date: Date): string {
+/** Format the day-navigation label in the Anchors header (e.g. "Mon, Sep 29") */
+function formatNavDate(date: Date): string {
   try {
-    const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = String(date.getFullYear()).slice(-2);
-    return `Anchors ${weekday} ${day}/${month}/${year}`;
+    return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   } catch {
-    return 'Anchors Today';
+    return date.toDateString();
   }
 }
 
@@ -306,18 +305,24 @@ interface PadTabProps {
   isMobile?: boolean;
   pinned?: boolean;
   badge?: React.ReactNode;
+  /** When false the tab is a plain tap target — no drag-to-reorder */
+  draggable?: boolean;
+  /** Arrange mode: reveal a touch-safe grip that starts the drag explicitly */
+  isArranging?: boolean;
 }
 
 function PadTab({
   pad, isActive, isDragTarget, editingPadId, editingPadName,
   onSelect, onStartRename, onRenameChange, onSaveRename, onCancelRename,
-  isMobile, pinned, badge,
+  isMobile, pinned, badge, draggable = true, isArranging = false,
 }: PadTabProps) {
   const isEditing = editingPadId === pad.id;
+  const dragControls = useDragControls();
+  /** On touch a drag may only start from the grip, so tap (select/rename) and
+   *  swipe (scroll the tab strip) keep working everywhere else on the tab. */
+  const gripOnlyDrag = !!isMobile;
 
-  const className = `group flex items-center h-7 gap-1.5 ${
-    isMobile ? 'px-3' : 'px-2.5'
-  } rounded-lg text-xs font-mono transition-colors cursor-pointer shrink-0 border select-none ${
+  const className = `group flex items-center h-7 gap-1.5 px-2.5 rounded-lg text-xs font-mono transition-colors cursor-pointer shrink-0 border select-none ${
     isDragTarget
       ? 'bg-amber-500/30 border-amber-400 text-amber-300 ring-2 ring-amber-500/60 shadow-md font-bold'
       : isActive
@@ -349,10 +354,26 @@ function PadTab({
     </div>
   ) : (
     <>
+      {isArranging && !pinned && (
+        <button
+          type="button"
+          onPointerDown={(e) => dragControls.start(e)}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Drag to reorder ${pad.name}`}
+          title="Drag to reorder"
+          className="-ml-1 p-0.5 text-stone-500 active:text-amber-400 touch-none cursor-grab active:cursor-grabbing shrink-0"
+        >
+          <GripVertical className="w-3 h-3" />
+        </button>
+      )}
       <span
         onClick={(e) => { if (isActive) onStartRename(pad.id, pad.name, e); }}
-        className="cursor-pointer select-none truncate max-w-[110px]"
-        title={pinned ? 'Click to rename, always stays first' : 'Click to rename, drag to reorder'}
+        className="cursor-pointer select-none whitespace-nowrap"
+        title={
+          pinned ? 'Click to rename, always stays first'
+          : draggable ? 'Click to rename, drag to reorder'
+          : 'Click to rename'
+        }
       >
         {pad.name}
       </span>
@@ -360,7 +381,7 @@ function PadTab({
     </>
   );
 
-  if (pinned) {
+  if (pinned || !draggable) {
     return (
       <div
         data-pad-id={pad.id}
@@ -378,7 +399,8 @@ function PadTab({
       value={pad}
       as="div"
       data-pad-id={pad.id}
-      dragListener={!isEditing}
+      dragListener={!isEditing && !gripOnlyDrag}
+      dragControls={dragControls}
       whileDrag={{ zIndex: 50, cursor: 'grabbing', opacity: 0.85 }}
       transition={{ duration: 0.15 }}
       onClick={() => { if (!isEditing) onSelect(pad.id); }}
@@ -403,6 +425,20 @@ interface MobileScratchpadItemProps {
   onDrag?: (e: any, info: { point: { x: number; y: number } }) => void;
   onDragEnd?: (item: ScratchpadItem, e: any, info: { point: { x: number; y: number } }) => void;
 }
+
+// ─── Tab strip actions ───────────────────────────────────────────────────────
+
+/**
+ * Shared look for the icon-only buttons pinned to the right of the tab strip
+ * (reorder toggle + new pad) so the two read as one matched pair — identical
+ * size, radius, border and colour. A toggle only differs while it is active.
+ */
+const tabStripActionClass = (isActive = false) =>
+  `h-7 w-7 shrink-0 flex items-center justify-center rounded-lg border transition-colors cursor-pointer ${
+    isActive
+      ? 'bg-amber-500/15 border-amber-500/40 text-amber-500 shadow-xs'
+      : 'bg-stone-900/60 border-stone-800/80 text-stone-500 hover:text-amber-500 hover:bg-stone-900'
+  }`;
 
 function MobileScratchpadItem({
   item, index, textareaRef, onTextChange, onKeyDown,
@@ -454,9 +490,11 @@ interface MiniMonthCalendarProps {
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
   onClose: () => void;
+  /** Wrapper holding the trigger buttons — clicks in here must not count as "outside" */
+  triggerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-function MiniMonthCalendar({ selectedDate, onSelectDate, onClose }: MiniMonthCalendarProps) {
+function MiniMonthCalendar({ selectedDate, onSelectDate, onClose, triggerRef }: MiniMonthCalendarProps) {
   const todayKey = new Date().toISOString().slice(0, 10);
   const selectedKey = selectedDate.toISOString().slice(0, 10);
 
@@ -465,16 +503,17 @@ function MiniMonthCalendar({ selectedDate, onSelectDate, onClose }: MiniMonthCal
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
+  // Close on outside click (clicks on the trigger buttons are handled by their own onClick toggle)
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        onClose();
-      }
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      if (triggerRef?.current?.contains(target)) return;
+      onClose();
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [onClose]);
+  }, [onClose, triggerRef]);
 
   const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
@@ -583,150 +622,41 @@ function MiniMonthCalendar({ selectedDate, onSelectDate, onClose }: MiniMonthCal
   );
 }
 
-// ─── DaySwitcherStrip component ──────────────────────────────────────────────
-
-interface DaySwitcherStripProps {
-  selectedDate: Date;
-  onSelectDate: (date: Date) => void;
-  isMobile?: boolean;
-}
-
-function DaySwitcherStrip({ selectedDate, onSelectDate, isMobile }: DaySwitcherStripProps) {
-  const selectedKey = selectedDate.toISOString().slice(0, 10);
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const [calendarOpen, setCalendarOpen] = useState(false);
-
-  /** Build an array of 7 dates: -3 … selected … +3 */
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() + (i - 3));
-    return d;
-  });
-
-  const shiftDays = (delta: number) => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() + delta);
-    onSelectDate(d);
-  };
-
-  const SHORT_DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-
-  return (
-    <div className={`flex items-center gap-1 ${isMobile ? 'px-1 py-2' : 'px-0.5 py-1.5'}`}>
-
-      {/* ── Calendar icon button (left) ── */}
-      <div className="relative shrink-0">
-        <button
-          type="button"
-          onClick={() => setCalendarOpen((v) => !v)}
-          className={`flex items-center justify-center rounded-lg border transition-all cursor-pointer ${
-            isMobile ? 'w-10 h-10' : 'w-9 h-9'
-          } ${
-            calendarOpen
-              ? 'bg-amber-500/20 border-amber-500/50 text-amber-400'
-              : 'bg-stone-900/40 border-stone-800/50 text-stone-500 hover:border-stone-700 hover:text-stone-300'
-          }`}
-          aria-label="Open date picker"
-          title="Pick a specific date"
-        >
-          <CalendarDays className={isMobile ? 'w-4 h-4' : 'w-3.5 h-3.5'} />
-        </button>
-
-        {calendarOpen && (
-          <MiniMonthCalendar
-            selectedDate={selectedDate}
-            onSelectDate={onSelectDate}
-            onClose={() => setCalendarOpen(false)}
-          />
-        )}
-      </div>
-
-      {/* ── Prev arrow ── */}
-      <button
-        type="button"
-        onClick={() => shiftDays(-1)}
-        className="p-1 rounded-md text-stone-500 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer shrink-0"
-        aria-label="Previous day"
-      >
-        <ChevronLeft className={isMobile ? 'w-4 h-4' : 'w-3.5 h-3.5'} />
-      </button>
-
-      {/* ── Day squares ── */}
-      <div className="flex items-center gap-1 flex-1 justify-center">
-        {days.map((day) => {
-          const key = day.toISOString().slice(0, 10);
-          const isSelected = key === selectedKey;
-          const isToday = key === todayKey;
-          const dayNum = day.getDate();
-          const dayLabel = SHORT_DAYS[day.getDay()];
-
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onSelectDate(new Date(day))}
-              className={`flex flex-col items-center justify-center rounded-lg border transition-all cursor-pointer select-none shrink-0 ${
-                isMobile ? 'w-10 h-10 gap-0' : 'w-9 h-9 gap-0'
-              } ${
-                isSelected
-                  ? 'bg-amber-500/20 border-amber-500/60 text-amber-400 shadow-sm'
-                  : isToday
-                  ? 'bg-stone-800/80 border-stone-700 text-stone-300 hover:border-amber-500/30 hover:text-amber-400'
-                  : 'bg-stone-900/40 border-stone-800/50 text-stone-500 hover:border-stone-700 hover:text-stone-300'
-              }`}
-              title={day.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-            >
-              <span className={`font-mono leading-none ${isMobile ? 'text-[9px]' : 'text-[8px]'} ${isSelected ? 'text-amber-400' : 'text-stone-500'}`}>
-                {dayLabel}
-              </span>
-              <span className={`font-mono font-bold leading-none mt-0.5 ${isMobile ? 'text-sm' : 'text-xs'} ${isSelected ? 'text-amber-400' : isToday ? 'text-stone-200' : ''}`}>
-                {dayNum}
-              </span>
-              {isToday && !isSelected && (
-                <span className="w-1 h-1 rounded-full bg-amber-500/60 mt-0.5" />
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── Next arrow ── */}
-      <button
-        type="button"
-        onClick={() => shiftDays(1)}
-        className="p-1 rounded-md text-stone-500 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer shrink-0"
-        aria-label="Next day"
-      >
-        <ChevronRight className={isMobile ? 'w-4 h-4' : 'w-3.5 h-3.5'} />
-      </button>
-    </div>
-  );
-}
-
 // ─── TodayPad sub-component ──────────────────────────────────────────────────
 
 interface TodayPadProps {
   todayPad: TodayPadData;
   onUpdate: (data: TodayPadData) => void;
   viewMode?: ViewMode;
-  activeDate: Date;
   scratchpadDate: Date;
   onScratchpadDateChange: (date: Date) => void;
   isMobile?: boolean;
 }
 
-function TodayPad({ todayPad, onUpdate, viewMode, activeDate, scratchpadDate, onScratchpadDateChange, isMobile }: TodayPadProps) {
+function TodayPad({ todayPad, onUpdate, viewMode, scratchpadDate, onScratchpadDateChange, isMobile }: TodayPadProps) {
   const activeDateKeyStr = scratchpadDate.toISOString().slice(0, 10);
   const textareaRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
+  /** Original Anchor text captured on focus so Escape can restore it */
+  const anchorEditBackup = useRef<Map<string, string>>(new Map());
   const anchorInputRef = useRef<HTMLInputElement>(null);
+  const calendarTriggerRef = useRef<HTMLDivElement>(null);
 
   const [newAnchorText, setNewAnchorText] = useState('');
   const [isAddingAnchor, setIsAddingAnchor] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   // Scratchpad-only Anchors matching current activeDateKey
   const allAnchors = (todayPad.anchors || []).filter(
     (a) => (a.dateKey || todayDateKey()) === activeDateKeyStr,
   );
+  const activeAnchorCount = allAnchors.filter((a) => !a.isCompleted).length;
+
+  /** Step the viewed day by ±1 without leaving the Anchors section */
+  const shiftScratchpadDays = (delta: number) => {
+    const d = new Date(scratchpadDate);
+    d.setDate(d.getDate() + delta);
+    onScratchpadDateChange(d);
+  };
 
   // Active items for 5-slot engine
   const todayActiveItems = todayPad.items.filter(
@@ -817,6 +747,33 @@ function TodayPad({ todayPad, onUpdate, viewMode, activeDate, scratchpadDate, on
   const handleDeleteManualAnchor = (anchor: AnchorItem) => {
     const currentAnchors = todayPad.anchors || [];
     updateAnchors(currentAnchors.filter((a) => a.id !== anchor.id));
+  };
+
+  /** Inline rename of an Anchor — text only; timeStr and dateKey stay untouched */
+  const handleAnchorTextChange = (id: string, text: string) => {
+    const currentAnchors = todayPad.anchors || [];
+    updateAnchors(currentAnchors.map((a) => (a.id === id ? { ...a, text } : a)));
+  };
+
+  /** Enter commits (blurs), Escape restores the text captured when the field was focused */
+  const handleAnchorKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, anchor: AnchorItem) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      (e.target as HTMLInputElement).blur();
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      handleAnchorTextChange(anchor.id, anchorEditBackup.current.get(anchor.id) ?? anchor.text);
+      (e.target as HTMLInputElement).blur();
+    }
+  };
+
+  /** Never leave a nameless Anchor behind (mirrors the pad-rename fallback) */
+  const handleAnchorBlur = (anchor: AnchorItem) => {
+    if (!anchor.text.trim()) {
+      handleAnchorTextChange(anchor.id, anchorEditBackup.current.get(anchor.id) ?? anchor.text);
+    }
   };
 
   const handleAddTodayItem = () => {
@@ -995,25 +952,89 @@ function TodayPad({ todayPad, onUpdate, viewMode, activeDate, scratchpadDate, on
   return (
     <div className="flex flex-col gap-4 font-sans">
 
-      {/* ─── DAY SWITCHER STRIP ──────────────────────────────────────────── */}
-      <DaySwitcherStrip
-        selectedDate={scratchpadDate}
-        onSelectDate={onScratchpadDateChange}
-        isMobile={isMobile}
-      />
-
       {/* ─── SECTION 1: TODAY'S ANCHORS (TIME-SPECIFIC) ─────────────────── */}
       <div className="flex flex-col gap-1.5 bg-stone-900/50 border border-stone-800/80 rounded-xl p-3 shadow-xs">
-        <div className="flex items-center justify-between px-0.5 mb-1">
-          <div className="flex items-center gap-1.5">
-            <AnchorIcon className="w-3.5 h-3.5 text-amber-500" />
-            <h4 className="text-xs font-mono font-bold text-stone-200 tracking-wide uppercase">
-              {formatAnchorsHeaderDate(activeDate)}
-            </h4>
+
+        {/* ── Header bar: day navigation (left) · section label + count (right) ── */}
+        <div className="flex items-center gap-0.5 px-0.5 mb-1.5">
+
+          {/* Day navigator — also the anchor point for the calendar popover */}
+          <div ref={calendarTriggerRef} className="relative flex items-center gap-0.5 shrink-0">
+            <AnchorIcon className="w-3.5 h-3.5 text-amber-500 shrink-0 mr-0.5" />
+
+            <button
+              type="button"
+              onClick={() => shiftScratchpadDays(-1)}
+              className={`rounded-md text-stone-500 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer shrink-0 ${isMobile ? 'p-1.5' : 'p-1'}`}
+              aria-label="Previous day"
+              title="Previous day"
+            >
+              <ChevronLeft className={isMobile ? 'w-4 h-4' : 'w-3.5 h-3.5'} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCalendarOpen((v) => !v)}
+              className={`min-w-[92px] text-center rounded-md text-xs font-mono font-bold text-stone-200 tracking-wide hover:bg-stone-800 hover:text-amber-400 transition-colors cursor-pointer shrink-0 ${isMobile ? 'px-2 py-1' : 'px-1.5 py-0.5'}`}
+              aria-label="Pick a specific date"
+              title="Pick a specific date"
+            >
+              {formatNavDate(scratchpadDate)}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => shiftScratchpadDays(1)}
+              className={`rounded-md text-stone-500 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer shrink-0 ${isMobile ? 'p-1.5' : 'p-1'}`}
+              aria-label="Next day"
+              title="Next day"
+            >
+              <ChevronRight className={isMobile ? 'w-4 h-4' : 'w-3.5 h-3.5'} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCalendarOpen((v) => !v)}
+              className={`flex items-center justify-center rounded-lg border transition-all cursor-pointer shrink-0 ml-0.5 ${
+                isMobile ? 'w-8 h-8' : 'w-7 h-7'
+              } ${
+                calendarOpen
+                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-400'
+                  : 'bg-stone-900/40 border-stone-800/50 text-stone-500 hover:border-stone-700 hover:text-stone-300'
+              }`}
+              aria-label="Open date picker"
+              title="Pick a specific date"
+            >
+              <CalendarIcon className={isMobile ? 'w-4 h-4' : 'w-3.5 h-3.5'} />
+            </button>
+
+            {calendarOpen && (
+              <MiniMonthCalendar
+                selectedDate={scratchpadDate}
+                onSelectDate={onScratchpadDateChange}
+                onClose={() => setCalendarOpen(false)}
+                triggerRef={calendarTriggerRef}
+              />
+            )}
           </div>
-          <span className="text-[10px] font-mono text-stone-500">
-            Time-Specific
-          </span>
+
+          {/* Divider */}
+          <div className="border-l border-stone-700/50 h-4 shrink-0 mx-1" />
+
+          {/* Section label + active count */}
+          <div className="flex-1 flex items-center justify-end gap-1.5 min-w-0">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wide text-stone-400">
+              Anchors
+            </span>
+            <span className="text-[10px] font-mono text-stone-600">·</span>
+            <span
+              className={`text-[10px] font-mono font-bold tabular-nums ${
+                activeAnchorCount > 0 ? 'text-amber-500' : 'text-stone-600'
+              }`}
+            >
+              {activeAnchorCount}
+            </span>
+          </div>
         </div>
 
         {allAnchors.length === 0 && !isAddingAnchor ? (
@@ -1029,7 +1050,7 @@ function TodayPad({ todayPad, onUpdate, viewMode, activeDate, scratchpadDate, on
                 className={`group flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border transition-colors ${
                   anchor.isCompleted
                     ? 'bg-stone-900/30 border-stone-800/40 text-stone-500 opacity-60'
-                    : 'bg-stone-900/80 border-stone-800 text-stone-200'
+                    : 'bg-stone-900/80 border-stone-800 text-stone-200 focus-within:border-amber-500/40'
                 }`}
               >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -1049,15 +1070,22 @@ function TodayPad({ todayPad, onUpdate, viewMode, activeDate, scratchpadDate, on
                       {anchor.timeStr}
                     </span>
                   )}
-                  <span className={`text-xs select-text truncate ${anchor.isCompleted ? 'text-stone-500' : 'text-stone-200'}`}>
-                    {anchor.text}
-                  </span>
+                  <input
+                    type="text"
+                    value={anchor.text}
+                    onChange={(e) => handleAnchorTextChange(anchor.id, e.target.value)}
+                    onFocus={() => anchorEditBackup.current.set(anchor.id, anchor.text)}
+                    onKeyDown={(e) => handleAnchorKeyDown(e, anchor)}
+                    onBlur={() => handleAnchorBlur(anchor)}
+                    placeholder="Anchor..."
+                    className={`flex-1 min-w-0 bg-transparent text-xs focus:outline-none placeholder-stone-500 ${anchor.isCompleted ? 'text-stone-500' : 'text-stone-200'}`}
+                  />
                 </div>
 
                 <button
                   type="button"
                   onClick={() => handleDeleteManualAnchor(anchor)}
-                  className="p-0.5 text-stone-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  className="p-0.5 text-stone-500 hover:text-rose-400 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity cursor-pointer"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -1235,7 +1263,7 @@ function TodayPad({ todayPad, onUpdate, viewMode, activeDate, scratchpadDate, on
                   placeholder="Active task..."
                   className={`flex-1 w-full min-w-0 bg-transparent text-xs focus:outline-none placeholder-stone-600 resize-none overflow-hidden leading-normal pr-1 ${item.isConverted ? 'text-stone-500' : 'text-stone-200'}`}
                 />
-                <div className="absolute right-1.5 top-1 flex items-center gap-1 z-10 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto focus-within:pointer-events-auto bg-stone-900 group-hover:bg-stone-850 pl-1.5 py-0.5 rounded-md">
+                <div className="flex items-center gap-1 z-10 shrink-0 mt-0.5 transition-opacity opacity-100 pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto pl-1.5 py-0.5 rounded-md bg-transparent md:absolute md:right-1.5 md:top-1 md:mt-0 md:opacity-0 md:pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto md:bg-stone-900 md:group-hover:bg-stone-850">
                   {!item.isConverted && item.text.trim() && (
                     <button type="button" onClick={() => handleConvertToTask(item)}
                       className="p-0.5 px-1.5 text-stone-400 hover:text-amber-400 bg-stone-900 hover:bg-stone-850 border border-stone-800 rounded-md shrink-0 text-[9px] font-mono flex items-center gap-0.5 transition-colors cursor-pointer">
@@ -1333,7 +1361,7 @@ function TodayPad({ todayPad, onUpdate, viewMode, activeDate, scratchpadDate, on
                             <span className="flex-1 text-xs text-stone-500 select-text break-words leading-normal pr-1">
                               {item.text}
                             </span>
-                            <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                               {item.isConverted && (
                                 <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-amber-500/10 text-amber-400/70 border border-amber-500/20">
                                   Task
@@ -1414,10 +1442,14 @@ export default function DayScratchpad({
   const [isClearConfirming, setIsClearConfirming] = useState(false);
   const [isDeletePadConfirming, setIsDeletePadConfirming] = useState(false);
   const [isCompletedOpen, setIsCompletedOpen] = useState(false);
+  const [isTabsMenuOpen, setIsTabsMenuOpen] = useState(false);
+  /** Arrange mode: pad tabs expose a grip handle so touch users can reorder */
+  const [isArrangingTabs, setIsArrangingTabs] = useState(false);
   const textareaRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
   const windowDragControls = useDragControls();
   const [dragOverPadId, setDragOverPadId] = useState<string | null>(null);
   const dragOverPadIdRef = useRef<string | null>(null);
+  const tabsMenuRef = useRef<HTMLDivElement>(null);
 
   const isOnTodayPad = activePadId === TODAY_PAD_ID;
   const currentPad = isOnTodayPad
@@ -1427,8 +1459,33 @@ export default function DayScratchpad({
   const activeItems = items.filter((i) => !i.isCompleted);
   const completedItems = items.filter((i) => i.isCompleted);
 
+  // ── Tab strip windowing: Today is pinned to slot 1, so only the first
+  //    (MAX_VISIBLE_TABS - 1) pads get their own tab; the rest live in the menu.
+  const visiblePads = pads.slice(0, MAX_VISIBLE_TABS - 1);
+  const hiddenPads = pads.slice(MAX_VISIBLE_TABS - 1);
+  const hasTabOverflow = hiddenPads.length > 0;
+  const activeHiddenPad = hiddenPads.find((p) => p.id === activePadId) ?? null;
+
+  // Dismiss the tab menu on outside click (trigger + panel share tabsMenuRef)
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    if (!isTabsMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (tabsMenuRef.current && !tabsMenuRef.current.contains(e.target as Node)) {
+        setIsTabsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [isTabsMenuOpen]);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const nextIsMobile = window.innerWidth < 768;
+      setIsMobile(nextIsMobile);
+      // Arrange mode is a touch-only affordance (its toggle lives on the mobile
+      // tab strip), so never leave it latched once we grow into desktop layout.
+      if (!nextIsMobile) setIsArrangingTabs(false);
+    };
     checkMobile();
     window.addEventListener('resize', checkMobile);
     const handleSyncUpdate = () => {
@@ -1453,6 +1510,7 @@ export default function DayScratchpad({
     setActivePadId(id);
     setIsDeletePadConfirming(false);
     setIsClearConfirming(false);
+    setIsTabsMenuOpen(false);
     try { localStorage.setItem(STORAGE_ACTIVE_PAD_ID_KEY, id); } catch {}
   };
 
@@ -1488,9 +1546,12 @@ export default function DayScratchpad({
     setEditingPadId(null);
   };
 
-  const handleReorderPads = (newPads: Scratchpad[]) => {
-    setPads(newPads);
-    savePads(newPads);
+  /** The strip only renders `visiblePads`, so re-apply the hidden remainder behind them */
+  const handleReorderPads = (reorderedVisible: Scratchpad[]) => {
+    const hiddenIds = new Set(hiddenPads.map((p) => p.id));
+    const updated = [...reorderedVisible, ...pads.filter((p) => hiddenIds.has(p.id))];
+    setPads(updated);
+    savePads(updated);
   };
 
   const handleDeleteCurrentPad = () => {
@@ -1716,47 +1777,145 @@ export default function DayScratchpad({
   );
 
   const renderTabsRow = (mobileView: boolean) => (
-    <div className={`flex-none flex items-center gap-1 ${mobileView ? 'px-3 py-2' : 'px-3 py-1.5'} bg-stone-900/60 border-b border-stone-800/70 overflow-x-auto no-scrollbar`}>
-      <PadTab
-        pad={todayPadProxy}
-        isActive={isOnTodayPad}
-        isDragTarget={dragOverPadId === TODAY_PAD_ID}
-        editingPadId={editingPadId}
-        editingPadName={editingPadName}
-        onSelect={handleSelectPad}
-        onStartRename={handleStartRenamePad}
-        onRenameChange={setEditingPadName}
-        onSaveRename={handleSaveRenamePad}
-        onCancelRename={() => setEditingPadId(null)}
-        isMobile={mobileView}
-        pinned
-        badge={todayActiveBadge}
-      />
+    <div className={`flex-none flex items-center gap-1 ${mobileView ? 'px-3 py-2' : 'px-3 py-1.5'} bg-stone-900/60 border-b border-stone-800/70`}>
+      {/* Tabs scroll sideways once they outgrow the row — pad titles are never truncated.
+          The overflow menu / New button stay pinned outside the scroll area. */}
+      <div className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <PadTab
+          pad={todayPadProxy}
+          isActive={isOnTodayPad}
+          isDragTarget={dragOverPadId === TODAY_PAD_ID}
+          editingPadId={editingPadId}
+          editingPadName={editingPadName}
+          onSelect={handleSelectPad}
+          onStartRename={handleStartRenamePad}
+          onRenameChange={setEditingPadName}
+          onSaveRename={handleSaveRenamePad}
+          onCancelRename={() => setEditingPadId(null)}
+          isMobile={mobileView}
+          pinned
+          badge={todayActiveBadge}
+        />
 
-      <Reorder.Group as="div" axis="x" values={pads} onReorder={handleReorderPads} className="flex items-center gap-1 shrink-0">
-        {pads.map((pad) => (
-          <PadTab
-            key={pad.id}
-            pad={pad}
-            isActive={pad.id === activePadId}
-            isDragTarget={pad.id === dragOverPadId}
-            editingPadId={editingPadId}
-            editingPadName={editingPadName}
-            onSelect={handleSelectPad}
-            onStartRename={handleStartRenamePad}
-            onRenameChange={setEditingPadName}
-            onSaveRename={handleSaveRenamePad}
-            onCancelRename={() => setEditingPadId(null)}
-            isMobile={mobileView}
-          />
-        ))}
-      </Reorder.Group>
+        <Reorder.Group as="div" axis="x" values={visiblePads} onReorder={handleReorderPads} className="flex items-center gap-1 shrink-0">
+          {/* Touch needs an explicit grip (arrange mode); desktop keeps free dragging */}
+          {visiblePads.map((pad) => (
+            <PadTab
+              key={pad.id}
+              pad={pad}
+              isActive={pad.id === activePadId}
+              isDragTarget={pad.id === dragOverPadId}
+              editingPadId={editingPadId}
+              editingPadName={editingPadName}
+              onSelect={handleSelectPad}
+              onStartRename={handleStartRenamePad}
+              onRenameChange={setEditingPadName}
+              onSaveRename={handleSaveRenamePad}
+              onCancelRename={() => setEditingPadId(null)}
+              isMobile={mobileView}
+              draggable={!mobileView || isArrangingTabs}
+              isArranging={mobileView && isArrangingTabs}
+            />
+          ))}
+        </Reorder.Group>
+      </div>
 
-      <button type="button" onClick={handleCreateNewPad}
-        className="h-7 px-2 rounded-lg bg-stone-900/60 border border-stone-800/80 text-stone-500 hover:text-amber-500 hover:bg-stone-900 flex items-center gap-1 text-xs shrink-0 cursor-pointer transition-colors">
-        <Plus className="w-3.5 h-3.5" />
-        <span className="text-[10px] font-mono">New</span>
-      </button>
+      {/* Arrange mode is touch-only — desktops already drag tabs freely, so the toggle is hidden there */}
+      {mobileView && (pads.length > 1 || isArrangingTabs) && (
+        <button
+          type="button"
+          onClick={() => setIsArrangingTabs((v) => !v)}
+          aria-pressed={isArrangingTabs}
+          aria-label={isArrangingTabs ? 'Done reordering pads' : 'Reorder pads'}
+          title={isArrangingTabs ? 'Done reordering pads' : 'Reorder pads — drag the grip handles'}
+          className={tabStripActionClass(isArrangingTabs)}
+        >
+          {isArrangingTabs ? <Check className="w-3.5 h-3.5" /> : <ArrowLeftRight className="w-3.5 h-3.5" />}
+        </button>
+      )}
+
+      {hasTabOverflow ? (
+        /* Overflow menu — adopts the active pad's identity when it has no tab of its own */
+        <div ref={tabsMenuRef} className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsTabsMenuOpen((v) => !v)}
+            className={`flex items-center h-7 gap-1.5 rounded-lg text-xs font-mono transition-colors cursor-pointer shrink-0 border select-none ${
+              activeHiddenPad ? 'px-2.5 max-w-[110px]' : 'px-2'
+            } ${
+              isTabsMenuOpen || activeHiddenPad
+                ? 'bg-amber-500/15 border-amber-500/40 text-amber-500 font-bold shadow-xs'
+                : 'bg-stone-900/60 border-stone-800/80 text-stone-500 hover:text-stone-300 hover:bg-stone-900'
+            }`}
+            aria-label="More pads"
+            aria-expanded={isTabsMenuOpen}
+            title={
+              activeHiddenPad
+                ? `Current pad: ${activeHiddenPad.name}`
+                : `${hiddenPads.length} more pad${hiddenPads.length > 1 ? 's' : ''}`
+            }
+          >
+            {activeHiddenPad && <span className="truncate">{activeHiddenPad.name}</span>}
+            <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+          </button>
+
+          {isTabsMenuOpen && (
+            <div className="absolute right-0 top-full mt-1 z-[60] w-56 bg-stone-900 border border-stone-700 rounded-xl shadow-2xl p-1.5 select-none">
+              <div className="px-2 py-1 text-[9px] font-mono text-stone-500 uppercase tracking-wide">
+                Switch pad
+              </div>
+              <div className="max-h-56 overflow-y-auto space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => handleSelectPad(TODAY_PAD_ID)}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-mono transition-colors cursor-pointer ${
+                    isOnTodayPad ? 'bg-amber-500/15 text-amber-500 font-bold' : 'text-stone-300 hover:bg-stone-800 hover:text-stone-100'
+                  }`}
+                >
+                  <span className="truncate flex-1 text-left">{todayPad.name}</span>
+                  <span className="text-[9px] opacity-60 shrink-0">
+                    {todayPad.items.filter((i) => !i.isCompleted).length}/{TODAY_PAD_MAX_ITEMS}
+                  </span>
+                </button>
+                {pads.map((pad) => (
+                  <button
+                    key={pad.id}
+                    type="button"
+                    onClick={() => handleSelectPad(pad.id)}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-mono transition-colors cursor-pointer ${
+                      pad.id === activePadId ? 'bg-amber-500/15 text-amber-500 font-bold' : 'text-stone-300 hover:bg-stone-800 hover:text-stone-100'
+                    }`}
+                  >
+                    <span className="truncate flex-1 text-left">{pad.name}</span>
+                    <span className="text-[9px] opacity-60 shrink-0">
+                      {pad.items.filter((i) => !i.isCompleted).length}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-1 pt-1 border-t border-stone-800">
+                <button
+                  type="button"
+                  onClick={handleCreateNewPad}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-mono text-stone-400 hover:text-amber-500 hover:bg-stone-800 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3 h-3 shrink-0" /> New Pad
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={handleCreateNewPad}
+          aria-label="New pad"
+          title="New pad"
+          className={tabStripActionClass()}
+        >
+          <Plus className="w-3.5 h-3.5" />
+        </button>
+      )}
     </div>
   );
 
@@ -1879,7 +2038,7 @@ export default function DayScratchpad({
               <div className="flex-1 overflow-y-auto">
                 {isOnTodayPad ? (
                   <div className="p-4">
-                    <TodayPad todayPad={todayPad} onUpdate={handleTodayPadUpdate} viewMode={viewMode} activeDate={activeDate} scratchpadDate={scratchpadDate} onScratchpadDateChange={setScratchpadDate} isMobile={true} />
+                    <TodayPad todayPad={todayPad} onUpdate={handleTodayPadUpdate} viewMode={viewMode} scratchpadDate={scratchpadDate} onScratchpadDateChange={setScratchpadDate} isMobile={true} />
                   </div>
                 ) : (
                   <div className="p-4 space-y-2">
@@ -1947,7 +2106,7 @@ export default function DayScratchpad({
               </div>
             </motion.div>
           ) : (
-            /* DESKTOP FLOATING WINDOW (Width: 480px, Height: 720px) */
+            /* DESKTOP FLOATING WINDOW (Width: 560px, Height: 720px) */
             <motion.div
               drag dragListener={false} dragControls={windowDragControls} dragMomentum={false}
               onDragEnd={(_, info) => {
@@ -1958,7 +2117,7 @@ export default function DayScratchpad({
               animate={{ opacity: 1, scale: 1, x: position.x, y: position.y }}
               exit={{ opacity: 0, scale: 0.95, x: position.x, y: position.y + 15 }}
               transition={{ duration: 0.2 }}
-              className="fixed z-50 bottom-12 right-8 w-[480px] max-w-[90vw] h-[720px] max-h-[90vh] bg-stone-900/95 border border-stone-800 rounded-2xl shadow-2xl backdrop-blur-md flex flex-col overflow-hidden font-sans"
+              className="fixed z-50 bottom-12 right-8 w-[560px] max-w-[90vw] h-[720px] max-h-[90vh] bg-stone-900/95 border border-stone-800 rounded-2xl shadow-2xl backdrop-blur-md flex flex-col overflow-hidden font-sans"
             >
               {/* Header */}
               <div onPointerDown={(e) => windowDragControls.start(e)}
@@ -1979,7 +2138,7 @@ export default function DayScratchpad({
               {/* Content */}
               <div className="flex-1 overflow-y-auto p-3.5">
                 {isOnTodayPad ? (
-                  <TodayPad todayPad={todayPad} onUpdate={handleTodayPadUpdate} viewMode={viewMode} activeDate={activeDate} scratchpadDate={scratchpadDate} onScratchpadDateChange={setScratchpadDate} isMobile={false} />
+                  <TodayPad todayPad={todayPad} onUpdate={handleTodayPadUpdate} viewMode={viewMode} scratchpadDate={scratchpadDate} onScratchpadDateChange={setScratchpadDate} isMobile={false} />
                 ) : (
                   renderRegularPadItems()
                 )}

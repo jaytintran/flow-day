@@ -35,12 +35,14 @@ import {
   Activity,
   Flame,
   FileText,
+  HardDrive,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useGistSync } from '../hooks/useGistSync';
 import { useTheme } from '../lib/theme';
+import StorageManager from './StorageManager';
 
-export type SettingsTab = 'preferences' | 'sync' | 'shortcuts' | 'guide';
+export type SettingsTab = 'preferences' | 'sync' | 'shortcuts' | 'guide' | 'storage';
 export type GuideSubTab = 'philosophy' | 'types' | 'rules' | 'syntax';
 
 interface SettingsProps {
@@ -293,8 +295,12 @@ export default function Settings({
           </button>
         </div>
 
-        {/* Tab Navigation Strip */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-2 scrollbar-none">
+        {/* Tab Navigation Strip — scrollable on mobile */}
+        <div
+          className="overflow-x-auto scrollbar-none pb-2 -mx-4"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+          <div className={`flex items-center gap-1 ${isMobile ? 'px-4' : 'px-6'} w-max`}>
           <button
             type="button"
             onClick={() => {
@@ -359,6 +365,23 @@ export default function Settings({
             <BookOpen className="w-3.5 h-3.5 text-amber-400" />
             <span>Guide &amp; Philosophy</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('storage');
+              setShowHelp(false);
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-mono font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'storage'
+                ? 'bg-stone-800 text-stone-100 shadow-xs border border-stone-700/60'
+                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-850/60 border border-transparent'
+            }`}
+          >
+            <HardDrive className="w-3.5 h-3.5 text-rose-400" />
+            <span>Storage &amp; Data</span>
+          </button>
+          </div>
         </div>
       </div>
 
@@ -1263,7 +1286,13 @@ export default function Settings({
                         </div>
                       </div>
                     )}
-                  </div>
+                   </div>
+                )}
+                {/* ======================================================== */}
+                {/* TAB 5: STORAGE & DATA                                    */}
+                {/* ======================================================== */}
+                {activeTab === 'storage' && (
+                  <StorageManager isMobile={isMobile} />
                 )}
       </div>
     </>
@@ -1312,7 +1341,7 @@ export default function Settings({
                 exit={{ opacity: 0, scale: 0.96 }}
                 transition={{ type: 'spring', damping: 28, stiffness: 300 }}
                 onClick={(e) => e.stopPropagation()}
-                className="bg-stone-900 border border-stone-800 shadow-2xl relative flex flex-col overflow-hidden w-full max-w-2xl max-h-[85vh] rounded-2xl"
+                className="bg-stone-900 border border-stone-800 shadow-2xl relative flex flex-col overflow-hidden w-full max-w-3xl max-h-[85vh] rounded-2xl"
               >
                 {renderModalContent()}
               </motion.div>
