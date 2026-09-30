@@ -28,7 +28,9 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import HabitConsistencyModal from './HabitConsistencyModal';
+import HabitWeekMiniModal, { HabitWeekDay } from './HabitWeekMiniModal';
 import AnimatedFireIcon from './AnimatedFireIcon';
+import { soundService } from '../services/audio';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { Task, Habit, HabitLog, TaskAchievement, DayRange, ViewMode } from '../types';
@@ -72,7 +74,11 @@ export default function DayNavigator({
   const [contextHabit, setContextHabit] = useState<Habit | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [consistencyHabit, setConsistencyHabit] = useState<Habit | null>(null);
+  // Long-press mini week editor (deliberate backfill of a single habit's week)
+  const [weekEditHabit, setWeekEditHabit] = useState<Habit | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
+  const longPressFiredRef = useRef(false);
   const stripRef = useRef<HTMLDivElement>(null);
   const [stripCanScrollRight, setStripCanScrollRight] = useState(false);
   const [stripCanScrollLeft, setStripCanScrollLeft] = useState(false);
@@ -151,6 +157,7 @@ export default function DayNavigator({
   }, [habitLogs]);
 
   const activeDateStr = toLocalDateString(activeDate);
+  const todayStr = toLocalDateString(new Date());
 
   // --- Habit strip scroll-fade detection ---
   const updateStripFade = useCallback(() => {
@@ -184,6 +191,40 @@ export default function DayNavigator({
     setContextMenuPos(null);
   }, []);
 
+  // --- Movement-aware long-press on a habit card (opens the mini week editor) ---
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressStartRef.current = null;
+  }, []);
+
+  const startLongPress = useCallback(
+    (habit: Habit, x: number, y: number) => {
+      cancelLongPress();
+      // A fresh gesture always starts with a clean tap/click slate
+      longPressFiredRef.current = false;
+      longPressStartRef.current = { x, y };
+      longPressTimerRef.current = setTimeout(() => {
+        longPressTimerRef.current = null;
+        longPressFiredRef.current = true;
+        setWeekEditHabit(habit);
+      }, 450);
+    },
+    [cancelLongPress],
+  );
+
+  // Any real drag means the user is scrolling the strip, not long-pressing
+  const trackLongPressMove = useCallback(
+    (x: number, y: number) => {
+      const start = longPressStartRef.current;
+      if (!start) return;
+      if (Math.abs(x - start.x) > 8 || Math.abs(y - start.y) > 8) cancelLongPress();
+    },
+    [cancelLongPress],
+  );
+
   // Close context menu on outside click
   useEffect(() => {
     if (!contextMenuPos) return;
@@ -200,6 +241,7 @@ export default function DayNavigator({
       : [];
     if (targetLogs.length > 0) {
       await db.entries.delete(targetLogs[targetLogs.length - 1].id);
+      soundService.playStrikeSound();
     } else {
       const logTimestamp = new Date(targetDate);
       const now = new Date();
@@ -219,7 +261,38 @@ export default function DayNavigator({
         created_at: new Date(),
       };
       await db.entries.add(log as any);
+      soundService.playCompleteSound();
     }
+  };
+
+  // Bulk-fill every remaining (non-future) day of the visible week (from the long-press editor)
+  const handleTickAllRemaining = async (habit: Habit, days: HabitWeekDay[]) => {
+    const localTodayStr = toLocalDateString(new Date());
+    const alreadyLogged = habitLogsByHabitMap.get(habit.id)?.dateStrings || new Set<string>();
+    const pending = days.filter((d) => d.dateStr <= localTodayStr && !alreadyLogged.has(d.dateStr));
+    if (pending.length === 0) return;
+
+    const now = new Date();
+    const logs: HabitLog[] = pending.map((d) => {
+      const logTimestamp = new Date(d.date);
+      logTimestamp.setHours(
+        now.getHours(),
+        now.getMinutes(),
+        now.getSeconds(),
+        now.getMilliseconds(),
+      );
+      return {
+        id: crypto.randomUUID(),
+        type: 'habit-log',
+        habit_id: habit.id,
+        title: habit.title,
+        timestamp: logTimestamp,
+        created_at: new Date(),
+      };
+    });
+
+    await db.entries.bulkAdd(logs as any);
+    soundService.playCompleteSound();
   };
 
   // 7-day sliding window for habit cards (ending at activeDate or current week Monday–Sunday)
@@ -860,7 +933,7 @@ export default function DayNavigator({
 
                   <div
                     ref={stripRef}
-                    className="flex items-center gap-2 overflow-x-auto pb-0.5 md:flex-wrap md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                    className="flex items-center gap-2 overflow-x-auto overscroll-x-contain touch-manipulation pb-0.5 md:flex-wrap md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                   >
                     {sortedActiveHabits.map((habit) => {
                       const stats = habitStatsMap.get(habit.id);
@@ -916,84 +989,85 @@ export default function DayNavigator({
                       const theme = themeMap[habit.color ?? 'emerald'] ?? themeMap.emerald;
 
                       return (
-                        <div
+                        <button
                           key={habit.id}
+                          type="button"
                           onContextMenu={(e) => {
                             e.preventDefault();
                             openContextMenu(habit, e.clientX, e.clientY);
                           }}
                           onPointerDown={(e) => {
-                            if (e.pointerType === 'touch') {
-                              longPressTimerRef.current = setTimeout(() => {
-                                openContextMenu(habit, e.clientX, e.clientY);
-                              }, 500);
-                            }
+                            // Press-and-hold (touch, pen or mouse) opens the mini week editor
+                            startLongPress(habit, e.clientX, e.clientY);
                           }}
-                          onPointerUp={() => {
-                            if (longPressTimerRef.current) {
-                              clearTimeout(longPressTimerRef.current);
-                              longPressTimerRef.current = null;
+                          onPointerMove={(e) => trackLongPressMove(e.clientX, e.clientY)}
+                          onPointerUp={cancelLongPress}
+                          onPointerLeave={cancelLongPress}
+                          onPointerCancel={cancelLongPress}
+                          onClick={() => {
+                            // Swallow the tap that follows a long-press (editor already opened)
+                            if (longPressFiredRef.current) {
+                              longPressFiredRef.current = false;
+                              return;
                             }
+                            handleQuickTick(habit, activeDate);
                           }}
-                          onPointerCancel={() => {
-                            if (longPressTimerRef.current) {
-                              clearTimeout(longPressTimerRef.current);
-                              longPressTimerRef.current = null;
-                            }
-                          }}
-                          className={`flex flex-col justify-between px-2.5 py-1 rounded-xl border transition-all shrink-0 select-none shadow-sm ${theme.cardBg} ${theme.border} min-w-[105px]`}
+                          aria-label={
+                            isTickedToday
+                              ? `Uncheck "${habit.title}" for today`
+                              : `Check "${habit.title}" for today`
+                          }
+                          title={
+                            isTickedToday
+                              ? `Uncheck "${habit.title}" for today · hold to edit week`
+                              : `Check "${habit.title}" for today · hold to edit week`
+                          }
+                          className={`flex flex-col justify-between gap-1 px-2.5 py-1.5 rounded-xl border transition-all shrink-0 select-none shadow-sm text-left cursor-pointer active:scale-[0.97] touch-manipulation min-w-[105px] min-h-[46px] ${theme.cardBg} ${theme.border}`}
                         >
-                          {/* Row 1: Habit Flame / Dot + Title */}
-                          <button
-                            type="button"
-                            onClick={() => handleQuickTick(habit, activeDate)}
-                            className="flex items-center gap-1.5 cursor-pointer active:scale-95 w-full text-left"
-                            title={
-                              isTickedToday
-                                ? `Uncheck "${habit.title}" for today`
-                                : `Check "${habit.title}" for today`
-                            }
-                          >
+                          {/* Row 1: Habit Flame / Dot + Title + Streak */}
+                          <div className="flex items-center gap-1.5 w-full">
                             {isTickedToday ? (
                               <AnimatedFireIcon size={11} />
                             ) : (
                               <span className="w-1.5 h-1.5 rounded-full bg-stone-600 shrink-0" />
                             )}
                             <span
-                              className={`text-[10px] font-mono font-semibold uppercase tracking-wide truncate max-w-[100px] ${theme.text}`}
+                              className={`text-[10px] font-mono font-semibold uppercase tracking-wide truncate max-w-[76px] ${theme.text}`}
                             >
                               {habit.title}
                             </span>
-                          </button>
+                            {stats?.streak ? (
+                              <span className="ml-auto text-[9px] font-mono text-stone-500 tabular-nums">
+                                {stats.streak}d
+                              </span>
+                            ) : null}
+                          </div>
 
-                          {/* Row 2: Mini 7-Dash Calendar Strip Below Title */}
+                          {/* Row 2: read-only 7-day sparkline (no tap targets — card ticks today) */}
                           <div
-                            className="flex items-center justify-between gap-[3px] pt-1 mt-0.5 border-t border-stone-850/60 w-full"
-                            title="7-Day Mini Calendar: Click any dash to toggle that day"
+                            aria-hidden="true"
+                            className="flex items-center justify-between gap-[3px] pt-1 border-t border-stone-850/60 w-full"
                           >
                             {habitWeekDays.map((d) => {
                               const isDone = loggedDayStrings.has(d.dateStr);
+                              const isFutureDay = d.dateStr > todayStr;
                               return (
-                                <button
+                                <span
                                   key={d.dateStr}
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleQuickTick(habit, d.date);
-                                  }}
-                                  title={`${d.label} (${d.dateStr}): ${isDone ? 'Completed' : 'Empty'} · Click to toggle`}
-                                  className={`flex-1 h-1.5 rounded-[1.5px] transition-all cursor-pointer hover:scale-125 ${
+                                  className={`flex-1 h-1.5 rounded-[1.5px] transition-colors ${
                                     isDone
                                       ? theme.activeDash
                                       : d.isToday
                                         ? 'bg-stone-700 ring-1 ring-amber-400/40'
-                                        : 'bg-stone-850 hover:bg-stone-700'
+                                        : isFutureDay
+                                          ? 'bg-stone-900'
+                                          : 'bg-stone-850'
                                   }`}
                                 />
                               );
                             })}
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -1075,6 +1149,33 @@ export default function DayNavigator({
           <HabitConsistencyModal
             habit={consistencyHabit}
             onClose={() => setConsistencyHabit(null)}
+          />
+        )}
+
+        {/* Habit Week Mini Modal (opened by long-pressing a habit card) */}
+        {weekEditHabit && (
+          <HabitWeekMiniModal
+            habit={weekEditHabit}
+            weekDays={habitWeekDays}
+            loggedDayStrings={
+              habitStatsMap.get(weekEditHabit.id)?.loggedDayStrings || new Set<string>()
+            }
+            onToggleDay={handleQuickTick}
+            onTickAllRemaining={handleTickAllRemaining}
+            onOpenMonth={(habit) => {
+              setWeekEditHabit(null);
+              longPressFiredRef.current = false;
+              setConsistencyHabit(habit);
+            }}
+            onOpenHabitView={() => {
+              setWeekEditHabit(null);
+              longPressFiredRef.current = false;
+              setViewMode('habits');
+            }}
+            onClose={() => {
+              longPressFiredRef.current = false;
+              setWeekEditHabit(null);
+            }}
           />
         )}
 
