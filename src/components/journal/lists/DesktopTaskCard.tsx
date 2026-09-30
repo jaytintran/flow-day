@@ -27,6 +27,7 @@ import { CATEGORY_COLORS } from './TrophyView';
 interface DesktopTaskCardProps {
   task: Task;
   activeTaskId: string | null;
+  /** Parent-owned delete confirmation (2-tap, auto-resets after 3s). */
   deletingId: string | null;
   taskLists: Category[];
   selectedListId?: string;
@@ -40,11 +41,8 @@ interface DesktopTaskCardProps {
   onToggleTaskStatus: (task: Task) => void;
   onOpenStatusModal: (task: Task) => void;
   onActivateTask: (taskId: string) => void;
-  onOpenScheduleModal: (task: Task) => void;
-  onOpenListPicker: (task: Task) => void;
   onOpenFolderPicker?: (task: Task) => void;
   onToggleAccomplishment?: (task: Task) => void;
-  showContent?: boolean;
   onContextMenu?: (task: Task, e: React.MouseEvent) => void;
 }
 
@@ -64,11 +62,8 @@ export default function DesktopTaskCard({
   onToggleTaskStatus,
   onOpenStatusModal,
   onActivateTask,
-  onOpenScheduleModal,
-  onOpenListPicker,
   onOpenFolderPicker,
   onToggleAccomplishment,
-  showContent = true,
   onContextMenu,
 }: DesktopTaskCardProps) {
   const isActive = activeTaskId === task.id;
@@ -95,30 +90,73 @@ export default function DesktopTaskCard({
   const hasTimeSpent = (task.time_spent ?? 0) > 0;
   const achievementsCount = task.achievements?.length ?? 0;
 
-  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  const confirmTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Delete confirmation lives in the parent (single source of truth): the first
+  // tap arms it, the second within 3s actually deletes.
+  const isConfirmingDelete = deletingId === task.id;
+  // ── Status control: tap toggles complete, press-and-hold picks any status ──
+  const LONG_PRESS_MS = 450;
+  const MOVE_TOLERANCE_PX = 8;
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressFiredRef = useRef(false);
+  const pressStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const clearLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    pressStartRef.current = null;
+  };
+
+  const handleStatusPointerDown = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    // Alt/Shift-click jumps straight to the full status picker.
+    if (e.altKey || e.shiftKey) {
+      longPressFiredRef.current = true;
+      onOpenStatusModal(task);
+      return;
+    }
+    longPressFiredRef.current = false;
+    clearLongPress();
+    pressStartRef.current = { x: e.clientX, y: e.clientY };
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      onOpenStatusModal(task);
+    }, LONG_PRESS_MS);
+  };
+
+  const handleStatusPointerMove = (e: React.PointerEvent) => {
+    const start = pressStartRef.current;
+    if (!start) return;
+    if (
+      Math.abs(e.clientX - start.x) > MOVE_TOLERANCE_PX ||
+      Math.abs(e.clientY - start.y) > MOVE_TOLERANCE_PX
+    ) {
+      clearLongPress();
+    }
+  };
+
+  const handleStatusClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    clearLongPress();
+    if (longPressFiredRef.current) {
+      longPressFiredRef.current = false;
+      return;
+    }
+    onToggleTaskStatus(task);
+  };
 
   useEffect(() => {
     return () => {
-      if (confirmTimeoutRef.current) {
-        clearTimeout(confirmTimeoutRef.current);
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
       }
     };
   }, []);
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isConfirmingDelete) {
-      setIsConfirmingDelete(true);
-      if (confirmTimeoutRef.current) clearTimeout(confirmTimeoutRef.current);
-      confirmTimeoutRef.current = setTimeout(() => {
-        setIsConfirmingDelete(false);
-      }, 3000);
-    } else {
-      if (confirmTimeoutRef.current) clearTimeout(confirmTimeoutRef.current);
-      setIsConfirmingDelete(false);
-      onDeleteEntry(task.id);
-    }
+    onDeleteEntry(task.id);
   };
 
   return (
@@ -173,10 +211,12 @@ export default function DesktopTaskCard({
         <div className="flex items-start gap-2">
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenStatusModal(task);
-            }}
+            onPointerDown={handleStatusPointerDown}
+            onPointerMove={handleStatusPointerMove}
+            onPointerUp={clearLongPress}
+            onPointerLeave={clearLongPress}
+            onPointerCancel={clearLongPress}
+            onClick={handleStatusClick}
             className={`w-5 h-5 mt-0.5 rounded-lg border flex items-center justify-center shrink-0 transition-all cursor-pointer active:scale-90 ${
               isDone
                 ? 'bg-emerald-500/20 border-emerald-500/45 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.25)]'
@@ -188,7 +228,17 @@ export default function DesktopTaskCard({
                     ? 'border-indigo-500/40 bg-indigo-500/10 text-indigo-400'
                     : 'border-stone-700 hover:border-stone-500 bg-stone-900/90 text-stone-400 hover:text-stone-200'
             }`}
-            title="Click to change status"
+            title={
+              isDone
+                ? 'Mark as to-do — hold for all statuses'
+                : 'Mark as completed — hold for all statuses'
+            }
+            aria-label={
+              isDone
+                ? `Mark "${task.title}" as to-do`
+                : `Mark "${task.title}" as completed`
+            }
+            aria-pressed={isDone}
           >
             {isDone && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
             {isInProgress && (
@@ -255,6 +305,11 @@ export default function DesktopTaskCard({
                   : 'text-stone-500 hover:text-rose-400 hover:bg-stone-850/70 border border-transparent'
               }`}
               title={isConfirmingDelete ? 'Click again to confirm delete' : 'Delete task'}
+              aria-label={
+                isConfirmingDelete
+                  ? `Confirm delete "${task.title}"`
+                  : `Delete "${task.title}"`
+              }
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -362,7 +417,7 @@ export default function DesktopTaskCard({
             ))}
           </div>
 
-          {/* Quick Timer Start Button (Discrete on Hover) */}
+          {/* Quick Timer Start Button — always visible, dimmed until hover */}
           {!isDone && !isDropped && !isActive && (
             <button
               type="button"
@@ -370,8 +425,9 @@ export default function DesktopTaskCard({
                 e.stopPropagation();
                 onActivateTask(task.id);
               }}
-              className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-stone-900 border border-stone-800 hover:border-amber-500/40 text-stone-400 hover:text-amber-400 transition-all cursor-pointer text-[9px] font-mono shrink-0 active:scale-95"
-              title="Start Timer"
+              className="flex items-center gap-1 px-1.5 py-1 rounded-md bg-stone-900 border border-stone-800 hover:border-amber-500/40 text-stone-400 hover:text-amber-400 transition-all cursor-pointer text-[9px] font-mono shrink-0 active:scale-95 opacity-80 hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-amber-500/50"
+              title="Start tracking time"
+              aria-label={`Start tracking time on "${task.title}"`}
             >
               <Play className="w-2.5 h-2.5 fill-current" />
               <span>Track</span>

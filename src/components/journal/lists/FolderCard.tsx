@@ -7,14 +7,20 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import {
+  Check,
   ChevronDown,
   Folder,
   FolderOpen,
+  Palette,
   Plus,
   Trash2,
 } from 'lucide-react';
 import { Task, Category, ListFolder, TimelineEntry } from '../../../types';
 import { STATUS_GROUPS } from '../ListsView';
+import {
+  FOLDER_COLOR_OPTIONS,
+  getFolderTheme,
+} from './folderColors';
 import DesktopTaskCard from './DesktopTaskCard';
 import DesktopTaskRow from './DesktopTaskRow';
 import MobileTaskItem from './MobileTaskItem';
@@ -25,6 +31,7 @@ interface FolderCardProps {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onRenameFolder: (folderId: string, newName: string) => void;
+  onChangeColor?: (folderId: string, newColor: string) => void;
   onDeleteFolder: (folderId: string) => void;
   activeTaskId: string | null;
   deletingId: string | null;
@@ -49,7 +56,6 @@ interface FolderCardProps {
   isDesktop?: boolean;
   viewLayout?: 'grid' | 'list';
   gridClass?: string;
-  showContent?: boolean;
   statusFilter?: "all" | "todo" | "in_progress" | "done" | "dropped" | "maybe";
   onContextMenu?: (task: Task, e: React.MouseEvent) => void;
 }
@@ -60,6 +66,7 @@ export default function FolderCard({
   isCollapsed,
   onToggleCollapse,
   onRenameFolder,
+  onChangeColor,
   onDeleteFolder,
   activeTaskId,
   deletingId,
@@ -84,7 +91,6 @@ export default function FolderCard({
   isDesktop = false,
   viewLayout = 'grid',
   gridClass = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5',
-  showContent = true,
   statusFilter = 'all',
   onContextMenu,
 }: FolderCardProps) {
@@ -92,6 +98,10 @@ export default function FolderCard({
   const [titleDraft, setTitleDraft] = useState(folder.name);
   const inputRef = useRef<HTMLInputElement>(null);
   const autoExpandTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Set when a rename is abandoned (Escape) so the blur handler does not save it.
+  const cancelledRef = useRef(false);
+  /** Palette resolved from the folder's stored color (never a hard-coded hue). */
+  const theme = getFolderTheme(folder.color);
 
   const [collapsedStatusGroups, setCollapsedStatusGroups] = useState<
     Record<string, boolean>
@@ -152,8 +162,27 @@ export default function FolderCard({
     }
   }, [isEditingTitle]);
 
+  /** Begin a rename, discarding the previous draft state. */
+  const startRename = () => {
+    cancelledRef.current = false;
+    setTitleDraft(folder.name);
+    setIsEditingTitle(true);
+  };
+
+  /** Abandon an in-flight rename without persisting the draft. */
+  const cancelRename = () => {
+    cancelledRef.current = true;
+    setIsEditingTitle(false);
+    setTitleDraft(folder.name);
+  };
+
   const commitRename = () => {
     setIsEditingTitle(false);
+    if (cancelledRef.current) {
+      cancelledRef.current = false;
+      setTitleDraft(folder.name);
+      return;
+    }
     const trimmed = titleDraft.trim();
     if (trimmed && trimmed !== folder.name) {
       onRenameFolder(folder.id, trimmed);
@@ -163,12 +192,16 @@ export default function FolderCard({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === 'Escape') {
-      commitRename();
+    if (e.key === 'Enter') commitRename();
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      cancelRename();
     }
   };
 
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
 
   return (
     <div
@@ -176,7 +209,7 @@ export default function FolderCard({
       ref={setNodeRef}
       className={`rounded-2xl border transition-all duration-200 scroll-mt-4 ${
         isOver
-          ? 'border-amber-500/60 bg-amber-500/[0.04] shadow-[0_0_20px_rgba(245,158,11,0.1)]'
+          ? `${theme.border} ${theme.bg} ${theme.glow}`
           : 'border-stone-800/80 bg-[#101010]'
       }`}
     >
@@ -187,6 +220,9 @@ export default function FolderCard({
             type="button"
             onClick={onToggleCollapse}
             className="p-1 rounded-lg text-stone-500 hover:text-stone-300 hover:bg-stone-800 transition-transform cursor-pointer"
+            title={isCollapsed ? `Expand ${folder.name}` : `Collapse ${folder.name}`}
+            aria-label={isCollapsed ? `Expand folder ${folder.name}` : `Collapse folder ${folder.name}`}
+            aria-expanded={!isCollapsed}
           >
             <ChevronDown
               className={`w-3.5 h-3.5 transition-transform duration-200 ${
@@ -196,9 +232,9 @@ export default function FolderCard({
           </button>
 
           {isCollapsed ? (
-            <Folder className="w-4 h-4 text-amber-400 shrink-0" />
+            <Folder className={`w-4 h-4 ${theme.text} shrink-0`} />
           ) : (
-            <FolderOpen className="w-4 h-4 text-amber-400 shrink-0" />
+            <FolderOpen className={`w-4 h-4 ${theme.text} shrink-0`} />
           )}
 
           {isEditingTitle ? (
@@ -209,15 +245,12 @@ export default function FolderCard({
               onChange={(e) => setTitleDraft(e.target.value)}
               onBlur={commitRename}
               onKeyDown={handleKeyDown}
-              className="bg-[#0a0a0a] border border-amber-500/50 rounded px-2 py-0.5 text-xs font-mono font-bold text-amber-300 focus:outline-none flex-1 max-w-sm"
+              className={`bg-[#0a0a0a] border ${theme.border} rounded px-2 py-0.5 text-xs font-mono font-bold ${theme.text} focus:outline-none flex-1 max-w-sm`}
             />
           ) : (
             <span
-              onClick={() => {
-                setTitleDraft(folder.name);
-                setIsEditingTitle(true);
-              }}
-              className="text-xs font-mono font-bold uppercase tracking-wider text-stone-200 hover:text-amber-300 transition-colors cursor-text truncate"
+              onClick={startRename}
+              className={`text-xs font-mono font-bold uppercase tracking-wider ${theme.text} hover:opacity-80 transition-colors cursor-text truncate`}
               title="Click to rename"
             >
               {folder.name}
@@ -231,11 +264,58 @@ export default function FolderCard({
 
         {/* Action buttons on right */}
         <div className="flex items-center gap-1">
+          {/* Color swatch — always visible so the folder's real color is discoverable */}
+          {onChangeColor && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsColorPickerOpen((prev) => !prev)}
+                className={`p-1 rounded-lg hover:bg-stone-800 transition-colors cursor-pointer flex items-center justify-center min-w-[26px] min-h-[26px]`}
+                title={`Folder color: ${folder.color || 'amber'} (click to change)`}
+                aria-label={`Change color of folder ${folder.name}`}
+                aria-expanded={isColorPickerOpen}
+              >
+                <span
+                  className={`w-2.5 h-2.5 rounded-full ${theme.dot} ring-1 ring-white/20`}
+                />
+              </button>
+
+              {isColorPickerOpen && (
+                <div className="absolute right-0 top-full mt-1 z-30 p-1.5 bg-[#141414] border border-stone-700/80 rounded-xl shadow-2xl grid grid-cols-4 gap-1 w-[132px]">
+                  {FOLDER_COLOR_OPTIONS.map((c) => {
+                    const isCurrent = (folder.color || 'amber') === c;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => {
+                          onChangeColor(folder.id, c);
+                          setIsColorPickerOpen(false);
+                        }}
+                        className={`h-6 rounded flex items-center justify-center transition-transform hover:scale-110 cursor-pointer ${
+                          getFolderTheme(c).dot
+                        } ${isCurrent ? 'ring-2 ring-white ring-offset-1 ring-offset-stone-900' : ''}`}
+                        title={c}
+                        aria-label={`Set folder color: ${c}`}
+                        aria-pressed={isCurrent}
+                      >
+                        {isCurrent && (
+                          <Check className="w-3 h-3 text-stone-950 stroke-[3]" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           <button
             type="button"
             onClick={() => onAddTaskToFolder(folder.id)}
-            className="p-1 rounded-lg text-stone-500 hover:text-amber-400 hover:bg-stone-800 transition-colors cursor-pointer"
+            className="p-1 rounded-lg text-stone-500 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer min-w-[26px] min-h-[26px] flex items-center justify-center"
             title={`Add item to ${folder.name}`}
+            aria-label={`Add item to folder ${folder.name}`}
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
@@ -245,14 +325,15 @@ export default function FolderCard({
               <button
                 type="button"
                 onClick={() => onDeleteFolder(folder.id)}
-                className="px-2 py-0.5 rounded-lg bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 text-[10px] font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                className="px-2 py-1 rounded-lg bg-rose-500 text-stone-950 hover:bg-rose-400 text-[10px] font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                aria-label={`Confirm delete folder ${folder.name}`}
               >
-                Delete
+                Confirm Delete
               </button>
               <button
                 type="button"
                 onClick={() => setConfirmDelete(false)}
-                className="px-1.5 py-0.5 rounded-lg text-stone-400 hover:text-stone-200 text-[10px] font-mono transition-colors cursor-pointer"
+                className="px-1.5 py-1 rounded-lg text-stone-400 hover:text-stone-200 text-[10px] font-mono transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -261,14 +342,25 @@ export default function FolderCard({
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
-              className="p-1 rounded-lg text-stone-600 hover:text-rose-400 hover:bg-stone-800 transition-colors cursor-pointer"
-              title="Delete folder"
+              className="p-1 rounded-lg text-stone-600 hover:text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer min-w-[26px] min-h-[26px] flex items-center justify-center"
+              title={`Delete folder ${folder.name}`}
+              aria-label={`Delete folder ${folder.name}`}
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
       </div>
+
+      {/* Active Drop Landing Zone Banner */}
+      {isOver && (
+        <div className="mx-3.5 my-2.5 px-3 py-2 rounded-xl bg-amber-500/10 border-2 border-dashed border-amber-500/50 flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse">
+          <FolderOpen className="w-4 h-4 text-amber-400 shrink-0" />
+          <span className="text-xs font-mono font-bold text-amber-300">
+            Drop to move into "{folder.name}"
+          </span>
+        </div>
+      )}
 
       {/* Active Drop Landing Zone Banner */}
       {isOver && (
@@ -327,10 +419,10 @@ export default function FolderCard({
                             <div className="space-y-1.5">
                               {groupTasks.map((task) => (
                                 <DesktopTaskRow
+                                	deletingId={deletingId}
                                   key={task.id}
                                   task={task}
                                   activeTaskId={activeTaskId}
-                                  deletingId={deletingId}
                                   taskLists={taskLists}
                                   selectedListId={selectedListId}
                                   availableFolders={availableFolders}
@@ -342,11 +434,8 @@ export default function FolderCard({
                                   onToggleTaskStatus={onToggleTaskStatus}
                                   onOpenStatusModal={onOpenStatusModal}
                                   onActivateTask={onActivateTask}
-                                  onOpenScheduleModal={onOpenScheduleModal}
-                                  onOpenListPicker={onOpenListPicker}
                                   onOpenFolderPicker={onOpenFolderPicker}
                                   onToggleAccomplishment={onToggleAccomplishment}
-                                  showContent={showContent}
                                   onContextMenu={onContextMenu}
                                 />
                               ))}
@@ -355,10 +444,10 @@ export default function FolderCard({
                             <div className={gridClass}>
                               {groupTasks.map((task) => (
                                 <DesktopTaskCard
+                                	deletingId={deletingId}
                                   key={task.id}
                                   task={task}
                                   activeTaskId={activeTaskId}
-                                  deletingId={deletingId}
                                   taskLists={taskLists}
                                   selectedListId={selectedListId}
                                   availableFolders={availableFolders}
@@ -370,11 +459,8 @@ export default function FolderCard({
                                   onToggleTaskStatus={onToggleTaskStatus}
                                   onOpenStatusModal={onOpenStatusModal}
                                   onActivateTask={onActivateTask}
-                                  onOpenScheduleModal={onOpenScheduleModal}
-                                  onOpenListPicker={onOpenListPicker}
                                   onOpenFolderPicker={onOpenFolderPicker}
                                   onToggleAccomplishment={onToggleAccomplishment}
-                                  showContent={showContent}
                                   onContextMenu={onContextMenu}
                                 />
                               ))}
@@ -392,7 +478,6 @@ export default function FolderCard({
                                 selectedListId={selectedListId}
                                 availableFolders={availableFolders}
                                 isSelected={selectedTaskIds?.has(task.id)}
-                                isGhost={activeDragTaskIds?.has(task.id)}
                                 onClickCard={onClickCard}
                                 isSwiped={activeSwipedTaskId === task.id}
                                 onSetSwiped={(swiped) =>
@@ -407,7 +492,6 @@ export default function FolderCard({
                                 onOpenListPicker={onOpenListPicker}
                                 onOpenFolderPicker={onOpenFolderPicker}
                                 onToggleAccomplishment={onToggleAccomplishment}
-                                showContent={showContent}
                                 onContextMenu={onContextMenu}
                               />
                             ))}
@@ -429,10 +513,10 @@ export default function FolderCard({
                   <div className="space-y-1.5">
                     {tasks.map((task) => (
                       <DesktopTaskRow
+                      	deletingId={deletingId}
                         key={task.id}
                         task={task}
                         activeTaskId={activeTaskId}
-                        deletingId={deletingId}
                         taskLists={taskLists}
                         selectedListId={selectedListId}
                         availableFolders={availableFolders}
@@ -444,11 +528,8 @@ export default function FolderCard({
                         onToggleTaskStatus={onToggleTaskStatus}
                         onOpenStatusModal={onOpenStatusModal}
                         onActivateTask={onActivateTask}
-                        onOpenScheduleModal={onOpenScheduleModal}
-                        onOpenListPicker={onOpenListPicker}
                         onOpenFolderPicker={onOpenFolderPicker}
                         onToggleAccomplishment={onToggleAccomplishment}
-                        showContent={showContent}
                         onContextMenu={onContextMenu}
                       />
                     ))}
@@ -457,10 +538,10 @@ export default function FolderCard({
                   <div className={gridClass}>
                     {tasks.map((task) => (
                       <DesktopTaskCard
+                      	deletingId={deletingId}
                         key={task.id}
                         task={task}
                         activeTaskId={activeTaskId}
-                        deletingId={deletingId}
                         taskLists={taskLists}
                         selectedListId={selectedListId}
                         availableFolders={availableFolders}
@@ -472,11 +553,8 @@ export default function FolderCard({
                         onToggleTaskStatus={onToggleTaskStatus}
                         onOpenStatusModal={onOpenStatusModal}
                         onActivateTask={onActivateTask}
-                        onOpenScheduleModal={onOpenScheduleModal}
-                        onOpenListPicker={onOpenListPicker}
                         onOpenFolderPicker={onOpenFolderPicker}
                         onToggleAccomplishment={onToggleAccomplishment}
-                        showContent={showContent}
                         onContextMenu={onContextMenu}
                       />
                     ))}
@@ -508,7 +586,6 @@ export default function FolderCard({
                       onOpenListPicker={onOpenListPicker}
                       onOpenFolderPicker={onOpenFolderPicker}
                       onToggleAccomplishment={onToggleAccomplishment}
-                      showContent={showContent}
                       onContextMenu={onContextMenu}
                     />
                   ))}

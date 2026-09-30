@@ -76,6 +76,8 @@ export default function PaperListView({
                 <button
                   onClick={() => onToggleTaskStatus(t)}
                   className="w-4 h-4 mt-0.5 rounded border border-stone-600 hover:border-amber-400 flex items-center justify-center shrink-0 cursor-pointer"
+                  title="Mark as completed"
+                  aria-label={`Mark "${t.title}" as completed`}
                 />
                 <span
                   onClick={() => onOpenDetail(t)}
@@ -105,6 +107,8 @@ export default function PaperListView({
                 <button
                   onClick={() => onToggleTaskStatus(t)}
                   className="w-4 h-4 mt-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0 cursor-pointer"
+                  title="Reopen task"
+                  aria-label={`Mark "${t.title}" as to-do`}
                 >
                   <Check className="w-2.5 h-2.5 stroke-[3]" />
                 </button>

@@ -14,79 +14,11 @@ import {
 } from "lucide-react";
 import { ListFolder } from "../../../types";
 import { AnimatePresence, motion } from "motion/react";
-
-const FOLDER_COLOR_MAP: Record<
-	string,
-	{ dot: string; border: string; text: string; bgActive: string }
-> = {
-	amber: {
-		dot: "bg-amber-400",
-		border: "border-amber-500/40",
-		text: "text-amber-300",
-		bgActive:
-			"bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.15)]",
-	},
-	emerald: {
-		dot: "bg-emerald-400",
-		border: "border-emerald-500/40",
-		text: "text-emerald-300",
-		bgActive:
-			"bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.15)]",
-	},
-	sky: {
-		dot: "bg-sky-400",
-		border: "border-sky-500/40",
-		text: "text-sky-300",
-		bgActive:
-			"bg-sky-500/15 border-sky-500/40 text-sky-300 shadow-[0_0_12px_rgba(14,165,233,0.15)]",
-	},
-	violet: {
-		dot: "bg-violet-400",
-		border: "border-violet-500/40",
-		text: "text-violet-300",
-		bgActive:
-			"bg-violet-500/15 border-violet-500/40 text-violet-300 shadow-[0_0_12px_rgba(139,92,246,0.15)]",
-	},
-	rose: {
-		dot: "bg-rose-400",
-		border: "border-rose-500/40",
-		text: "text-rose-300",
-		bgActive:
-			"bg-rose-500/15 border-rose-500/40 text-rose-300 shadow-[0_0_12px_rgba(244,63,94,0.15)]",
-	},
-	teal: {
-		dot: "bg-teal-400",
-		border: "border-teal-500/40",
-		text: "text-teal-300",
-		bgActive:
-			"bg-teal-500/15 border-teal-500/40 text-teal-300 shadow-[0_0_12px_rgba(20,184,166,0.15)]",
-	},
-	orange: {
-		dot: "bg-orange-400",
-		border: "border-orange-500/40",
-		text: "text-orange-300",
-		bgActive:
-			"bg-orange-500/15 border-orange-500/40 text-orange-300 shadow-[0_0_12px_rgba(249,115,22,0.15)]",
-	},
-	indigo: {
-		dot: "bg-indigo-400",
-		border: "border-indigo-500/40",
-		text: "text-indigo-300",
-		bgActive:
-			"bg-indigo-500/15 border-indigo-500/40 text-indigo-300 shadow-[0_0_12px_rgba(99,102,241,0.15)]",
-	},
-};
-
-const COLOR_OPTIONS = [
-	"amber",
-	"emerald",
-	"sky",
-	"violet",
-	"rose",
-	"teal",
-	"orange",
-	"indigo",
-];
+import {
+	FOLDER_COLOR_OPTIONS,
+	FOLDER_COLOR_MAP,
+	getFolderTheme,
+} from "./folderColors";
 
 interface FolderTabChipProps {
 	folder: ListFolder;
@@ -117,6 +49,8 @@ export default function FolderTabChip({
 	const chipRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const menuRef = useRef<HTMLDivElement>(null);
+	// Set when a rename is abandoned (Escape) so the blur handler does not save it.
+	const cancelledRef = useRef(false);
 
 	const { setNodeRef, isOver } = useDroppable({
 		id: `folder-tab-drop-${folder.id}`,
@@ -124,7 +58,21 @@ export default function FolderTabChip({
 	});
 
 	const colorKey = folder.color || "amber";
-	const colorTheme = FOLDER_COLOR_MAP[colorKey] ?? FOLDER_COLOR_MAP.amber;
+	const colorTheme = getFolderTheme(colorKey);
+
+	/** Begin a rename, discarding the previous draft state. */
+	const startRename = () => {
+		cancelledRef.current = false;
+		setNameDraft(folder.name);
+		setIsEditing(true);
+	};
+
+	/** Abandon an in-flight rename without persisting the draft. */
+	const cancelRename = () => {
+		cancelledRef.current = true;
+		setIsEditing(false);
+		setNameDraft(folder.name);
+	};
 
 	useEffect(() => {
 		if (isEditing) {
@@ -158,6 +106,11 @@ export default function FolderTabChip({
 
 	const commitRename = () => {
 		setIsEditing(false);
+		if (cancelledRef.current) {
+			cancelledRef.current = false;
+			setNameDraft(folder.name);
+			return;
+		}
 		const trimmed = nameDraft.trim();
 		if (trimmed && trimmed !== folder.name) {
 			onRename(folder.id, trimmed);
@@ -189,7 +142,12 @@ export default function FolderTabChip({
 						onChange={(e) => setNameDraft(e.target.value)}
 						onBlur={commitRename}
 						onKeyDown={(e) => {
-							if (e.key === "Enter" || e.key === "Escape") commitRename();
+							if (e.key === "Enter") commitRename();
+							if (e.key === "Escape") {
+								e.preventDefault();
+								e.stopPropagation();
+								cancelRename();
+							}
 						}}
 						className="bg-transparent text-[11px] font-mono font-bold text-stone-100 focus:outline-none w-28"
 					/>
@@ -200,8 +158,7 @@ export default function FolderTabChip({
 					onClick={onSelect}
 					onDoubleClick={(e) => {
 						e.stopPropagation();
-						setNameDraft(folder.name);
-						setIsEditing(true);
+						startRename();
 					}}
 					className={`h-7.5 inline-flex items-center gap-1.5 px-2.5 rounded-xl text-[11px] font-mono font-semibold transition-all cursor-pointer border shrink-0 leading-none ${
 						isActive
@@ -258,8 +215,7 @@ export default function FolderTabChip({
 							type="button"
 							onClick={() => {
 								setIsMenuOpen(false);
-								setNameDraft(folder.name);
-								setIsEditing(true);
+								startRename();
 							}}
 							className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-stone-300 hover:bg-stone-800 hover:text-white transition-colors cursor-pointer text-left text-[11px]"
 						>
@@ -283,7 +239,7 @@ export default function FolderTabChip({
 						{/* Palette list */}
 						{showColorPicker && (
 							<div className="grid grid-cols-4 gap-1 p-1.5 my-1 bg-stone-900/90 rounded-lg border border-stone-800">
-								{COLOR_OPTIONS.map((c) => {
+								{FOLDER_COLOR_OPTIONS.map((c) => {
 									const itemTheme = FOLDER_COLOR_MAP[c];
 									const isCurrent = colorKey === c;
 									return (
@@ -299,6 +255,8 @@ export default function FolderTabChip({
 												itemTheme.dot
 											} ${isCurrent ? "ring-2 ring-white ring-offset-1 ring-offset-stone-900" : ""}`}
 											title={c}
+										aria-label={`Set folder color: ${c}`}
+										aria-pressed={isCurrent}
 										>
 											{isCurrent && <Check className="w-3 h-3 text-stone-950 stroke-[3]" />}
 										</button>

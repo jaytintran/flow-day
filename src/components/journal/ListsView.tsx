@@ -88,6 +88,7 @@ import DesktopTaskCard from "./lists/DesktopTaskCard";
 import DesktopTaskRow from "./lists/DesktopTaskRow";
 import FolderCard from "./lists/FolderCard";
 import FolderTabChip from "./lists/FolderTabChip";
+import MobileFolderMenu from "./lists/MobileFolderMenu";
 import TrophyView from "./lists/TrophyView";
 import PaperListView from "./lists/PaperListView";
 import SortableSidebarListItem from "./lists/SortableSidebarListItem";
@@ -210,8 +211,6 @@ export default function ListsView({
 	formatDateStringLabel,
 }: ListsViewProps) {
 	const [searchQuery, setSearchQuery] = useState("");
-	const showContent =
-		localStorage.getItem("flowday_show_note_event_content") !== "false";
 
 	// 6-status switcher: 'all' | 'todo' | 'in_progress' | 'done' | 'dropped' | 'maybe'
 	const [statusFilter, setStatusFilter] = useState<
@@ -268,7 +267,7 @@ export default function ListsView({
 			mobileFolderDropdownBtnRef.current = e.currentTarget;
 			setMobileDropdownCoords({
 				top: rect.bottom + 6,
-				left: Math.max(8, Math.min(rect.left, window.innerWidth - 230)),
+				left: Math.max(8, Math.min(rect.left, window.innerWidth - 300)),
 			});
 			setIsMobileFolderDropdownOpen(true);
 		}
@@ -618,21 +617,58 @@ export default function ListsView({
 		onOpenDetail(task);
 	};
 
-	const handleBatchAssignLists = async (listId: string) => {
+	type BatchAssignMode = "add" | "remove" | "replace";
+
+	const [batchAssignMode, setBatchAssignMode] = useState<BatchAssignMode>("add");
+	const [batchAssignFeedback, setBatchAssignFeedback] = useState<string | null>(
+		null,
+	);
+
+	// (Selection-derived stats for the batch Assign Lists sheet are computed
+	// further down, once `allTasks` and `taskLists` are resolved.)
+
+	/**
+	 * Apply one list to the whole selection.
+	 * `add`    – ensure every selected item has the list (keeps their other lists)
+	 * `remove` – strip the list from every selected item
+	 * `replace`– make the list the only list on every selected item
+	 */
+	const handleBatchAssignLists = async (
+		listId: string,
+		mode: BatchAssignMode = batchAssignMode,
+	) => {
 		const ids = Array.from(selectedTaskIds);
 		if (ids.length === 0) return;
 		await db.transaction("rw", db.entries, async () => {
 			for (const id of ids) {
-				const item = await db.entries.get(id);
-				if (item && item.type === "task") {
-					const current = item.category_ids ?? [];
-					const updated = current.includes(listId)
-						? current.filter((cId) => cId !== listId)
-						: [...current, listId];
-					await db.entries.update(id, { category_ids: updated } as any);
+				const item = (await db.entries.get(id)) as Task | undefined;
+				if (!item || item.type !== "task") continue;
+				const current = item.category_ids ?? [];
+				let next: string[];
+				if (mode === "add") {
+					next = current.includes(listId) ? current : [...current, listId];
+				} else if (mode === "remove") {
+					next = current.filter((cId) => cId !== listId);
+				} else {
+					next = [listId];
+				}
+				const unchanged =
+					next.length === current.length &&
+					next.every((cId, i) => cId === current[i]);
+				if (!unchanged) {
+					await db.entries.update(id, { category_ids: next } as any);
 				}
 			}
 		});
+		const listName = taskLists.find((l) => l.id === listId)?.name ?? "list";
+		const plural = ids.length === 1 ? "item" : "items";
+		setBatchAssignFeedback(
+			mode === "add"
+				? `Added "${listName}" to ${ids.length} ${plural}.`
+				: mode === "remove"
+					? `Removed "${listName}" from ${ids.length} ${plural}.`
+					: `Now only in "${listName}" — ${ids.length} ${plural} updated.`,
+		);
 	};
 
 	// Helper to resolve the active folder ID for a task within a specific list view
@@ -915,6 +951,160 @@ export default function ListsView({
 		return listTasks.filter((t) => t.status === statusFilter);
 	}, [listTasks, statusFilter]);
 
+	// ─── "Why is this empty?" helpers ────────────────────────────────────────────
+	// Tasks matching only the active view (no search, no status filter). Lets the
+	// UI explain that items exist but are hidden by filtering instead of lying.
+	const viewTasks = useMemo(() => {
+		let tasks = selectedView === "trophy" ? accomplishmentTasks : allTasks;
+		if (selectedView === "unassigned") {
+			tasks = tasks.filter((t) => {
+				const ids = t.category_ids ?? [];
+				return ids.length === 0 || !taskLists.some((l) => ids.includes(l.id));
+			});
+		} else if (
+			selectedView !== "all" &&
+			selectedView !== "paper" &&
+			selectedView !== "trophy"
+		) {
+			tasks = tasks.filter((t) => (t.category_ids ?? []).includes(selectedView));
+		}
+		return tasks;
+	}, [allTasks, accomplishmentTasks, selectedView, taskLists]);
+
+	/** Folder membership ignoring search/status filters, for per-folder empty states. */
+	const unfilteredFolderCounts = useMemo(() => {
+		const map: Record<string, number> = {};
+		const validFolderIds = new Set(currentListFolders.map((f) => f.id));
+		let root = 0;
+		viewTasks.forEach((t) => {
+			const fId = getTaskFolderId(t, selectedView, validFolderIds);
+			if (fId && validFolderIds.has(fId)) {
+				map[fId] = (map[fId] ?? 0) + 1;
+			} else {
+				root += 1;
+			}
+		});
+		return { map, root };
+	}, [viewTasks, currentListFolders, selectedView]);
+
+	const statusFilterLabel: Record<string, string> = {
+		all: "All",
+		todo: "To Do",
+		in_progress: "In Progress",
+		done: "Completed",
+		dropped: "Dropped",
+		maybe: "Maybe / Later",
+	};
+
+	const activeFilterChips: string[] = [
+		...(searchQuery.trim() ? [`Search: "${searchQuery.trim()}"`] : []),
+		...(statusFilter !== "all"
+			? [`Status: ${statusFilterLabel[statusFilter] ?? statusFilter}`]
+			: []),
+	];
+
+	const clearAllFilters = () => {
+		setSearchQuery("");
+		setIsMobileSearchOpen(false);
+		handleStatusFilterChange("all");
+	};
+
+	/**
+	 * Empty state that first answers "did my filters hide everything?".
+	 * `itemsBeforeFilters` is the item count for this surface ignoring search/status.
+	 */
+	const renderFilterAwareEmpty = (
+		defaultTitle: string,
+		defaultHint: string,
+		icon: React.ReactNode,
+		itemsBeforeFilters: number,
+		onActivate?: () => void,
+	) => {
+		const hidden = Math.max(0, itemsBeforeFilters);
+		if (activeFilterChips.length > 0 && hidden > 0) {
+			return (
+				<div className="py-14 px-4 text-center border border-dashed border-stone-800/80 rounded-2xl select-none">
+					{icon}
+					<h4 className="font-mono font-medium text-xs text-stone-200 mb-1">
+						{hidden} {hidden === 1 ? "item is" : "items are"} hidden by your
+						filters
+					</h4>
+					<p className="text-[11px] font-mono text-stone-500 max-w-xs mx-auto mb-3">
+						Items exist in this view — none of them match the filters below.
+					</p>
+					<div className="flex flex-wrap items-center justify-center gap-1.5 mb-3">
+						{activeFilterChips.map((chip) => (
+							<span
+								key={chip}
+								className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-stone-900 border border-stone-800 text-stone-400"
+							>
+								{chip}
+							</span>
+						))}
+					</div>
+					<div className="flex flex-wrap items-center justify-center gap-2">
+						<button
+							type="button"
+							onClick={clearAllFilters}
+							className="px-3 py-1.5 rounded-xl bg-amber-500 text-stone-950 text-[11px] font-mono font-bold uppercase tracking-wider hover:bg-amber-400 transition-colors cursor-pointer"
+						>
+							Clear filters
+						</button>
+						{statusFilter !== "all" && searchQuery.trim() && (
+							<button
+								type="button"
+								onClick={() => handleStatusFilterChange("all")}
+								className="px-3 py-1.5 rounded-xl border border-stone-700 text-stone-300 hover:text-white text-[11px] font-mono transition-colors cursor-pointer"
+							>
+								Show all statuses
+							</button>
+						)}
+					</div>
+				</div>
+			);
+		}
+		return (
+			<div
+				onClick={onActivate}
+				className={`py-20 text-center text-stone-500 select-none ${
+					onActivate
+						? "cursor-pointer hover:text-stone-400 transition-colors"
+						: ""
+				}`}
+			>
+				{icon}
+				<h4 className="font-mono font-medium text-xs text-stone-400 mb-1">
+					{defaultTitle}
+				</h4>
+				<p className="text-[11px] font-mono text-stone-600 max-w-sm mx-auto">
+					{defaultHint}
+				</p>
+			</div>
+		);
+	};
+
+	/** Per-list membership across the current selection (batch Assign Lists sheet). */
+	const selectedBatchTasks = useMemo(
+		() => allTasks.filter((t) => selectedTaskIds.has(t.id)),
+		[allTasks, selectedTaskIds],
+	);
+
+	const batchAssignRows = useMemo(() => {
+		const total = selectedBatchTasks.length;
+		return taskLists.map((list) => {
+			const have = selectedBatchTasks.filter((t) =>
+				(t.category_ids ?? []).includes(list.id),
+			).length;
+			return {
+				list,
+				have,
+				total,
+				status:
+					have === 0 ? "none" : have === total ? "all" : "some",
+			} as const;
+		});
+	}, [taskLists, selectedBatchTasks]);
+
 	// Split tasks into folders vs root tasks
 	const { folderTasksMap, rootTasks } = useMemo(() => {
 		const map: Record<string, Task[]> = {};
@@ -1053,6 +1243,25 @@ export default function ListsView({
 			...prev,
 			[folderId]: !prev[folderId],
 		}));
+	};
+
+	/**
+	 * Reorder a folder inside the active list (-1 = earlier, 1 = later).
+	 * Folders are ordered by `sort_order`, so we renumber the whole strip.
+	 */
+	const handleReorderFolder = async (folderId: string, direction: -1 | 1) => {
+		const strip = currentListFolders;
+		const fromIdx = strip.findIndex((f) => f.id === folderId);
+		const toIdx = fromIdx + direction;
+		if (fromIdx === -1 || toIdx < 0 || toIdx >= strip.length) return;
+		const reordered = arrayMove(strip, fromIdx, toIdx);
+		await db.transaction("rw", db.list_folders, async () => {
+			for (let i = 0; i < reordered.length; i++) {
+				await db.list_folders.update(reordered[i].id, {
+					sort_order: i,
+				} as any);
+			}
+		});
 	};
 
 	const handleToggleAccomplishment = async (task: Task) => {
@@ -1499,64 +1708,22 @@ export default function ListsView({
 										left: `${mobileDropdownCoords.left}px`,
 										zIndex: 9999,
 									}}
-									className="w-56 bg-[#141414] dark:bg-[#141414] border border-stone-700/80 rounded-xl p-1 shadow-2xl backdrop-blur-xl select-none font-mono max-h-64 overflow-y-auto"
+									className="w-72 bg-[#141414] dark:bg-[#141414] border border-stone-700/80 rounded-xl shadow-2xl backdrop-blur-xl select-none font-mono max-h-[70vh] overflow-y-auto"
 								>
-									<div className="px-2.5 py-1.5 border-b border-stone-800/80 mb-1 flex items-center justify-between">
-										<span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">
-											Folders
-										</span>
-										<button
-											type="button"
-											onClick={() => {
-												setIsMobileFolderDropdownOpen(false);
-												handleCreateFolder();
-											}}
-											className="text-[10px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer"
-										>
-											<Plus className="w-3 h-3" />
-											<span>New Folder</span>
-										</button>
-									</div>
-
-									<div className="space-y-0.5">
-										{currentListFolders.map((f) => {
-											const fCount = folderTasksMap[f.id]?.length ?? 0;
-											const isSelected = selectedFolderTab === f.id;
-											return (
-												<button
-													key={f.id}
-													type="button"
-													onClick={() => {
-														handleSelectFolderTab(f.id);
-														setIsMobileFolderDropdownOpen(false);
-													}}
-													className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left text-xs transition-colors cursor-pointer ${
-														isSelected
-															? "bg-amber-500/20 text-amber-300 font-bold"
-															: "text-stone-300 hover:bg-stone-800/80 hover:text-white"
-													}`}
-												>
-													<div className="flex items-center gap-2 min-w-0">
-														<Folder
-															className={`w-3.5 h-3.5 ${
-																isSelected ? "text-amber-400" : "text-stone-400"
-															} shrink-0`}
-														/>
-														<span className="truncate">{f.name}</span>
-													</div>
-													<span
-														className={`text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded-md ${
-															isSelected
-																? "bg-amber-500/30 text-amber-200 font-bold"
-																: "bg-stone-800 text-stone-400"
-														}`}
-													>
-														{fCount}
-													</span>
-												</button>
-											);
-										})}
-									</div>
+										<MobileFolderMenu
+											folders={currentListFolders}
+											selectedFolderTab={selectedFolderTab}
+											counts={Object.fromEntries(
+												currentListFolders.map((f) => [f.id, folderTasksMap[f.id]?.length ?? 0]),
+											)}
+											onSelectFolderTab={handleSelectFolderTab}
+											onCreateFolder={handleCreateFolder}
+											onRenameFolder={handleRenameFolder}
+											onChangeFolderColor={handleChangeFolderColor}
+											onDeleteFolder={handleDeleteFolder}
+											onMoveFolder={handleReorderFolder}
+											onClose={() => setIsMobileFolderDropdownOpen(false)}
+										/>
 								</motion.div>
 							)}
 						</AnimatePresence>
@@ -1665,10 +1832,10 @@ export default function ListsView({
 												<div className="space-y-1.5">
 													{groupTasks.map((task) => (
 														<DesktopTaskRow
+															deletingId={deletingId}
 															key={task.id}
 															task={task}
 															activeTaskId={activeTaskId}
-															deletingId={deletingId}
 															taskLists={taskLists}
 															selectedListId={selectedView}
 															availableFolders={availableFoldersForPicker}
@@ -1680,15 +1847,10 @@ export default function ListsView({
 															onToggleTaskStatus={onToggleTaskStatus}
 															onOpenStatusModal={setStatusPickerTask}
 															onActivateTask={onActivateTask}
-															onOpenScheduleModal={setScheduleModalTask}
-															onOpenListPicker={(t) =>
-																setListPickerTaskId(t.id)
-															}
 															onOpenFolderPicker={setFolderPickerTask}
 															onToggleAccomplishment={
 																handleToggleAccomplishment
 															}
-															showContent={showContent}
 															onContextMenu={handleTaskContextMenu}
 														/>
 													))}
@@ -1697,10 +1859,10 @@ export default function ListsView({
 												<div className={gridClass}>
 													{groupTasks.map((task) => (
 														<DesktopTaskCard
+															deletingId={deletingId}
 															key={task.id}
 															task={task}
 															activeTaskId={activeTaskId}
-															deletingId={deletingId}
 															taskLists={taskLists}
 															selectedListId={selectedView}
 															availableFolders={availableFoldersForPicker}
@@ -1712,15 +1874,10 @@ export default function ListsView({
 															onToggleTaskStatus={onToggleTaskStatus}
 															onOpenStatusModal={setStatusPickerTask}
 															onActivateTask={onActivateTask}
-															onOpenScheduleModal={setScheduleModalTask}
-															onOpenListPicker={(t) =>
-																setListPickerTaskId(t.id)
-															}
 															onOpenFolderPicker={setFolderPickerTask}
 															onToggleAccomplishment={
 																handleToggleAccomplishment
 															}
-															showContent={showContent}
 															onContextMenu={handleTaskContextMenu}
 														/>
 													))}
@@ -1758,7 +1915,6 @@ export default function ListsView({
 														onToggleAccomplishment={
 															handleToggleAccomplishment
 														}
-														showContent={showContent}
 														onContextMenu={handleTaskContextMenu}
 													/>
 												))}
@@ -1783,10 +1939,10 @@ export default function ListsView({
 						<div className="space-y-1.5">
 							{tasksToRender.map((task) => (
 								<DesktopTaskRow
+									deletingId={deletingId}
 									key={task.id}
 									task={task}
 									activeTaskId={activeTaskId}
-									deletingId={deletingId}
 									taskLists={taskLists}
 									selectedListId={selectedView}
 									availableFolders={availableFoldersForPicker}
@@ -1798,11 +1954,8 @@ export default function ListsView({
 									onToggleTaskStatus={onToggleTaskStatus}
 									onOpenStatusModal={setStatusPickerTask}
 									onActivateTask={onActivateTask}
-									onOpenScheduleModal={setScheduleModalTask}
-									onOpenListPicker={(t) => setListPickerTaskId(t.id)}
 									onOpenFolderPicker={setFolderPickerTask}
 									onToggleAccomplishment={handleToggleAccomplishment}
-									showContent={showContent}
 									onContextMenu={handleTaskContextMenu}
 								/>
 							))}
@@ -1811,10 +1964,10 @@ export default function ListsView({
 						<div className={gridClass}>
 							{tasksToRender.map((task) => (
 								<DesktopTaskCard
+									deletingId={deletingId}
 									key={task.id}
 									task={task}
 									activeTaskId={activeTaskId}
-									deletingId={deletingId}
 									taskLists={taskLists}
 									selectedListId={selectedView}
 									availableFolders={availableFoldersForPicker}
@@ -1826,11 +1979,8 @@ export default function ListsView({
 									onToggleTaskStatus={onToggleTaskStatus}
 									onOpenStatusModal={setStatusPickerTask}
 									onActivateTask={onActivateTask}
-									onOpenScheduleModal={setScheduleModalTask}
-									onOpenListPicker={(t) => setListPickerTaskId(t.id)}
 									onOpenFolderPicker={setFolderPickerTask}
 									onToggleAccomplishment={handleToggleAccomplishment}
-									showContent={showContent}
 									onContextMenu={handleTaskContextMenu}
 								/>
 							))}
@@ -1862,7 +2012,6 @@ export default function ListsView({
 								onOpenListPicker={(t) => setListPickerTaskId(t.id)}
 								onOpenFolderPicker={setFolderPickerTask}
 								onToggleAccomplishment={handleToggleAccomplishment}
-								showContent={showContent}
 								onContextMenu={handleTaskContextMenu}
 							/>
 						))}
@@ -1878,18 +2027,18 @@ export default function ListsView({
 			if (selectedFolderTab === "flat") {
 				return (
 					<div className="space-y-4">
-						{displayedTasks.length > 0 ? (
-							renderTaskGroupList(displayedTasks, isDesktop)
-						) : (
-							<div className="py-20 text-center text-stone-500 select-none">
-								<ListTodo className="w-10 h-10 text-stone-800 mx-auto mb-3" />
-								<h4 className="font-mono font-medium text-xs text-stone-400 mb-1">
-									{searchQuery.trim()
+						{displayedTasks.length > 0
+							? renderTaskGroupList(displayedTasks, isDesktop)
+							: renderFilterAwareEmpty(
+									searchQuery.trim()
 										? "No matching items found."
-										: "List is empty."}
-								</h4>
-							</div>
-						)}
+										: "List is empty.",
+									searchQuery.trim()
+										? "Try a different search term, or clear the filters."
+										: "Add an item with the input bar below.",
+									<ListTodo className="w-10 h-10 text-stone-800 mx-auto mb-3" />,
+									viewTasks.length - displayedTasks.length,
+								)}
 					</div>
 				);
 			}
@@ -1903,25 +2052,19 @@ export default function ListsView({
 
 				return (
 					<div className="space-y-4">
-						{fTasks.length > 0 ? (
-							renderTaskGroupList(fTasks, isDesktop)
-						) : (
-							<div
-								onClick={() => {
-									const input = document.getElementById("quick-task-input");
-									if (input) input.focus();
-								}}
-								className="py-16 text-center text-stone-500 border border-dashed border-stone-800/80 rounded-2xl hover:border-amber-500/40 hover:text-stone-400 transition-all cursor-pointer select-none"
-							>
-								<Folder className="w-10 h-10 text-stone-800 mx-auto mb-2" />
-								<p className="font-mono text-xs text-stone-300 font-medium">
-									"{activeFolder?.name || "Folder"}" is empty
-								</p>
-								<p className="text-[11px] font-mono text-stone-600 mt-1">
-									Type below and press Enter, or drag items into this folder.
-								</p>
-							</div>
-						)}
+						{fTasks.length > 0
+							? renderTaskGroupList(fTasks, isDesktop)
+							: renderFilterAwareEmpty(
+									`"${activeFolder?.name || "Folder"}" is empty`,
+									"Type below and press Enter, or drag items into this folder.",
+									<Folder className="w-10 h-10 text-stone-800 mx-auto mb-2" />,
+									(unfilteredFolderCounts.map[selectedFolderTab] ?? 0) -
+										fTasks.length,
+									() => {
+										const input = document.getElementById("quick-task-input");
+										if (input) input.focus();
+									},
+								)}
 					</div>
 				);
 			}
@@ -1930,19 +2073,14 @@ export default function ListsView({
 			if (selectedFolderTab === "unfiled") {
 				return (
 					<div ref={setRootNodeRef} className="space-y-4">
-						{rootTasks.length > 0 ? (
-							renderTaskGroupList(rootTasks, isDesktop)
-						) : (
-							<div className="py-16 text-center text-stone-500 border border-dashed border-stone-800/80 rounded-2xl select-none">
-								<Layers className="w-10 h-10 text-stone-800 mx-auto mb-2" />
-								<p className="font-mono text-xs text-stone-300 font-medium">
-									No unfiled items
-								</p>
-								<p className="text-[11px] font-mono text-stone-600 mt-1">
-									All items in this list have been organized into folders.
-								</p>
-							</div>
-						)}
+						{rootTasks.length > 0
+							? renderTaskGroupList(rootTasks, isDesktop)
+							: renderFilterAwareEmpty(
+									"No unfiled items",
+									"All items in this list have been organized into folders.",
+									<Layers className="w-10 h-10 text-stone-800 mx-auto mb-2" />,
+									unfilteredFolderCounts.root - rootTasks.length,
+								)}
 					</div>
 				);
 			}
@@ -2013,27 +2151,36 @@ export default function ListsView({
 								isDesktop={isDesktop}
 								viewLayout={viewLayout}
 								gridClass={gridClass}
-								showContent={showContent}
 								statusFilter={statusFilter}
+								onChangeColor={handleChangeFolderColor}
 								onContextMenu={handleTaskContextMenu}
 							/>
 						);
 					})}
 
 					{/* Empty State when no root items and no folders */}
-					{rootTasks.length === 0 && currentListFolders.length === 0 && (
-						<div className="py-20 text-center text-stone-500 select-none">
-							<ListTodo className="w-10 h-10 text-stone-800 mx-auto mb-3" />
-							<h4 className="font-mono font-medium text-xs text-stone-400 mb-1">
-								{searchQuery.trim()
-									? "No matching items found."
-									: "List is empty."}
-							</h4>
-							<p className="text-[11px] font-mono text-stone-600 max-w-sm mx-auto">
-								Create an item using the input engine or add a folder to organize your backlog.
-							</p>
-						</div>
-					)}
+					{rootTasks.length === 0 &&
+						currentListFolders.length === 0 &&
+						renderFilterAwareEmpty(
+							searchQuery.trim() ? "No matching items found." : "List is empty.",
+							"Create an item using the input engine or add a folder to organize your backlog.",
+							<ListTodo className="w-10 h-10 text-stone-800 mx-auto mb-3" />,
+							viewTasks.length - displayedTasks.length,
+						)}
+
+					{/* Folders + items exist, but the active filters hide every one of them */}
+					{currentListFolders.length > 0 &&
+						displayedTasks.length === 0 &&
+						rootTasks.length === 0 &&
+						currentListFolders.every(
+							(f) => (folderTasksMap[f.id] ?? []).length === 0,
+						) &&
+						renderFilterAwareEmpty(
+							"Nothing matches the current filters",
+							"Clear the filters to see your folders and items again.",
+							<ListTodo className="w-10 h-10 text-stone-800 mx-auto mb-3" />,
+							viewTasks.length,
+						)}
 				</div>
 			);
 		};
@@ -2467,9 +2614,6 @@ export default function ListsView({
 										active: 0,
 										done: 0,
 									};
-									const listFolders = allFolders.filter(
-										(f) => f.list_id === list.id,
-									);
 
 									return (
 										<SortableSidebarListItem
@@ -2478,7 +2622,6 @@ export default function ListsView({
 											isActive={isActive}
 											colorStyle={cs}
 											counts={counts}
-											listFolders={listFolders}
 											isEditing={editingListId === list.id}
 											editingName={editingListName}
 											onStartRename={() => {
@@ -2504,17 +2647,6 @@ export default function ListsView({
 												await db.categories.update(list.id, { color });
 											}}
 											onDelete={() => handleDeleteList(list.id)}
-											onFolderClick={(folderId) => {
-												const el = document.getElementById(
-													`folder-${folderId}`,
-												);
-												if (el) {
-													el.scrollIntoView({
-														behavior: "smooth",
-														block: "start",
-													});
-												}
-											}}
 										/>
 									);
 								})}
@@ -2757,7 +2889,7 @@ export default function ListsView({
 							animate={{ opacity: 1, scale: 1, y: 0 }}
 							exit={{ opacity: 0, scale: 0.95, y: 8 }}
 							onClick={(e) => e.stopPropagation()}
-							className="w-full max-w-xs bg-[#141414] border border-stone-800 rounded-2xl shadow-2xl overflow-hidden font-sans"
+							className="w-full max-w-sm bg-[#141414] border border-stone-800 rounded-2xl shadow-2xl overflow-hidden font-sans"
 						>
 							<div className="flex items-center justify-between px-5 pt-4 pb-2 border-b border-stone-800/60">
 								<div>
@@ -2771,31 +2903,132 @@ export default function ListsView({
 								<button
 									onClick={() => setBatchListPickerOpen(false)}
 									className="p-1 text-stone-500 hover:text-stone-300 rounded-lg transition-colors cursor-pointer"
+									aria-label="Close assign lists"
 								>
 									<X className="w-4 h-4" />
 								</button>
 							</div>
 
+							{/* Add / Remove / Replace mode — no more silent per-item toggling */}
+							<div className="px-3 pt-3">
+								<div className="flex items-center gap-1 bg-stone-900 border border-stone-800 rounded-xl p-1">
+									{(["add", "remove", "replace"] as const).map((m) => (
+										<button
+											key={m}
+											type="button"
+											onClick={() => {
+												setBatchAssignMode(m);
+												setBatchAssignFeedback(null);
+											}}
+											aria-pressed={batchAssignMode === m}
+											className={`flex-1 px-2 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+												batchAssignMode === m
+													? m === "remove"
+														? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+														: m === "replace"
+															? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+															: "bg-violet-500/20 text-violet-300 border border-violet-500/40"
+													: "text-stone-400 hover:text-stone-200 border border-transparent"
+											}`}
+										>
+											{m === "add"
+												? "Add to all"
+												: m === "remove"
+													? "Remove from all"
+													: "Set only"}
+										</button>
+									))}
+								</div>
+								<p className="text-[10px] font-mono text-stone-500 mt-1.5 leading-snug">
+									{batchAssignMode === "add"
+										? "Adds the list to every selected item, keeping their other lists."
+										: batchAssignMode === "remove"
+											? "Removes the list from every selected item."
+											: "Makes the list the ONLY list on every selected item."}
+								</p>
+							</div>
+
 							<div className="p-3 flex flex-col gap-1 max-h-60 overflow-y-auto">
-								{taskLists.map((list) => {
+								{taskLists.length === 0 && (
+									<p className="px-2 py-6 text-center text-[11px] font-mono text-stone-500">
+										No lists yet — create one from the sidebar first.
+									</p>
+								)}
+								{batchAssignRows.map((row) => {
+									const doneAlready =
+										(batchAssignMode === "add" && row.status === "all") ||
+										(batchAssignMode === "remove" && row.status === "none") ||
+										(batchAssignMode === "replace" &&
+											row.status === "all" &&
+											row.total > 0);
+									const verb =
+										batchAssignMode === "add"
+											? "Add"
+											: batchAssignMode === "remove"
+												? "Remove"
+												: "Set only";
 									return (
 										<button
-											key={list.id}
-											onClick={() => handleBatchAssignLists(list.id)}
-											className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-left transition-all cursor-pointer border border-transparent text-stone-300 hover:bg-stone-800/60 hover:text-white"
+											key={row.list.id}
+											type="button"
+											disabled={doneAlready}
+											onClick={() => handleBatchAssignLists(row.list.id)}
+											className={`flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-left transition-all border cursor-pointer ${
+												doneAlready
+													? "border-transparent text-stone-600 cursor-default"
+													: "border-transparent text-stone-300 hover:bg-stone-800/60 hover:text-white"
+											}`}
+											aria-label={`${verb} list ${row.list.name} for ${
+												row.total
+											} selected items`}
 										>
 											<CategoryIcon
-												name={list.icon}
-												color={list.color}
+												name={row.list.icon}
+												color={row.list.color}
 												className="w-3.5 h-3.5"
 												fallback="ListTodo"
 											/>
 											<span className="flex-1 min-w-0 text-xs font-mono truncate">
-												{list.name}
+												{row.list.name}
+											</span>
+											<span
+												className="text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded-md bg-stone-900 border border-stone-800 text-stone-400 shrink-0"
+												title={`${row.have} of ${row.total} selected items are in this list`}
+											>
+												{row.have}/{row.total}
+											</span>
+											<span
+												className={`text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-1 rounded-md shrink-0 ${
+													doneAlready
+														? "bg-stone-900 text-stone-600"
+														: batchAssignMode === "remove"
+															? "bg-rose-500/15 text-rose-300 border border-rose-500/30"
+															: batchAssignMode === "replace"
+																? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+																: "bg-violet-500/15 text-violet-300 border border-violet-500/30"
+												}`}
+											>
+												{doneAlready ? "Done" : verb}
 											</span>
 										</button>
 									);
 								})}
+							</div>
+
+							<div className="px-3 pb-3 pt-1 flex items-center justify-between gap-2 border-t border-stone-800/60">
+								<p
+									className="text-[10px] font-mono text-emerald-300/90 leading-snug min-w-0"
+									aria-live="polite"
+								>
+									{batchAssignFeedback ?? ""}
+								</p>
+								<button
+									type="button"
+									onClick={() => setBatchListPickerOpen(false)}
+									className="px-3 py-1.5 rounded-xl bg-stone-900 border border-stone-800 text-stone-300 hover:text-white text-[10px] font-mono font-bold uppercase tracking-wider shrink-0 cursor-pointer"
+								>
+									Done
+								</button>
 							</div>
 						</motion.div>
 					</motion.div>
@@ -2911,7 +3144,10 @@ export default function ListsView({
 						</button>
 
 						<button
-							onClick={() => setBatchListPickerOpen(true)}
+							onClick={() => {
+								setBatchAssignFeedback(null);
+								setBatchListPickerOpen(true);
+							}}
 							className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-stone-900 border border-stone-800 text-stone-300 hover:text-violet-300 hover:border-violet-500/40 transition-all cursor-pointer whitespace-nowrap shrink-0"
 							title="Assign selected tasks to lists"
 						>
@@ -3336,9 +3572,9 @@ export default function ListsView({
 									</div>
 									{viewLayout === "list" ? (
 										<DesktopTaskRow
+											deletingId={deletingId}
 											task={activeDragTask}
 											activeTaskId={activeTaskId}
-											deletingId={deletingId}
 											taskLists={taskLists}
 											selectedListId={selectedView}
 											availableFolders={availableFoldersForPicker}
@@ -3351,18 +3587,15 @@ export default function ListsView({
 											onToggleTaskStatus={() => {}}
 											onOpenStatusModal={() => {}}
 											onActivateTask={() => {}}
-											onOpenScheduleModal={() => {}}
-											onOpenListPicker={() => {}}
 											onOpenFolderPicker={() => {}}
 											onToggleAccomplishment={() => {}}
-											showContent={showContent}
 											onContextMenu={() => {}}
 										/>
 									) : (
 										<DesktopTaskCard
+											deletingId={deletingId}
 											task={activeDragTask}
 											activeTaskId={activeTaskId}
-											deletingId={deletingId}
 											taskLists={taskLists}
 											selectedListId={selectedView}
 											availableFolders={availableFoldersForPicker}
@@ -3375,11 +3608,8 @@ export default function ListsView({
 											onToggleTaskStatus={() => {}}
 											onOpenStatusModal={() => {}}
 											onActivateTask={() => {}}
-											onOpenScheduleModal={() => {}}
-											onOpenListPicker={() => {}}
 											onOpenFolderPicker={() => {}}
 											onToggleAccomplishment={() => {}}
-											showContent={showContent}
 											onContextMenu={() => {}}
 										/>
 									)}
@@ -3390,9 +3620,9 @@ export default function ListsView({
 							<div className="w-full">
 								{viewLayout === "list" ? (
 									<DesktopTaskRow
+										deletingId={deletingId}
 										task={activeDragTask}
 										activeTaskId={activeTaskId}
-										deletingId={deletingId}
 										taskLists={taskLists}
 										selectedListId={selectedView}
 										availableFolders={availableFoldersForPicker}
@@ -3405,18 +3635,15 @@ export default function ListsView({
 										onToggleTaskStatus={() => {}}
 										onOpenStatusModal={() => {}}
 										onActivateTask={() => {}}
-										onOpenScheduleModal={() => {}}
-										onOpenListPicker={() => {}}
 										onOpenFolderPicker={() => {}}
 										onToggleAccomplishment={() => {}}
-										showContent={showContent}
 										onContextMenu={() => {}}
 									/>
 								) : (
 									<DesktopTaskCard
+										deletingId={deletingId}
 										task={activeDragTask}
 										activeTaskId={activeTaskId}
-										deletingId={deletingId}
 										taskLists={taskLists}
 										selectedListId={selectedView}
 										availableFolders={availableFoldersForPicker}
@@ -3429,11 +3656,8 @@ export default function ListsView({
 										onToggleTaskStatus={() => {}}
 										onOpenStatusModal={() => {}}
 										onActivateTask={() => {}}
-										onOpenScheduleModal={() => {}}
-										onOpenListPicker={() => {}}
 										onOpenFolderPicker={() => {}}
 										onToggleAccomplishment={() => {}}
-										showContent={showContent}
 										onContextMenu={() => {}}
 									/>
 								)}

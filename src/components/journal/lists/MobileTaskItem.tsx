@@ -46,7 +46,6 @@ interface MobileTaskItemProps {
   onOpenListPicker: (task: Task) => void;
   onOpenFolderPicker?: (task: Task) => void;
   onToggleAccomplishment?: (task: Task) => void;
-  showContent?: boolean;
   onContextMenu?: (task: Task, e: React.MouseEvent) => void;
 }
 
@@ -70,7 +69,6 @@ export default function MobileTaskItem({
   onOpenListPicker,
   onOpenFolderPicker,
   onToggleAccomplishment,
-  showContent = true,
   onContextMenu,
 }: MobileTaskItemProps) {
   const isActive = activeTaskId === task.id;
@@ -105,6 +103,53 @@ export default function MobileTaskItem({
     onOpenFolderPicker
   );
 
+  // ── Status control: tap toggles complete, press-and-hold picks any status ──
+  const LONG_PRESS_MS = 450;
+  const MOVE_TOLERANCE_PX = 8;
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressFiredRef = useRef(false);
+  const pressStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const clearLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    pressStartRef.current = null;
+  };
+
+  const handleStatusPointerDown = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    longPressFiredRef.current = false;
+    clearLongPress();
+    pressStartRef.current = { x: e.clientX, y: e.clientY };
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      onOpenStatusModal(task);
+    }, LONG_PRESS_MS);
+  };
+
+  const handleStatusPointerMove = (e: React.PointerEvent) => {
+    const start = pressStartRef.current;
+    if (!start) return;
+    if (
+      Math.abs(e.clientX - start.x) > MOVE_TOLERANCE_PX ||
+      Math.abs(e.clientY - start.y) > MOVE_TOLERANCE_PX
+    ) {
+      clearLongPress();
+    }
+  };
+
+  const handleStatusClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    clearLongPress();
+    if (longPressFiredRef.current) {
+      longPressFiredRef.current = false;
+      return;
+    }
+    onToggleTaskStatus(task);
+  };
+
   let buttonCount = 2; // Schedule + Delete
   if (!isActive && !isDone && !isDropped) buttonCount += 1; // Activate
   if (taskLists.length > 0) buttonCount += 1; // List Picker
@@ -127,8 +172,11 @@ export default function MobileTaskItem({
         {/* Underlying Mobile Action Tray */}
         {!isSwipeDisabled && (
           <div
-            className={`absolute inset-y-0 right-0 flex items-center pr-2 gap-1.5 bg-transparent z-0 transition-opacity duration-200 ${
-              isMobileSwiped ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            aria-hidden={!isMobileSwiped}
+            className={`absolute inset-y-0 right-0 flex flex-row-reverse items-center pr-2 pl-1 gap-1.5 bg-transparent z-0 transition-opacity duration-200 ${
+              isMobileSwiped
+                ? 'opacity-100 visible'
+                : 'opacity-0 invisible pointer-events-none'
             }`}
           >
             {!isDone && !isDropped && !isActive && (
@@ -139,8 +187,9 @@ export default function MobileTaskItem({
                   setIsMobileSwiped(false);
                   onActivateTask(task.id);
                 }}
-                className="p-2 rounded-xl text-amber-400 bg-stone-900 border border-amber-500/30 hover:bg-stone-800 transition-colors cursor-pointer shadow-md"
-                title="Activate timer"
+                className="p-2.5 rounded-xl text-amber-400 bg-stone-900 border border-amber-500/30 hover:bg-stone-800 transition-colors cursor-pointer shadow-md"
+                title="Start tracking time"
+                aria-label={`Start tracking time on "${task.title}"`}
               >
                 <Play className="w-4 h-4 fill-current" />
               </button>
@@ -153,8 +202,9 @@ export default function MobileTaskItem({
                 setIsMobileSwiped(false);
                 onOpenScheduleModal(task);
               }}
-              className="p-2 rounded-xl text-stone-300 hover:text-amber-400 bg-stone-900 border border-stone-800 hover:border-stone-700 transition-colors cursor-pointer shadow-md"
+              className="p-2.5 rounded-xl text-stone-300 hover:text-amber-400 bg-stone-900 border border-stone-800 hover:border-stone-700 transition-colors cursor-pointer shadow-md"
               title="Schedule date"
+              aria-label={`Schedule "${task.title}"`}
             >
               <Calendar className="w-4 h-4" />
             </button>
@@ -167,8 +217,9 @@ export default function MobileTaskItem({
                   setIsMobileSwiped(false);
                   onOpenListPicker(task);
                 }}
-                className="p-2 rounded-xl text-stone-300 hover:text-violet-400 bg-stone-900 border border-stone-800 hover:border-stone-700 transition-colors cursor-pointer shadow-md"
-                title="Assign to list"
+                className="p-2.5 rounded-xl text-stone-300 hover:text-violet-400 bg-stone-900 border border-stone-800 hover:border-stone-700 transition-colors cursor-pointer shadow-md"
+                title="Assign to lists"
+                aria-label={`Assign "${task.title}" to lists`}
               >
                 <ListTodo className="w-4 h-4" />
               </button>
@@ -183,26 +234,40 @@ export default function MobileTaskItem({
                   setIsMobileSwiped(false);
                   onOpenFolderPicker(task);
                 }}
-                className="p-2 rounded-xl text-stone-300 hover:text-amber-300 bg-stone-900 border border-stone-800 hover:border-stone-700 transition-colors cursor-pointer shadow-md"
+                className="p-2.5 rounded-xl text-stone-300 hover:text-amber-300 bg-stone-900 border border-stone-800 hover:border-stone-700 transition-colors cursor-pointer shadow-md"
                 title="Move to folder"
+                aria-label={`Move "${task.title}" to a folder`}
               >
                 <FolderInput className="w-4 h-4" />
               </button>
             )}
 
+            {/* Divider isolates the destructive action from the safe ones */}
+            <span className="w-px h-6 bg-stone-700/60 mr-0.5 ml-1.5" aria-hidden="true" />
+
+            {/* Delete — rendered at the far end of the swipe track (row-reverse):
+                a partial swipe never reaches it, a full swipe does. */}
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setIsMobileSwiped(false);
                 onDeleteEntry(task.id);
               }}
-              className={`p-2 rounded-xl transition-colors cursor-pointer shadow-md ${
+              className={`p-2.5 rounded-xl transition-all cursor-pointer shadow-md ${
                 deletingId === task.id
-                  ? 'text-red-400 bg-red-950 border border-red-800'
-                  : 'text-stone-300 hover:text-red-400 bg-stone-900 border border-stone-800 hover:border-stone-700'
+                  ? 'bg-rose-500 text-stone-950 border border-rose-300 animate-pulse'
+                  : 'bg-rose-950/60 text-rose-300 border border-rose-800/70 hover:bg-rose-900/70'
               }`}
-              title="Delete task"
+              title={
+                deletingId === task.id
+                  ? 'Tap again to confirm delete'
+                  : `Delete "${task.title}"`
+              }
+              aria-label={
+                deletingId === task.id
+                  ? `Confirm delete "${task.title}"`
+                  : `Delete "${task.title}"`
+              }
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -274,10 +339,12 @@ export default function MobileTaskItem({
           <div className="flex items-center gap-2.5">
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenStatusModal(task);
-              }}
+              onPointerDown={handleStatusPointerDown}
+              onPointerMove={handleStatusPointerMove}
+              onPointerUp={clearLongPress}
+              onPointerLeave={clearLongPress}
+              onPointerCancel={clearLongPress}
+              onClick={handleStatusClick}
               className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all cursor-pointer active:scale-95 ${
                 isDone
                   ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.2)]'
@@ -289,7 +356,17 @@ export default function MobileTaskItem({
                         ? 'border-indigo-500/40 bg-indigo-500/10 text-indigo-400'
                         : 'border-stone-700 hover:border-stone-500 bg-stone-900/80 text-stone-400 hover:text-stone-200'
               }`}
-              title="Click to change status"
+              title={
+                isDone
+                  ? 'Tap to reopen — hold for all statuses'
+                  : 'Tap to complete — hold for all statuses'
+              }
+              aria-label={
+                isDone
+                  ? `Mark "${task.title}" as to-do`
+                  : `Mark "${task.title}" as completed`
+              }
+              aria-pressed={isDone}
             >
               {isDone && <Check className="w-3.5 h-3.5 stroke-[3]" />}
               {isInProgress && (
@@ -337,7 +414,12 @@ export default function MobileTaskItem({
                         ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.25)]'
                         : 'bg-stone-900/40 border-stone-800 text-stone-600 hover:text-amber-400'
                     }`}
-                    title="Toggle Accomplishment"
+                    title="Toggle accomplishment"
+                    aria-label={
+                      task.is_accomplishment
+                        ? `Remove accomplishment flag from "${task.title}"`
+                        : `Mark "${task.title}" as an accomplishment`
+                    }
                   >
                     <Trophy
                       className={`w-3.5 h-3.5 ${
@@ -353,12 +435,21 @@ export default function MobileTaskItem({
                     e.stopPropagation();
                     onDeleteEntry(task.id);
                   }}
-                  className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                  className={`p-2 rounded-lg border transition-all cursor-pointer ${
                     deletingId === task.id
-                      ? 'bg-red-950 border-red-800 text-red-400'
-                      : 'bg-stone-900/40 border-stone-800 text-stone-500 hover:text-red-400 hover:bg-stone-850'
+                      ? 'bg-rose-500 border-rose-300 text-stone-950 animate-pulse'
+                      : 'bg-stone-900/40 border-stone-800 text-stone-500 hover:text-rose-300 hover:bg-rose-950/30'
                   }`}
-                  title="Delete task"
+                  title={
+                    deletingId === task.id
+                      ? 'Tap again to confirm delete'
+                      : `Delete "${task.title}"`
+                  }
+                  aria-label={
+                    deletingId === task.id
+                      ? `Confirm delete "${task.title}"`
+                      : `Delete "${task.title}"`
+                  }
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

@@ -104,7 +104,7 @@ export default function SortableCategorySidebarItem({
 					{...attributes}
 					{...listeners}
 					onClick={(e) => e.stopPropagation()}
-					className="p-0.5 -ml-1 text-stone-600 hover:text-stone-300 opacity-0 group-hover/item:opacity-100 transition-opacity cursor-grab active:cursor-grabbing shrink-0"
+					className="p-1 -ml-1 text-stone-700 hover:text-stone-300 opacity-45 group-hover/item:opacity-100 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-amber-500/40 rounded transition-opacity cursor-grab active:cursor-grabbing shrink-0"
 					title="Drag to reorder category"
 				>
 					<GripVertical className="w-3.5 h-3.5" />
@@ -194,7 +194,7 @@ export default function SortableCategorySidebarItem({
 									setIsMenuOpen(!isMenuOpen);
 									setIsConfirmingDelete(false);
 								}}
-								className="p-1 rounded-md text-stone-500 hover:text-stone-200 hover:bg-stone-800 opacity-0 group-hover/item:opacity-100 transition-all cursor-pointer"
+								className="p-1.5 rounded-md text-stone-500 hover:text-stone-200 hover:bg-stone-800 opacity-60 group-hover/item:opacity-100 focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-amber-500/40 transition-all cursor-pointer"
 								title="Category options"
 							>
 								<MoreHorizontal className="w-3.5 h-3.5" />
