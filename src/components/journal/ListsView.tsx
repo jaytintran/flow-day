@@ -1438,12 +1438,86 @@ export default function ListsView({
     data: { folderId: 'flat' },
   });
 
+  const systemTabs = [
+    {
+      id: 'all',
+      label: 'Grouped',
+      Icon: FolderTree,
+      count: displayedTasks.length,
+      title: 'All items, grouped into folder sections',
+      dropRef: undefined,
+      isOver: false,
+    },
+    {
+      id: 'flat',
+      label: 'Flat List',
+      Icon: List,
+      count: displayedTasks.length,
+      title: 'All items in one flat list, no folder sections',
+      dropRef: undefined,
+      isOver: false,
+    },
+    {
+      id: 'unfiled',
+      label: 'No Folder',
+      Icon: FolderMinus,
+      count: rootTasks.length,
+      title: "Items that aren't in any folder",
+      dropRef: setTabUnfiledNodeRef,
+      isOver: isOverTabUnfiled,
+    },
+  ] as const;
+
   // ─── Interactive Folder Tab / Filter Strip Panel ──────────────────────────
   const activeMobileFolder = currentListFolders.find((f) => f.id === selectedFolderTab);
 
   const folderStripPanel = selectedView !== 'paper' && selectedView !== 'trophy' && (
     <div className="flex items-center gap-1.5 overflow-x-auto py-1.5 scrollbar-none shrink-0 mb-3">
-      {/* [+ Folder] */}
+      {/* System view switcher (single pill) */}
+      {currentListFolders.length > 0 && (
+        <div
+          role="tablist"
+          aria-label="Folder view"
+          className="flex items-center gap-0.5 bg-white/[0.03] border border-white/[0.08] backdrop-blur-xl rounded-xl p-0.5 shrink-0"
+        >
+          {systemTabs.map((tab) => {
+            const isActive = selectedFolderTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                ref={tab.dropRef}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => handleSelectFolderTab(tab.id)}
+                title={tab.title}
+                className={`h-6.5 inline-flex items-center gap-1.5 px-2.5 rounded-lg text-[11px] font-mono font-semibold transition-all cursor-pointer border leading-none whitespace-nowrap ${
+                  isActive
+                    ? 'bg-white/[0.12] border-white/20 text-white shadow-sm font-bold'
+                    : 'border-transparent text-stone-400 hover:text-stone-200 hover:bg-white/[0.06]'
+                } ${tab.isOver ? 'ring-2 ring-amber-400 bg-amber-500/20' : ''}`}
+              >
+                <tab.Icon className="w-3.5 h-3.5 shrink-0" />
+                <span>{tab.label}</span>
+                <span
+                  className={`text-[10px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded-md leading-none ${
+                    isActive ? 'bg-white/15 text-white' : 'bg-black/15 text-stone-400'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Divider: system views | your folders */}
+      {currentListFolders.length > 0 && (
+        <div className="hidden md:block w-px h-5 bg-stone-800 shrink-0" />
+      )}
+
+      {/* + New Folder (end of strip so tab positions stay stable) */}
       <button
         type="button"
         onClick={handleCreateFolder}
@@ -1451,85 +1525,8 @@ export default function ListsView({
         title="Create new folder"
       >
         <FolderPlus className="w-3.5 h-3.5 shrink-0" />
-        <span>+ Folder</span>
+        <span>New Folder</span>
       </button>
-
-      {/* All Tasks Tab (Hierarchical with Folders) */}
-      <button
-        ref={setTabAllNodeRef}
-        type="button"
-        onClick={() => handleSelectFolderTab('all')}
-        className={`h-7.5 inline-flex items-center gap-1.5 px-2.5 rounded-xl text-[11px] font-mono font-semibold transition-all cursor-pointer border shrink-0 leading-none ${
-          selectedFolderTab === 'all'
-            ? 'bg-white/[0.1] border-white/20 text-white shadow-sm font-bold'
-            : 'bg-white/[0.03] border-white/[0.08] text-stone-400 hover:text-stone-200 hover:bg-white/[0.06]'
-        } ${isOverTabAll ? 'ring-2 ring-amber-400 bg-amber-500/20' : ''}`}
-        title="All Items (Grouped with Folder sections)"
-      >
-        <FolderTree className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-        <span>All</span>
-        <span
-          className={`text-[10px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded-md leading-none ${
-            selectedFolderTab === 'all'
-              ? 'bg-white/15 text-white'
-              : 'bg-black/15 dark:bg-white/5 text-stone-400'
-          }`}
-        >
-          {displayedTasks.length}
-        </span>
-      </button>
-
-      {/* Unfiled / General Tab (if folders exist) */}
-      {currentListFolders.length > 0 && (
-        <button
-          ref={setTabUnfiledNodeRef}
-          type="button"
-          onClick={() => handleSelectFolderTab('unfiled')}
-          className={`h-7.5 inline-flex items-center gap-1.5 px-2.5 rounded-xl text-[11px] font-mono font-semibold transition-all cursor-pointer border shrink-0 leading-none ${
-            selectedFolderTab === 'unfiled'
-              ? 'bg-white/[0.1] border-white/20 text-white shadow-sm font-bold'
-              : 'bg-white/[0.03] border-white/[0.08] text-stone-400 hover:text-stone-200 hover:bg-white/[0.06]'
-          } ${isOverTabUnfiled ? 'ring-2 ring-amber-400 bg-amber-500/20' : ''}`}
-          title="General (Unfiled Items only)"
-        >
-          <span>General</span>
-          <span
-            className={`text-[10px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded-md leading-none ${
-              selectedFolderTab === 'unfiled'
-                ? 'bg-white/15 text-white'
-                : 'bg-black/15 dark:bg-white/5 text-stone-400'
-            }`}
-          >
-            {rootTasks.length}
-          </span>
-        </button>
-      )}
-
-      {/* No Folders (Flat All Items View) Tab (if folders exist) */}
-      {currentListFolders.length > 0 && (
-        <button
-          ref={setTabFlatNodeRef}
-          type="button"
-          onClick={() => handleSelectFolderTab('flat')}
-          className={`h-7.5 inline-flex items-center gap-1.5 px-2.5 rounded-xl text-[11px] font-mono font-semibold transition-all cursor-pointer border shrink-0 leading-none ${
-            selectedFolderTab === 'flat'
-              ? 'bg-white/[0.1] border-white/20 text-white shadow-sm font-bold'
-              : 'bg-white/[0.03] border-white/[0.08] text-stone-400 hover:text-stone-200 hover:bg-white/[0.06]'
-          } ${isOverTabFlat ? 'ring-2 ring-amber-400 bg-amber-500/20' : ''}`}
-          title="All Items (Flat view without folder sections)"
-        >
-          <FolderMinus className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-          <span
-            className={`text-[10px] font-mono font-bold tabular-nums px-1.5 py-0.5 rounded-md leading-none ${
-              selectedFolderTab === 'flat'
-                ? 'bg-white/15 text-white'
-                : 'bg-black/15 dark:bg-white/5 text-stone-400'
-            }`}
-          >
-            {displayedTasks.length}
-          </span>
-        </button>
-      )}
 
       {/* MOBILE ONLY: Grouped Folder Selector Dropdown (if folders exist) */}
       {currentListFolders.length > 0 && (
