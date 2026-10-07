@@ -644,6 +644,7 @@ function TodayPad({ todayPad, onUpdate, viewMode, scratchpadDate, onScratchpadDa
   const [newAnchorText, setNewAnchorText] = useState('');
   const [isAddingAnchor, setIsAddingAnchor] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [quickCompletedText, setQuickCompletedText] = useState('');
 
   // Scratchpad-only Anchors matching current activeDateKey
   const allAnchors = (todayPad.anchors || []).filter(
@@ -819,6 +820,32 @@ function TodayPad({ todayPad, onUpdate, viewMode, scratchpadDate, onScratchpadDa
     }
   };
 
+  const handleAddQuickCompletedItem = async () => {
+    const trimmed = quickCompletedText.trim();
+    if (!trimmed) return;
+
+    const logId = crypto.randomUUID();
+    const wallNow = new Date();
+    const completionTime = new Date(scratchpadDate);
+    completionTime.setHours(wallNow.getHours(), wallNow.getMinutes(), wallNow.getSeconds(), wallNow.getMilliseconds());
+
+    try {
+      const newLog: Log = { id: logId, type: 'log', title: trimmed, timestamp: completionTime, created_at: completionTime };
+      await db.entries.add(newLog);
+    } catch {}
+
+    const newItem: ScratchpadItem = {
+      id: crypto.randomUUID(),
+      text: trimmed,
+      isCompleted: true,
+      completedAt: completionTime.toISOString(),
+      dateKey: activeDateKeyStr,
+      completedLogId: logId,
+    };
+
+    updateItems([...todayPad.items, newItem]);
+    setQuickCompletedText('');
+  };
 
   const handleToggleComplete = async (item: ScratchpadItem) => {
     const nextCompleted = !item.isCompleted;
@@ -1295,6 +1322,38 @@ function TodayPad({ todayPad, onUpdate, viewMode, scratchpadDate, onScratchpadDa
             <Plus className="w-3.5 h-3.5" /> Add active task ({slotsLeft} left)
           </button>
         )}
+
+        {/* Quick Add Completed Item Bar */}
+        <div className="flex items-center gap-2 bg-stone-950/80 border border-emerald-500/20 focus-within:border-emerald-500/50 rounded-lg px-2.5 py-1.5 transition-colors">
+          <div className="w-4 h-4 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0">
+            <Check className="w-2.5 h-2.5 stroke-[3]" />
+          </div>
+          <input
+            type="text"
+            value={quickCompletedText}
+            onChange={(e) => setQuickCompletedText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleAddQuickCompletedItem();
+              if (e.key === 'Escape') setQuickCompletedText('');
+            }}
+            placeholder="Complete something? ... Enter here + enter"
+            className="flex-1 min-w-0 bg-transparent text-xs text-stone-200 placeholder-stone-500 focus:outline-none font-mono"
+          />
+          {/* Desktop shortcut hint */}
+          <span className="hidden md:inline-flex items-center text-[9px] font-mono text-stone-500 bg-stone-900 border border-stone-800 rounded px-1.5 py-0.5 shrink-0 select-none">
+            ↵ Enter
+          </span>
+          {/* Mobile + Add icon button */}
+          <button
+            type="button"
+            onClick={handleAddQuickCompletedItem}
+            className="md:hidden flex items-center justify-center gap-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-400 text-[10px] font-mono font-bold px-2 py-1 rounded-md shrink-0 cursor-pointer transition-colors active:scale-95"
+            aria-label="Add completed item"
+          >
+            <Plus className="w-3 h-3" />
+            <span>Add</span>
+          </button>
+        </div>
       </div>
 
       {/* ─── SECTION 3: COMPLETED HISTORY ───────────────────────────────── */}
