@@ -28,7 +28,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Settings from './Settings';
-import QuickSyncSheet from './QuickSyncSheet';
 import { useGistSync } from '../hooks/useGistSync';
 import ObjectivePickerSheet from './ObjectivePickerSheet';
 import GoalPickerSheet from './GoalPickerSheet';
@@ -79,7 +78,6 @@ export default function TimerBar({
 
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isGoalPickerOpen, setIsGoalPickerOpen] = useState(false);
-  const [isQuickSyncOpen, setIsQuickSyncOpen] = useState(false);
 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -975,109 +973,98 @@ export default function TimerBar({
               transition={{ duration: 0.15 }}
               className="flex items-center gap-1.5 shrink-0"
             >
-              {/* Mobile View: Compact Single Cloud Pill */}
-              {isMobile ? (
+              {/* Direct Split Push / Pull Segmented Pod (Mobile & Desktop) */}
+              {!isSyncConfigured ? (
                 <button
-                  id="mobile-sync-pill-btn"
+                  id="quick-sync-config-btn"
                   type="button"
-                  onClick={() => setIsQuickSyncOpen(true)}
-                  className="flex items-center gap-1.5 px-2.5 h-9 bg-[#0a0a0a] hover:bg-stone-900 border border-stone-800 rounded-xl transition-all cursor-pointer active:scale-95"
-                  title="Cloud Sync"
+                  onClick={() => {
+                    window.dispatchEvent(
+                      new CustomEvent('flowday-open-settings', {
+                        detail: { tab: 'sync' },
+                      }),
+                    );
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 h-8 bg-[#0a0a0a] hover:bg-stone-900 border border-stone-850 rounded-xl text-stone-400 hover:text-stone-200 transition-all cursor-pointer text-xs font-mono"
+                  title="Configure GitHub Gist Sync"
                 >
-                  {syncStatus === 'loading' ? (
-                    <RefreshCw className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-                  ) : (
-                    <Cloud className="w-3.5 h-3.5 text-stone-400" />
-                  )}
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                      !isSyncConfigured
-                        ? 'bg-stone-600'
-                        : syncStatus === 'error'
-                          ? 'bg-red-400'
-                          : isSyncDirty
-                            ? 'bg-amber-400 shadow-[0_0_6px_#f59e0b]'
-                            : 'bg-emerald-400 shadow-[0_0_6px_#34d399]'
-                    }`}
-                  />
+                  <Cloud className="w-3.5 h-3.5 text-stone-500" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-stone-600 shrink-0" />
                 </button>
               ) : (
-                /* Desktop View: Split Push / Pull Segmented Pod */
-                isSyncConfigured && (
-                  <div className="flex items-center gap-0.5 bg-[#0a0a0a] border border-stone-850 rounded-xl p-0.5 shadow-inner">
-                    {/* Sync Status Dot Indicator */}
-                    <div
-                      className="px-1.5 py-1 flex items-center justify-center cursor-default"
-                      title={
-                        syncStatus === 'loading'
-                          ? 'Syncing in progress...'
-                          : syncStatus === 'error'
-                            ? syncStatusMsg || 'Sync error occurred'
-                            : isSyncDirty
-                              ? 'Unpushed local changes — click Push to backup'
-                              : 'All changes synced with GitHub Gist'
-                      }
-                    >
-                      {syncStatus === 'loading' ? (
-                        <RefreshCw className="w-3 h-3 text-amber-400 animate-spin" />
-                      ) : syncStatus === 'error' ? (
-                        <AlertTriangle className="w-3 h-3 text-red-400" />
-                      ) : (
-                        <span
-                          className={`w-2 h-2 rounded-full ${
-                            isSyncDirty
-                              ? 'bg-amber-400 shadow-[0_0_8px_#f59e0b] animate-pulse'
-                              : 'bg-emerald-400 shadow-[0_0_8px_#34d399]'
-                          }`}
-                        />
-                      )}
-                    </div>
-
-                    {/* Push Button */}
-                    <button
-                      id="quick-push-btn"
-                      type="button"
-                      onClick={handleQuickPush}
-                      disabled={syncStatus === 'loading'}
-                      title={
-                        isSyncDirty
-                          ? 'Push to Cloud (Unsaved changes ready for backup)'
-                          : 'Push to Cloud (Backup local data)'
-                      }
-                      className={`px-2 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-                        isSyncDirty
-                          ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-500/10'
-                          : 'text-stone-400 hover:text-stone-200 hover:bg-stone-850'
-                      }`}
-                    >
-                      <UploadCloud className="w-3.5 h-3.5" />
-                    </button>
-
-                    {/* Pull Button with Safe Confirmation state */}
-                    {isPullConfirming ? (
-                      <button
-                        id="quick-pull-confirm-btn"
-                        type="button"
-                        onClick={handleQuickPull}
-                        title="Confirm: overwrite local data from GitHub Gist backup"
-                        className="px-2 h-8 flex items-center text-[10px] font-mono font-bold text-amber-400 hover:text-amber-300 bg-amber-500/15 border border-amber-500/30 rounded-lg animate-pulse transition-all cursor-pointer"
-                      >
-                        Sure?
-                      </button>
+                <div className="flex items-center gap-0.5 bg-[#0a0a0a] border border-stone-850 rounded-xl p-0.5 shadow-inner">
+                  {/* Sync Status Dot Indicator */}
+                  <div
+                    className="px-1.5 py-1 flex items-center justify-center cursor-default"
+                    title={
+                      syncStatus === 'loading'
+                        ? 'Syncing in progress...'
+                        : syncStatus === 'error'
+                          ? syncStatusMsg || 'Sync error occurred'
+                          : isSyncDirty
+                            ? 'Unpushed local changes — click Push to backup'
+                            : 'All changes synced with GitHub Gist'
+                    }
+                  >
+                    {syncStatus === 'loading' ? (
+                      <RefreshCw className="w-3 h-3 text-amber-400 animate-spin" />
+                    ) : syncStatus === 'error' ? (
+                      <AlertTriangle className="w-3 h-3 text-red-400" />
                     ) : (
-                      <button
-                        id="quick-pull-btn"
-                        type="button"
-                        onClick={handleQuickPull}
-                        disabled={syncStatus === 'loading'}
-                        title="Pull from Cloud (Restore latest backup)"
-                        className="px-2 h-8 rounded-lg text-stone-400 hover:text-sky-400 hover:bg-stone-850 flex items-center justify-center transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <DownloadCloud className="w-3.5 h-3.5" />
-                      </button>
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          isSyncDirty
+                            ? 'bg-amber-400 shadow-[0_0_8px_#f59e0b] animate-pulse'
+                            : 'bg-emerald-400 shadow-[0_0_8px_#34d399]'
+                        }`}
+                      />
                     )}
                   </div>
-                )
+
+                  {/* Push Button */}
+                  <button
+                    id="quick-push-btn"
+                    type="button"
+                    onClick={handleQuickPush}
+                    disabled={syncStatus === 'loading'}
+                    title={
+                      isSyncDirty
+                        ? 'Push to Cloud (Unsaved changes ready for backup)'
+                        : 'Push to Cloud (Backup local data)'
+                    }
+                    className={`px-2 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isSyncDirty
+                        ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-500/10'
+                        : 'text-stone-400 hover:text-stone-200 hover:bg-stone-850'
+                    }`}
+                  >
+                    <UploadCloud className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Pull Button with Safe Confirmation state */}
+                  {isPullConfirming ? (
+                    <button
+                      id="quick-pull-confirm-btn"
+                      type="button"
+                      onClick={handleQuickPull}
+                      title="Confirm: overwrite local data from GitHub Gist backup"
+                      className="px-2 h-8 flex items-center text-[10px] font-mono font-bold text-amber-400 hover:text-amber-300 bg-amber-500/15 border border-amber-500/30 rounded-lg animate-pulse transition-all cursor-pointer"
+                    >
+                      Sure?
+                    </button>
+                  ) : (
+                    <button
+                      id="quick-pull-btn"
+                      type="button"
+                      onClick={handleQuickPull}
+                      disabled={syncStatus === 'loading'}
+                      title="Pull from Cloud (Restore latest backup)"
+                      className="px-2 h-8 rounded-lg text-stone-400 hover:text-sky-400 hover:bg-stone-850 flex items-center justify-center transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <DownloadCloud className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               )}
 
               {/* Settings Trigger Button */}
@@ -1086,20 +1073,6 @@ export default function TimerBar({
           )}
         </AnimatePresence>
       </div>
-
-      {/* QUICK SYNC MOBILE BOTTOM SHEET */}
-      <QuickSyncSheet
-        isOpen={isQuickSyncOpen}
-        onClose={() => setIsQuickSyncOpen(false)}
-        onOpenFullSettings={() => {
-          setIsQuickSyncOpen(false);
-          window.dispatchEvent(
-            new CustomEvent('flowday-open-settings', {
-              detail: { tab: 'sync' },
-            }),
-          );
-        }}
-      />
 
       {/* OBJECTIVE PICKER SHEET */}
       <ObjectivePickerSheet
