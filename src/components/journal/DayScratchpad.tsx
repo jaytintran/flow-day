@@ -28,6 +28,7 @@ import {
   Anchor as AnchorIcon,
   Calendar as CalendarIcon,
 } from 'lucide-react';
+import SchedulePlannerTab from './SchedulePlannerTab';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -86,6 +87,7 @@ const STORAGE_OPEN_KEY = 'flowday_day_scratchpad_is_open';
 const STORAGE_POS_KEY = 'flowday_day_scratchpad_pos_v1';
 const STORAGE_TODAY_PAD_KEY = 'flowday_today_pad_v1';
 const TODAY_PAD_ID = '__today__';
+const SCHEDULE_PAD_ID = '__schedule__';
 const TODAY_PAD_MAX_ITEMS = 5;
 /** Tabs shown in the strip before overflow collapses into the pad menu (includes pinned Today) */
 const MAX_VISIBLE_TABS = 5;
@@ -1511,17 +1513,17 @@ export default function DayScratchpad({
   const tabsMenuRef = useRef<HTMLDivElement>(null);
 
   const isOnTodayPad = activePadId === TODAY_PAD_ID;
-  const currentPad = isOnTodayPad
+  const isOnSchedulePad = activePadId === SCHEDULE_PAD_ID;
+  const currentPad = (isOnTodayPad || isOnSchedulePad)
     ? null
     : (pads.find((p) => p.id === activePadId) || pads[0] || createDefaultPad());
   const items = currentPad?.items ?? [];
   const activeItems = items.filter((i) => !i.isCompleted);
   const completedItems = items.filter((i) => i.isCompleted);
 
-  // ── Tab strip windowing: Today is pinned to slot 1, so only the first
-  //    (MAX_VISIBLE_TABS - 1) pads get their own tab; the rest live in the menu.
-  const visiblePads = pads.slice(0, MAX_VISIBLE_TABS - 1);
-  const hiddenPads = pads.slice(MAX_VISIBLE_TABS - 1);
+  // ── Tab strip windowing: Today and Schedule are pinned to slots 1 & 2
+  const visiblePads = pads.slice(0, Math.max(1, MAX_VISIBLE_TABS - 2));
+  const hiddenPads = pads.slice(Math.max(1, MAX_VISIBLE_TABS - 2));
   const hasTabOverflow = hiddenPads.length > 0;
   const activeHiddenPad = hiddenPads.find((p) => p.id === activePadId) ?? null;
 
@@ -1787,9 +1789,11 @@ export default function DayScratchpad({
 
   const uncompletedCount = isOnTodayPad
     ? todayPad.items.filter((i) => !i.isCompleted && (i.dateKey === activeDate.toISOString().slice(0, 10) || !i.dateKey)).length
+    : isOnSchedulePad
+    ? (todayPad.anchors || []).filter((a) => !a.isCompleted && (a.dateKey || todayDateKey()) === scratchpadDate.toISOString().slice(0, 10)).length
     : items.filter((i) => !i.isCompleted && !i.isConverted && i.text.trim().length > 0).length;
 
-  const hasDoneItems = !isOnTodayPad && items.some((i) => i.isCompleted || i.isConverted);
+  const hasDoneItems = !isOnTodayPad && !isOnSchedulePad && items.some((i) => i.isCompleted || i.isConverted);
 
   const todayPadProxy = { id: TODAY_PAD_ID, name: todayPad.name, items: todayPad.items };
 
@@ -1854,6 +1858,28 @@ export default function DayScratchpad({
           isMobile={mobileView}
           pinned
           badge={todayActiveBadge}
+        />
+
+        <PadTab
+          pad={{ id: SCHEDULE_PAD_ID, name: 'Schedule', items: [] }}
+          isActive={isOnSchedulePad}
+          isDragTarget={dragOverPadId === SCHEDULE_PAD_ID}
+          editingPadId={null}
+          editingPadName=""
+          onSelect={handleSelectPad}
+          onStartRename={() => {}}
+          onRenameChange={() => {}}
+          onSaveRename={() => {}}
+          onCancelRename={() => {}}
+          isMobile={mobileView}
+          pinned
+          badge={
+            (todayPad.anchors && todayPad.anchors.length > 0) ? (
+              <span className="text-[9px] font-mono opacity-70 bg-stone-950/60 px-1 rounded-full text-amber-500">
+                {todayPad.anchors.filter((a) => (a.dateKey || todayDateKey()) === scratchpadDate.toISOString().slice(0, 10)).length}
+              </span>
+            ) : null
+          }
         />
 
         <Reorder.Group as="div" axis="x" values={visiblePads} onReorder={handleReorderPads} className="flex items-center gap-1 shrink-0">
@@ -1935,6 +1961,16 @@ export default function DayScratchpad({
                   <span className="text-[9px] opacity-60 shrink-0">
                     {todayPad.items.filter((i) => !i.isCompleted).length}/{TODAY_PAD_MAX_ITEMS}
                   </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectPad(SCHEDULE_PAD_ID)}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-mono transition-colors cursor-pointer ${
+                    isOnSchedulePad ? 'bg-amber-500/15 text-amber-500 font-bold' : 'text-stone-300 hover:bg-stone-800 hover:text-stone-100'
+                  }`}
+                >
+                  <span className="truncate flex-1 text-left">Schedule</span>
+                  <span className="text-[9px] opacity-60 shrink-0">Grid</span>
                 </button>
                 {pads.map((pad) => (
                   <button
@@ -2094,10 +2130,20 @@ export default function DayScratchpad({
 
               {renderTabsRow(true)}
 
-              <div className="flex-1 overflow-y-auto">
+              <div className={`flex-1 ${isOnSchedulePad ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}>
                 {isOnTodayPad ? (
                   <div className="p-4">
                     <TodayPad todayPad={todayPad} onUpdate={handleTodayPadUpdate} viewMode={viewMode} scratchpadDate={scratchpadDate} onScratchpadDateChange={setScratchpadDate} isMobile={true} />
+                  </div>
+                ) : isOnSchedulePad ? (
+                  <div className="p-3 flex-1 flex flex-col min-h-0 overflow-hidden">
+                    <SchedulePlannerTab
+                      scratchpadDate={scratchpadDate}
+                      onScratchpadDateChange={setScratchpadDate}
+                      todayPad={todayPad}
+                      onUpdateTodayPad={handleTodayPadUpdate}
+                      isMobile={true}
+                    />
                   </div>
                 ) : (
                   <div className="p-4 space-y-2">
@@ -2195,9 +2241,19 @@ export default function DayScratchpad({
               {renderTabsRow(false)}
 
               {/* Content */}
-              <div className="flex-1 overflow-y-auto p-3.5">
+              <div className={`flex-1 p-3.5 ${isOnSchedulePad ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}>
                 {isOnTodayPad ? (
                   <TodayPad todayPad={todayPad} onUpdate={handleTodayPadUpdate} viewMode={viewMode} scratchpadDate={scratchpadDate} onScratchpadDateChange={setScratchpadDate} isMobile={false} />
+                ) : isOnSchedulePad ? (
+                  <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                    <SchedulePlannerTab
+                      scratchpadDate={scratchpadDate}
+                      onScratchpadDateChange={setScratchpadDate}
+                      todayPad={todayPad}
+                      onUpdateTodayPad={handleTodayPadUpdate}
+                      isMobile={false}
+                    />
+                  </div>
                 ) : (
                   renderRegularPadItems()
                 )}
@@ -2205,8 +2261,8 @@ export default function DayScratchpad({
 
               {/* Footer hint */}
               <div className="flex-none px-4 py-2 bg-stone-900/80 border-t border-stone-800/60 text-[10px] font-mono text-stone-500 flex justify-between items-center">
-                <span>Anchors = Time-Specific • Engine = 5 Active Slots</span>
-                <span>Click tab title to rename</span>
+                <span>{isOnSchedulePad ? 'Drag down to create block • Edge to resize' : 'Anchors = Time-Specific • Engine = 5 Active Slots'}</span>
+                <span>{isOnSchedulePad ? 'Syncs with Today Anchors' : 'Click tab title to rename'}</span>
               </div>
             </motion.div>
           )
