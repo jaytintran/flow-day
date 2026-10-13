@@ -31,7 +31,8 @@ interface SchedulePlannerTabProps {
   showDateNav?: boolean;
 }
 
-const HOUR_HEIGHT = 60; // 60px per hour -> 1px = 1 minute
+const DEFAULT_COMPACT_HOUR_HEIGHT = 44; // 44px per hour -> ~11px per 15-min nudge (compact)
+const NORMAL_HOUR_HEIGHT = 60; // 60px per hour -> 15px per 15-min nudge (comfortable)
 const TOTAL_MINUTES = 24 * 60; // 1440 minutes
 const SNAP_MINUTES = 15;
 
@@ -78,6 +79,17 @@ export default function SchedulePlannerTab({
   const activeDateKeyStr = scratchpadDate.toISOString().slice(0, 10);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const gridCanvasRef = useRef<HTMLDivElement>(null);
+
+  // Density mode: Compact (44px/hr) vs Normal (60px/hr)
+  const [isCompact, setIsCompact] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('schedule_compact_view');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+  const hourHeight = isCompact ? DEFAULT_COMPACT_HOUR_HEIGHT : NORMAL_HOUR_HEIGHT;
 
   // Ghost block state when user is dragging to create
   const [dragCreation, setDragCreation] = useState<{
@@ -167,11 +179,11 @@ export default function SchedulePlannerTab({
     const timer = setTimeout(() => {
       if (!scrollContainerRef.current) return;
       const targetMin = isToday ? currentMinuteNow : 8 * 60; // 8:00 AM on other days
-      const targetScroll = Math.max(0, targetMin * (HOUR_HEIGHT / 60) - 180);
+      const targetScroll = Math.max(0, targetMin * (hourHeight / 60) - 180);
       scrollContainerRef.current.scrollTo({ top: targetScroll, behavior: 'smooth' });
     }, 100);
     return () => clearTimeout(timer);
-  }, [activeDateKeyStr, isToday]);
+  }, [activeDateKeyStr, isToday, hourHeight]);
 
   // Day navigation
   const shiftDay = (delta: number) => {
@@ -194,8 +206,8 @@ export default function SchedulePlannerTab({
         block: b,
         startMin,
         endMin,
-        top: startMin * (HOUR_HEIGHT / 60),
-        height: Math.max(20, (endMin - startMin) * (HOUR_HEIGHT / 60)),
+        top: startMin * (hourHeight / 60),
+        height: Math.max(14, (endMin - startMin) * (hourHeight / 60)),
         colIndex: 0,
         totalCols: 1,
         isCompleted: !!linkedAnchor?.isCompleted,
@@ -249,7 +261,7 @@ export default function SchedulePlannerTab({
     });
 
     return parsed;
-  }, [dayBlocks, linkedAnchorMap]);
+  }, [dayBlocks, linkedAnchorMap, hourHeight]);
 
   // ── Database & Anchor Sync Helpers ──────────────────────────────────────────
 
@@ -396,7 +408,7 @@ export default function SchedulePlannerTab({
 
     const rect = gridCanvasRef.current.getBoundingClientRect();
     const offsetY = e.clientY - rect.top;
-    const startMin = snapToMinutes(offsetY / (HOUR_HEIGHT / 60));
+    const startMin = snapToMinutes(offsetY / (hourHeight / 60));
 
     gridCanvasRef.current.setPointerCapture(e.pointerId);
     setDragCreation({
@@ -410,7 +422,7 @@ export default function SchedulePlannerTab({
     if (!dragCreation?.isCreating || !gridCanvasRef.current) return;
     const rect = gridCanvasRef.current.getBoundingClientRect();
     const offsetY = e.clientY - rect.top;
-    const currentMin = snapToMinutes(offsetY / (HOUR_HEIGHT / 60));
+    const currentMin = snapToMinutes(offsetY / (hourHeight / 60));
     setDragCreation((prev) => (prev ? { ...prev, currentMin } : null));
   };
 
@@ -454,7 +466,7 @@ export default function SchedulePlannerTab({
       }
       const rect = gridCanvasRef.current.getBoundingClientRect();
       const offsetY = touch.clientY - rect.top;
-      const startMin = snapToMinutes(offsetY / (HOUR_HEIGHT / 60));
+      const startMin = snapToMinutes(offsetY / (hourHeight / 60));
       setDragCreation({
         isCreating: true,
         startMin,
@@ -477,7 +489,7 @@ export default function SchedulePlannerTab({
       e.preventDefault();
       const rect = gridCanvasRef.current.getBoundingClientRect();
       const offsetY = touch.clientY - rect.top;
-      const currentMin = snapToMinutes(offsetY / (HOUR_HEIGHT / 60));
+      const currentMin = snapToMinutes(offsetY / (hourHeight / 60));
       setDragCreation((prev) => (prev ? { ...prev, currentMin } : null));
     }
   };
@@ -522,7 +534,7 @@ export default function SchedulePlannerTab({
   const handleInteractionPointerMove = (e: React.PointerEvent) => {
     if (!activeInteraction) return;
     const deltaPixels = e.clientY - activeInteraction.anchorPointerY;
-    const deltaMinutes = snapToMinutes(deltaPixels / (HOUR_HEIGHT / 60));
+    const deltaMinutes = snapToMinutes(deltaPixels / (hourHeight / 60));
 
     if (activeInteraction.type === 'move') {
       const duration = activeInteraction.origEndMin - activeInteraction.origStartMin;
@@ -618,10 +630,28 @@ export default function SchedulePlannerTab({
           </div>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <span className="text-[10px] font-mono text-stone-500">
             {dayBlocks.length} block{dayBlocks.length === 1 ? '' : 's'}
           </span>
+          <button
+            type="button"
+            onClick={() => {
+              const next = !isCompact;
+              setIsCompact(next);
+              try {
+                localStorage.setItem('schedule_compact_view', String(next));
+              } catch {}
+            }}
+            className={`text-[9px] font-mono px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+              isCompact
+                ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                : 'bg-stone-900 border-stone-800 text-stone-400 hover:text-stone-200'
+            }`}
+            title="Toggle between Compact (44px/hr) and Normal (60px/hr)"
+          >
+            {isCompact ? 'Compact' : 'Normal'}
+          </button>
           <span className="text-[9px] font-mono px-1.5 py-0.5 bg-stone-900 border border-stone-800 rounded text-amber-500/80">
             15m Snap
           </span>
@@ -664,15 +694,15 @@ export default function SchedulePlannerTab({
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           className="relative w-full flex"
-          style={{ height: `${24 * HOUR_HEIGHT}px` }}
+          style={{ height: `${24 * hourHeight}px` }}
         >
           {/* Left Hour Gutter */}
           <div className="w-14 shrink-0 border-r border-stone-800/60 bg-stone-900/30 select-none">
             {Array.from({ length: 24 }).map((_, hour) => (
               <div
                 key={hour}
-                style={{ height: `${HOUR_HEIGHT}px` }}
-                className="relative border-b border-stone-800/40 text-[10px] font-mono text-stone-500 text-right pr-2 pt-1"
+                style={{ height: `${hourHeight}px` }}
+                className="relative border-b border-stone-800/40 text-[10px] font-mono text-stone-500 text-right pr-2 pt-0.5 leading-none"
               >
                 <span>{formatHourLabel(hour)}</span>
               </div>
@@ -686,12 +716,12 @@ export default function SchedulePlannerTab({
               <div
                 key={hour}
                 data-empty-grid="true"
-                style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
+                style={{ top: `${hour * hourHeight}px`, height: `${hourHeight}px` }}
                 className="absolute left-0 right-0 border-b border-stone-800/40 pointer-events-none"
               >
                 {/* 30-min dashed line */}
                 <div
-                  style={{ top: `${HOUR_HEIGHT / 2}px` }}
+                  style={{ top: `${hourHeight / 2}px` }}
                   className="absolute left-0 right-0 border-b border-dashed border-stone-850/60"
                 />
               </div>
@@ -700,7 +730,7 @@ export default function SchedulePlannerTab({
             {/* Live Red "Now" Needle Indicator */}
             {isToday && (
               <div
-                style={{ top: `${currentMinuteNow * (HOUR_HEIGHT / 60)}px` }}
+                style={{ top: `${currentMinuteNow * (hourHeight / 60)}px` }}
                 className="absolute left-0 right-0 z-30 pointer-events-none flex items-center"
               >
                 <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-sm shadow-rose-500/80 -ml-1.5 shrink-0" />
@@ -715,23 +745,25 @@ export default function SchedulePlannerTab({
             {dragCreation?.isCreating && (
               <div
                 style={{
-                  top: `${Math.min(dragCreation.startMin, dragCreation.currentMin) * (HOUR_HEIGHT / 60)}px`,
-                  height: `${Math.max(15, Math.abs(dragCreation.currentMin - dragCreation.startMin)) * (HOUR_HEIGHT / 60)}px`,
+                  top: `${Math.min(dragCreation.startMin, dragCreation.currentMin) * (hourHeight / 60)}px`,
+                  height: `${Math.max(14, Math.abs(dragCreation.currentMin - dragCreation.startMin) * (hourHeight / 60))}px`,
                   left: '4px',
                   right: '4px',
                 }}
-                className="absolute z-20 bg-amber-500/20 border-2 border-dashed border-amber-400 rounded-lg pointer-events-none flex flex-col justify-between p-2 shadow-lg"
+                className="absolute z-20 bg-amber-500/20 border-2 border-dashed border-amber-400 rounded-lg pointer-events-none flex flex-col justify-between p-1.5 shadow-lg overflow-hidden"
               >
-                <div className="flex items-center gap-1 text-[11px] font-mono font-bold text-amber-300">
-                  <Clock className="w-3.5 h-3.5 text-amber-400" />
-                  <span>
+                <div className="flex items-center gap-1 text-[10px] font-mono font-bold text-amber-300">
+                  <Clock className="w-3 h-3 text-amber-400 shrink-0" />
+                  <span className="truncate">
                     {formatMinutesToTime(Math.min(dragCreation.startMin, dragCreation.currentMin))} –{' '}
                     {formatMinutesToTime(Math.max(dragCreation.startMin, dragCreation.currentMin))}
                   </span>
                 </div>
-                <span className="text-[10px] font-mono text-amber-400/80">
-                  Release to name block
-                </span>
+                {Math.abs(dragCreation.currentMin - dragCreation.startMin) >= 30 && (
+                  <span className="text-[9px] font-mono text-amber-400/80 truncate">
+                    Release to name block
+                  </span>
+                )}
               </div>
             )}
 
@@ -740,6 +772,7 @@ export default function SchedulePlannerTab({
               const widthPct = 100 / totalCols;
               const leftPct = colIndex * widthPct;
               const isEditing = editingBlockId === block.id;
+              const isShort = height < 28;
 
               return (
                 <div
@@ -750,7 +783,7 @@ export default function SchedulePlannerTab({
                     left: `calc(${leftPct}% + 4px)`,
                     width: `calc(${widthPct}% - 8px)`,
                   }}
-                  className={`group absolute z-10 rounded-lg border transition-all flex flex-col justify-between overflow-hidden shadow-xs ${
+                  className={`group absolute z-10 rounded-md border transition-all flex flex-col justify-between overflow-hidden shadow-xs select-none ${
                     isCompleted
                       ? 'bg-stone-900/50 border-stone-800 text-stone-500 opacity-60'
                       : 'bg-amber-500/15 hover:bg-amber-500/20 border-amber-500/40 hover:border-amber-400/80 text-stone-200'
@@ -758,18 +791,18 @@ export default function SchedulePlannerTab({
                   onPointerMove={handleInteractionPointerMove}
                   onPointerUp={handleInteractionPointerUp}
                 >
-                  {/* Top Resize Handle */}
+                  {/* Top Resize Handle - overlay */}
                   <div
                     onPointerDown={(e) =>
                       handleInteractionPointerDown(e, 'resize-top', block.id, startMin, endMin)
                     }
-                    className="h-2 w-full cursor-ns-resize shrink-0 hover:bg-amber-400/30 transition-colors"
+                    className="absolute inset-x-0 top-0 h-1.5 cursor-ns-resize z-20 hover:bg-amber-400/40 transition-colors"
                     title="Drag to resize start time"
                   />
 
                   {/* Block Content Body */}
-                  <div className="flex-1 px-2 py-0.5 flex items-start justify-between gap-1 min-w-0">
-                    <div className="flex items-start gap-1.5 flex-1 min-w-0">
+                  <div className={`flex-1 px-1.5 flex items-center justify-between gap-1 min-w-0 h-full ${isShort ? 'py-0' : 'py-0.5 items-start'}`}>
+                    <div className={`flex flex-1 min-w-0 ${isShort ? 'items-center gap-1' : 'items-start gap-1.5'}`}>
                       {/* Completion checkmark */}
                       <button
                         type="button"
@@ -777,13 +810,15 @@ export default function SchedulePlannerTab({
                           e.stopPropagation();
                           handleToggleBlockComplete(block.id);
                         }}
-                        className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 mt-0.5 cursor-pointer transition-colors ${
+                        className={`rounded-full border flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
+                          isShort ? 'w-3 h-3' : 'w-3.5 h-3.5 mt-0.5'
+                        } ${
                           isCompleted
                             ? 'bg-emerald-500/20 border-emerald-500/60 text-emerald-500'
                             : 'border-stone-600 hover:border-emerald-400 text-transparent hover:text-emerald-400'
                         }`}
                       >
-                        <Check className="w-2 h-2 stroke-[3]" />
+                        <Check className={isShort ? 'w-1.5 h-1.5 stroke-[3]' : 'w-2 h-2 stroke-[3]'} />
                       </button>
 
                       <div className="flex-1 min-w-0">
@@ -798,26 +833,48 @@ export default function SchedulePlannerTab({
                               if (e.key === 'Escape') setEditingBlockId(null);
                             }}
                             onBlur={() => handleUpdateBlockTitle(block.id, editingTitle)}
-                            className="w-full bg-stone-950 border border-amber-500/60 rounded px-1 text-xs text-amber-300 focus:outline-none font-mono"
+                            className="w-full bg-stone-950 border border-amber-500/60 rounded px-1 text-[11px] text-amber-300 focus:outline-none font-mono"
                           />
-                        ) : (
-                          <div
-                            onClick={() => {
-                              setEditingBlockId(block.id);
-                              setEditingTitle(block.title);
-                            }}
-                            className={`text-xs font-mono font-bold truncate cursor-pointer ${
-                              isCompleted ? 'line-through text-stone-500' : 'text-stone-100 hover:text-amber-300'
-                            }`}
-                            title="Click to rename"
-                          >
-                            {block.title}
+                        ) : isShort ? (
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span
+                              onClick={() => {
+                                setEditingBlockId(block.id);
+                                setEditingTitle(block.title);
+                              }}
+                              className={`text-[11px] leading-tight font-mono font-bold truncate cursor-pointer ${
+                                isCompleted ? 'line-through text-stone-500' : 'text-stone-100 hover:text-amber-300'
+                              }`}
+                              title="Click to rename"
+                            >
+                              {block.title}
+                            </span>
+                            {height >= 20 && (
+                              <span className="text-[9px] font-mono text-amber-500/80 shrink-0 hidden sm:inline">
+                                {formatMinutesToTime(startMin)}
+                              </span>
+                            )}
                           </div>
-                        )}
+                        ) : (
+                          <>
+                            <div
+                              onClick={() => {
+                                setEditingBlockId(block.id);
+                                setEditingTitle(block.title);
+                              }}
+                              className={`text-xs font-mono font-bold truncate cursor-pointer ${
+                                isCompleted ? 'line-through text-stone-500' : 'text-stone-100 hover:text-amber-300'
+                              }`}
+                              title="Click to rename"
+                            >
+                              {block.title}
+                            </div>
 
-                        <div className="text-[10px] font-mono text-amber-500/90 truncate">
-                          {formatMinutesToTime(startMin)} – {formatMinutesToTime(endMin)}
-                        </div>
+                            <div className="text-[10px] font-mono text-amber-500/90 truncate">
+                              {formatMinutesToTime(startMin)} – {formatMinutesToTime(endMin)}
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -827,7 +884,7 @@ export default function SchedulePlannerTab({
                         onPointerDown={(e) =>
                           handleInteractionPointerDown(e, 'move', block.id, startMin, endMin)
                         }
-                        className="p-1 text-stone-500 hover:text-amber-400 cursor-grab active:cursor-grabbing touch-none"
+                        className="p-0.5 text-stone-500 hover:text-amber-400 cursor-grab active:cursor-grabbing touch-none"
                         title="Drag to reschedule"
                       >
                         <GripVertical className="w-3 h-3" />
@@ -838,7 +895,7 @@ export default function SchedulePlannerTab({
                           e.stopPropagation();
                           handleDeleteBlock(block.id);
                         }}
-                        className="p-1 text-stone-500 hover:text-rose-400 cursor-pointer"
+                        className="p-0.5 text-stone-500 hover:text-rose-400 cursor-pointer"
                         title="Delete block"
                       >
                         <Trash2 className="w-3 h-3" />
@@ -846,12 +903,12 @@ export default function SchedulePlannerTab({
                     </div>
                   </div>
 
-                  {/* Bottom Resize Handle */}
+                  {/* Bottom Resize Handle - overlay */}
                   <div
                     onPointerDown={(e) =>
                       handleInteractionPointerDown(e, 'resize-bottom', block.id, startMin, endMin)
                     }
-                    className="h-2 w-full cursor-ns-resize shrink-0 hover:bg-amber-400/30 transition-colors"
+                    className="absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize z-20 hover:bg-amber-400/40 transition-colors"
                     title="Drag to resize end time"
                   />
                 </div>
