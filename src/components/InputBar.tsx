@@ -24,6 +24,9 @@ import {
   ArrowRight,
   Pin,
   Star,
+  Maximize2,
+  Minimize2,
+  Pencil,
 } from 'lucide-react';
 import { toLocalDateString, formatDuration } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -128,6 +131,26 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
   const [showHelp, setShowHelp] = useState(false);
   const [showTimePopup, setShowTimePopup] = useState(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
+
+  // Minimal mode state with persistence
+  const [isMinimal, setIsMinimal] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('flowday_input_bar_minimal') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
+
+  const toggleMinimal = () => {
+    setIsMinimal((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('flowday_input_bar_minimal', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Field values
   const [title, setTitle] = useState('');
@@ -719,7 +742,9 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
 
   return (
     <div
-      className="w-full bg-[#0d0d0d] border-t border-stone-800/60 p-5 md:p-6 relative z-30"
+      className={`w-full bg-[#0d0d0d] border-t border-stone-800/60 transition-all duration-200 relative z-30 ${
+        isMinimal ? 'py-2 px-3 md:py-2.5 md:px-6' : 'p-4 md:p-6'
+      }`}
       id="input-bar-container"
     >
       <div className="max-w-4xl mx-auto relative">
@@ -872,22 +897,218 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
           )}
         </AnimatePresence>
 
-        {/* Unified Premium Entry Panel Container */}
-        <div className="bg-[#141414] border border-stone-800/80 rounded-b-2xl shadow-2xl p-4 md:p-5 relative overflow-visible transition-all duration-300 focus-within:border-stone-700/80">
-          {/* Subtle Ambient Accent Border depending on activeType */}
-          <div
-            className={`absolute top-0 left-0 right-0 h-[2px] transition-all duration-300 ${
-              activeType === 'task'
-                ? 'bg-gradient-to-r from-emerald-500/20 via-emerald-500 to-emerald-500/20'
-                : activeType === 'log'
-                  ? 'bg-gradient-to-r from-stone-500/20 via-stone-500 to-stone-500/20'
-                  : activeType === 'event'
-                    ? 'bg-gradient-to-r from-amber-500/20 via-amber-500 to-amber-500/20'
-                    : activeType === 'note'
-                      ? 'bg-gradient-to-r from-blue-500/20 via-blue-500 to-blue-500/20'
-                      : 'bg-gradient-to-r from-indigo-500/20 via-indigo-500 to-indigo-500/20'
-            }`}
-          />
+        {/* ─── MINIMAL MODE: Slim Floating Command Bar ─── */}
+        {isMinimal ? (
+          <div className="bg-[#141414] border border-stone-800/80 rounded-2xl shadow-xl px-2.5 py-1.5 relative transition-all duration-200 focus-within:border-stone-700/80">
+            {/* Subtle Accent Glow */}
+            <div
+              className={`absolute top-0 left-4 right-4 h-[1px] transition-all duration-300 ${
+                activeType === 'task'
+                  ? 'bg-gradient-to-r from-transparent via-emerald-500/70 to-transparent'
+                  : activeType === 'log'
+                    ? 'bg-gradient-to-r from-transparent via-stone-400/70 to-transparent'
+                    : activeType === 'event'
+                      ? 'bg-gradient-to-r from-transparent via-amber-500/70 to-transparent'
+                      : activeType === 'note'
+                        ? 'bg-gradient-to-r from-transparent via-blue-500/70 to-transparent'
+                        : 'bg-gradient-to-r from-transparent via-indigo-500/70 to-transparent'
+              }`}
+            />
+
+            <form onSubmit={handleSubmit} className="flex items-center gap-1.5 sm:gap-2">
+              {/* Type Switcher Dropdown Button */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowTypeDropdown(!showTypeDropdown)}
+                  className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-all cursor-pointer border ${
+                    activeType === 'task'
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                      : activeType === 'log'
+                        ? 'bg-stone-500/10 text-stone-300 border-stone-500/30'
+                        : activeType === 'event'
+                          ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                          : activeType === 'note'
+                            ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+                            : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
+                  }`}
+                  title="Click to switch entry type (or press Tab)"
+                >
+                  {activeType === 'task' && <CheckSquare className="w-3.5 h-3.5" />}
+                  {activeType === 'log' && <CircleDot className="w-3.5 h-3.5" />}
+                  {activeType === 'event' && <Calendar className="w-3.5 h-3.5" />}
+                  {activeType === 'note' && <FileText className="w-3.5 h-3.5" />}
+                  {activeType === 'time-block' && <Clock className="w-3.5 h-3.5" />}
+                  <span className="hidden sm:inline text-[11px]">{activeType === 'time-block' ? 'Block' : activeType}</span>
+                  <ChevronDown className="w-3 h-3 opacity-60" />
+                </button>
+
+                {/* Dropdown Menu */}
+                {showTypeDropdown && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowTypeDropdown(false)}
+                    />
+                    <div className="absolute bottom-full mb-1.5 left-0 z-50 bg-[#141414] border border-stone-700/80 rounded-xl shadow-2xl p-1 w-36 select-none font-mono">
+                      {ENTRY_TYPES.map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => {
+                            setActiveType(t);
+                            setShowTypeDropdown(false);
+                          }}
+                          className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs capitalize transition-colors cursor-pointer ${
+                            activeType === t
+                              ? 'bg-stone-850 text-stone-100 font-bold'
+                              : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900'
+                          }`}
+                        >
+                          {t === 'task' && <CheckSquare className="w-3 h-3 text-emerald-400" />}
+                          {t === 'log' && <CircleDot className="w-3.5 h-3.5 text-stone-400" />}
+                          {t === 'event' && <Calendar className="w-3 h-3 text-amber-400" />}
+                          {t === 'note' && <FileText className="w-3 h-3 text-blue-400" />}
+                          {t === 'time-block' && <Clock className="w-3 h-3 text-indigo-400" />}
+                          <span>{t === 'time-block' ? 'Block' : t}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Note / Event Markdown Sheet Trigger */}
+              {(activeType === 'note' || activeType === 'event') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalTitle(title);
+                    setModalContent('');
+                    setIsNoteModalOpen(true);
+                  }}
+                  className={`p-1.5 rounded-lg border transition-colors cursor-pointer shrink-0 ${
+                    activeType === 'event'
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
+                      : 'bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20'
+                  }`}
+                  title="Open full markdown note editor"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {/* Time Popup Trigger */}
+              <div className="relative inline-block shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowTimePopup(!showTimePopup)}
+                  className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                    showTimePopup
+                      ? 'bg-stone-850 text-stone-200 border-stone-700'
+                      : timeManuallySet
+                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                        : 'bg-stone-900/60 text-stone-400 border-stone-850 hover:text-stone-200 hover:bg-stone-850'
+                  }`}
+                  title="Pick specific date or timestamp"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                </button>
+                {renderCalendarTimePopup()}
+              </div>
+
+              {/* Input Field with Live Preview Inline */}
+              <div className="relative flex-1 min-w-0">
+                <input
+                  type="text"
+                  required
+                  placeholder={
+                    activeType === 'task'
+                      ? PLACEHOLDERS.task[placeholderIndex % PLACEHOLDERS.task.length]
+                      : activeType === 'log'
+                        ? PLACEHOLDERS.log[placeholderIndex % PLACEHOLDERS.log.length]
+                        : activeType === 'event'
+                          ? PLACEHOLDERS.event[placeholderIndex % PLACEHOLDERS.event.length]
+                          : activeType === 'note'
+                            ? PLACEHOLDERS.note[placeholderIndex % PLACEHOLDERS.note.length]
+                            : PLACEHOLDERS['time-block'][placeholderIndex % PLACEHOLDERS['time-block'].length]
+                  }
+                  value={title}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyPress}
+                  className="w-full bg-transparent text-stone-100 text-xs sm:text-sm placeholder-stone-600 focus:outline-none px-2 py-1 font-sans"
+                />
+              </div>
+
+              {/* Detected Date/Span Chip Inline */}
+              {liveParsedPreview && (
+                <div className="hidden md:flex items-center gap-1 shrink-0 text-[10px] font-mono select-none">
+                  {liveParsedPreview.dateStr && (
+                    <span className="px-1.5 py-0.5 rounded bg-sky-950/60 border border-sky-800/60 text-sky-400">
+                      {liveParsedPreview.dateStr}
+                    </span>
+                  )}
+                  {liveParsedPreview.spanStr && (
+                    <span className="px-1.5 py-0.5 rounded bg-indigo-950/60 border border-indigo-800/60 text-indigo-300">
+                      {liveParsedPreview.spanStr}
+                    </span>
+                  )}
+                  {liveParsedPreview.durationStr && (
+                    <span className="px-1.5 py-0.5 rounded bg-amber-950/60 border border-amber-800/60 text-amber-400">
+                      {liveParsedPreview.durationStr}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Submit button */}
+              <button
+                type="submit"
+                className={`p-1.5 sm:px-3 sm:py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
+                  activeType === 'task'
+                    ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/40'
+                    : activeType === 'log'
+                      ? 'bg-stone-800 text-stone-200 hover:bg-stone-700 border border-stone-700'
+                      : activeType === 'event'
+                        ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/40'
+                        : activeType === 'note'
+                          ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border border-blue-500/40'
+                          : 'bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 border border-indigo-500/40'
+                }`}
+                title="Save Entry (Enter)"
+              >
+                <Send className="w-3 h-3" />
+                <span className="hidden sm:inline text-[11px]">Save</span>
+              </button>
+
+              {/* Expand to Standard Mode Toggle Button */}
+              <button
+                type="button"
+                onClick={toggleMinimal}
+                className="p-1.5 rounded-lg text-stone-500 hover:text-stone-200 hover:bg-stone-850 transition-colors cursor-pointer shrink-0"
+                title="Expand to Full Input Bar"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+            </form>
+          </div>
+        ) : (
+          /* ─── STANDARD EXPANDED MODE ─── */
+          <div className="bg-[#141414] border border-stone-800/80 rounded-b-2xl shadow-2xl p-4 md:p-5 relative overflow-visible transition-all duration-300 focus-within:border-stone-700/80">
+            {/* Subtle Ambient Accent Border depending on activeType */}
+            <div
+              className={`absolute top-0 left-0 right-0 h-[2px] transition-all duration-300 ${
+                activeType === 'task'
+                  ? 'bg-gradient-to-r from-emerald-500/20 via-emerald-500 to-emerald-500/20'
+                  : activeType === 'log'
+                    ? 'bg-gradient-to-r from-stone-500/20 via-stone-500 to-stone-500/20'
+                    : activeType === 'event'
+                      ? 'bg-gradient-to-r from-amber-500/20 via-amber-500 to-amber-500/20'
+                      : activeType === 'note'
+                        ? 'bg-gradient-to-r from-blue-500/20 via-blue-500 to-blue-500/20'
+                        : 'bg-gradient-to-r from-indigo-500/20 via-indigo-500 to-indigo-500/20'
+              }`}
+            />
 
           {/* Sub-Header Widget: Types Switcher + Custom Manual Inputs + Custom Help Toggle */}
           <div
@@ -995,6 +1216,17 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
                   <span className="hidden sm:inline">Syntax Guide</span>
                 </button>
               </div>
+
+              {/* Minimal Mode Toggle (Collapse to slim bar) */}
+              <button
+                type="button"
+                onClick={toggleMinimal}
+                className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-stone-500 hover:text-stone-200 hover:bg-stone-900 border border-transparent hover:border-stone-800 transition-all text-xs font-mono cursor-pointer shrink-0"
+                title="Switch to Compact Input Bar"
+              >
+                <Minimize2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline text-[11px]">Compact</span>
+              </button>
             </div>
           </div>
 
@@ -1302,6 +1534,7 @@ export default function InputBar({ activeDate, viewMode }: InputBarProps) {
             </div>
           </form>
         </div>
+        )}
       </div>
 
       {/* DEDICATED DETAILED NOTE CREATION MODAL */}
