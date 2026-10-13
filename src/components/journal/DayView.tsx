@@ -3,12 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import DayTimeline, { RenderItem } from './DayTimeline';
 import { TimelineEntry, Task, DayRange } from '../../types';
 import { ChevronDown, ChevronRight, Calendar, Trash2, Sparkles, AlertCircle, Play, Plus } from 'lucide-react';
 import EntryContextMenu from '../EntryContextMenu';
 import { toLocalDateString, formatDateLabel, isSameDay, getEffectiveDate } from '../../utils';
+import SchedulePlannerTab from './SchedulePlannerTab';
+import { loadTodayPad, saveTodayPad, TodayPadData } from './DayScratchpad';
 
 interface DayViewProps {
   activeDate: Date;
@@ -82,6 +84,26 @@ export default function DayView({
     x: number;
     y: number;
   } | null>(null);
+
+  // Synchronize TodayPad data so creating timeblocks updates Day Scratchpad anchors
+  const [todayPad, setTodayPad] = useState<TodayPadData>(loadTodayPad);
+
+  useEffect(() => {
+    const handleSync = () => {
+      setTodayPad(loadTodayPad());
+    };
+    window.addEventListener('scratchpad_sync_update', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('scratchpad_sync_update', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
+  const handleUpdateTodayPad = useCallback((data: TodayPadData) => {
+    setTodayPad(data);
+    saveTodayPad(data);
+  }, []);
 
   // Compute multi-day columns when dayRange !== '1D'
   const multiDayDates = React.useMemo(() => {
@@ -283,30 +305,49 @@ export default function DayView({
     );
   };
 
-  // 1D View Mode: Keep the existing single timeline layout
+  // 1D View Mode: Split-pane on desktop (lg:), single timeline on mobile
   if (dayRange === '1D') {
     return (
       <div className="space-y-6">
         {renderOverdueSection()}
 
-        <DayTimeline
-          items={dayRenderItems}
-          labelString={activeDayString}
-          isFromTimelineView={false}
-          collapsedDays={collapsedDays}
-          toggleDayCollapse={toggleDayCollapse}
-          setActiveDate={setActiveDate}
-          deletingId={deletingId}
-          activeTaskId={activeTaskId}
-          handleDeleteEntry={handleDeleteEntry}
-          handleOpenDetail={handleOpenDetail}
-          handleToggleTaskStatus={handleToggleTaskStatus}
-          handleActivateTask={handleActivateTask}
-          handleCarryTask={handleCarryTask}
-          formatTime={formatTime}
-          formatDateStringLabel={formatDateStringLabel}
-          onTimePickerConfirm={onTimePickerConfirm}
-        />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left Pane: Day Stream Timeline */}
+          <div className="lg:col-span-7 min-w-0">
+            <DayTimeline
+              items={dayRenderItems}
+              labelString={activeDayString}
+              isFromTimelineView={false}
+              collapsedDays={collapsedDays}
+              toggleDayCollapse={toggleDayCollapse}
+              setActiveDate={setActiveDate}
+              deletingId={deletingId}
+              activeTaskId={activeTaskId}
+              handleDeleteEntry={handleDeleteEntry}
+              handleOpenDetail={handleOpenDetail}
+              handleToggleTaskStatus={handleToggleTaskStatus}
+              handleActivateTask={handleActivateTask}
+              handleCarryTask={handleCarryTask}
+              formatTime={formatTime}
+              formatDateStringLabel={formatDateStringLabel}
+              onTimePickerConfirm={onTimePickerConfirm}
+            />
+          </div>
+
+          {/* Right Pane: 24h Schedule Grid (Desktop only) */}
+          <div className="hidden lg:block lg:col-span-5 sticky top-2 min-w-0">
+            <div className="bg-[#111111]/90 backdrop-blur-md rounded-2xl border border-stone-850 p-3 h-[calc(100vh-210px)] min-h-[580px] shadow-sm flex flex-col overflow-hidden">
+              <SchedulePlannerTab
+                scratchpadDate={activeDate}
+                onScratchpadDateChange={setActiveDate}
+                todayPad={todayPad}
+                onUpdateTodayPad={handleUpdateTodayPad}
+                isMobile={false}
+                showDateNav={false}
+              />
+            </div>
+          </div>
+        </div>
 
         {contextMenu && (
           <EntryContextMenu

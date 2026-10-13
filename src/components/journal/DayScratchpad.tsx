@@ -85,7 +85,7 @@ const STORAGE_ACTIVE_PAD_ID_KEY = 'flowday_scratchpad_active_id_v1';
 const STORAGE_LEGACY_ITEMS_KEY = 'flowday_day_scratchpad_items_v1';
 const STORAGE_OPEN_KEY = 'flowday_day_scratchpad_is_open';
 const STORAGE_POS_KEY = 'flowday_day_scratchpad_pos_v1';
-const STORAGE_TODAY_PAD_KEY = 'flowday_today_pad_v1';
+export const STORAGE_TODAY_PAD_KEY = 'flowday_today_pad_v1';
 const TODAY_PAD_ID = '__today__';
 const SCHEDULE_PAD_ID = '__schedule__';
 const TODAY_PAD_MAX_ITEMS = 5;
@@ -273,7 +273,7 @@ function savePads(pads: Scratchpad[]) {
   } catch {}
 }
 
-function loadTodayPad(): TodayPadData {
+export function loadTodayPad(): TodayPadData {
   try {
     const raw = localStorage.getItem(STORAGE_TODAY_PAD_KEY);
     if (raw) {
@@ -284,7 +284,7 @@ function loadTodayPad(): TodayPadData {
   return { name: 'Today', items: [], anchors: [] };
 }
 
-function saveTodayPad(data: TodayPadData) {
+export function saveTodayPad(data: TodayPadData) {
   try {
     localStorage.setItem(STORAGE_TODAY_PAD_KEY, JSON.stringify(data));
     window.dispatchEvent(new CustomEvent('scratchpad_sync_update'));

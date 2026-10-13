@@ -1080,7 +1080,7 @@ export default function Journal({
 								? "md:max-w-4xl space-y-0"
 								: dayRange !== "1D"
 									? "w-full px-4 sm:px-6 md:px-8 space-y-8"
-									: "md:max-w-4xl space-y-8"
+									: "w-full max-w-7xl md:px-2 space-y-8"
 				}`}
 			>
 				{viewMode === "records" ? (

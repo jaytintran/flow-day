@@ -28,6 +28,7 @@ interface SchedulePlannerTabProps {
   todayPad: TodayPadData;
   onUpdateTodayPad: (data: TodayPadData) => void;
   isMobile?: boolean;
+  showDateNav?: boolean;
 }
 
 const HOUR_HEIGHT = 60; // 60px per hour -> 1px = 1 minute
@@ -72,6 +73,7 @@ export default function SchedulePlannerTab({
   todayPad,
   onUpdateTodayPad,
   isMobile,
+  showDateNav = true,
 }: SchedulePlannerTabProps) {
   const activeDateKeyStr = scratchpadDate.toISOString().slice(0, 10);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -571,41 +573,50 @@ export default function SchedulePlannerTab({
     <div className="flex flex-col h-full select-none font-sans overflow-hidden">
       {/* ── Top Header Toolbar ── */}
       <div className="flex items-center justify-between pb-2 mb-2 border-b border-stone-800/80 px-1 shrink-0">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => shiftDay(-1)}
-            className="p-1 rounded-md text-stone-500 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer"
-            title="Previous Day"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <span className="text-xs font-mono font-bold text-stone-200 min-w-[100px] text-center">
-            {scratchpadDate.toLocaleDateString(undefined, {
-              weekday: 'short',
-              month: 'short',
-              day: 'numeric',
-            })}
-          </span>
-          <button
-            type="button"
-            onClick={() => shiftDay(1)}
-            className="p-1 rounded-md text-stone-500 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer"
-            title="Next Day"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-
-          {!isToday && (
+        {showDateNav ? (
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => onScratchpadDateChange(new Date())}
-              className="text-[10px] font-mono text-amber-500 hover:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30 transition-colors cursor-pointer ml-1"
+              onClick={() => shiftDay(-1)}
+              className="p-1 rounded-md text-stone-500 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer"
+              title="Previous Day"
             >
-              Today
+              <ChevronLeft className="w-4 h-4" />
             </button>
-          )}
-        </div>
+            <span className="text-xs font-mono font-bold text-stone-200 min-w-[100px] text-center">
+              {scratchpadDate.toLocaleDateString(undefined, {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+              })}
+            </span>
+            <button
+              type="button"
+              onClick={() => shiftDay(1)}
+              className="p-1 rounded-md text-stone-500 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer"
+              title="Next Day"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+
+            {!isToday && (
+              <button
+                type="button"
+                onClick={() => onScratchpadDateChange(new Date())}
+                className="text-[10px] font-mono text-amber-500 hover:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30 transition-colors cursor-pointer ml-1"
+              >
+                Today
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-amber-500" />
+            <span className="text-xs font-mono font-bold text-stone-200 tracking-wider uppercase">
+              Schedule Planner
+            </span>
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-mono text-stone-500">
