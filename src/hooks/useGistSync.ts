@@ -144,10 +144,11 @@ export function useGistSync() {
     const entities = await db.entities.toArray();
     const entity_types = await db.entity_types.toArray();
 
-    // Include Day Scratchpad data in backup (pads, today_pad, and legacy items)
+    // Include Day Scratchpad data in backup (pads, today_pad, legacy items, and quick notes)
     let scratchpadPads = [];
     let scratchpadItems = [];
     let todayPad = null;
+    let scratchpadQuickNotes = [];
     try {
       const rawPads = localStorage.getItem('flowday_scratchpad_pads_v1');
       if (rawPads) {
@@ -160,6 +161,10 @@ export function useGistSync() {
       const rawScratch = localStorage.getItem('flowday_day_scratchpad_items_v1');
       if (rawScratch) {
         scratchpadItems = JSON.parse(rawScratch);
+      }
+      const rawNotes = localStorage.getItem('flowday_scratchpad_quick_notes_v1');
+      if (rawNotes) {
+        scratchpadQuickNotes = JSON.parse(rawNotes);
       }
     } catch {}
 
@@ -177,6 +182,7 @@ export function useGistSync() {
       scratchpad_pads: scratchpadPads,
       today_pad: todayPad,
       scratchpad_items: scratchpadItems,
+      scratchpad_quick_notes: scratchpadQuickNotes,
     };
   };
 
@@ -218,6 +224,17 @@ export function useGistSync() {
             JSON.stringify(data.scratchpad_items),
           );
           window.dispatchEvent(new Event('scratchpad_sync_update'));
+        } catch {}
+      }
+
+      // Restore Day Scratchpad quick notes if present in backup
+      if (Array.isArray(data.scratchpad_quick_notes)) {
+        try {
+          localStorage.setItem(
+            'flowday_scratchpad_quick_notes_v1',
+            JSON.stringify(data.scratchpad_quick_notes),
+          );
+          window.dispatchEvent(new CustomEvent('scratchpad_sync_update'));
         } catch {}
       }
 

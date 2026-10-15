@@ -27,8 +27,12 @@ import {
   Zap,
   Anchor as AnchorIcon,
   Calendar as CalendarIcon,
+  Layers,
+  FileText,
+  NotebookPen,
 } from 'lucide-react';
 import SchedulePlannerTab from './SchedulePlannerTab';
+import QuickNotesTab from './QuickNotesTab';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -88,9 +92,8 @@ const STORAGE_POS_KEY = 'flowday_day_scratchpad_pos_v1';
 export const STORAGE_TODAY_PAD_KEY = 'flowday_today_pad_v1';
 const TODAY_PAD_ID = '__today__';
 const SCHEDULE_PAD_ID = '__schedule__';
+const NOTES_PAD_ID = '__notes__';
 const TODAY_PAD_MAX_ITEMS = 5;
-/** Tabs shown in the strip before overflow collapses into the pad menu (includes pinned Today) */
-const MAX_VISIBLE_TABS = 5;
 
 interface Position { x: number; y: number; }
 
@@ -1503,49 +1506,27 @@ export default function DayScratchpad({
   const [isClearConfirming, setIsClearConfirming] = useState(false);
   const [isDeletePadConfirming, setIsDeletePadConfirming] = useState(false);
   const [isCompletedOpen, setIsCompletedOpen] = useState(false);
-  const [isTabsMenuOpen, setIsTabsMenuOpen] = useState(false);
-  /** Arrange mode: pad tabs expose a grip handle so touch users can reorder */
-  const [isArrangingTabs, setIsArrangingTabs] = useState(false);
+  /** Tab management modal (replaces old overflow dropdown + arrange-mode toggle) */
+  const [isTabsModalOpen, setIsTabsModalOpen] = useState(false);
   const textareaRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
   const windowDragControls = useDragControls();
   const [dragOverPadId, setDragOverPadId] = useState<string | null>(null);
   const dragOverPadIdRef = useRef<string | null>(null);
-  const tabsMenuRef = useRef<HTMLDivElement>(null);
 
   const isOnTodayPad = activePadId === TODAY_PAD_ID;
   const isOnSchedulePad = activePadId === SCHEDULE_PAD_ID;
-  const currentPad = (isOnTodayPad || isOnSchedulePad)
+  const isOnNotesPad = activePadId === NOTES_PAD_ID;
+  const currentPad = (isOnTodayPad || isOnSchedulePad || isOnNotesPad)
     ? null
     : (pads.find((p) => p.id === activePadId) || pads[0] || createDefaultPad());
   const items = currentPad?.items ?? [];
   const activeItems = items.filter((i) => !i.isCompleted);
   const completedItems = items.filter((i) => i.isCompleted);
 
-  // ── Tab strip windowing: Today and Schedule are pinned to slots 1 & 2
-  const visiblePads = pads.slice(0, Math.max(1, MAX_VISIBLE_TABS - 2));
-  const hiddenPads = pads.slice(Math.max(1, MAX_VISIBLE_TABS - 2));
-  const hasTabOverflow = hiddenPads.length > 0;
-  const activeHiddenPad = hiddenPads.find((p) => p.id === activePadId) ?? null;
-
-  // Dismiss the tab menu on outside click (trigger + panel share tabsMenuRef)
-  useEffect(() => {
-    if (!isTabsMenuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (tabsMenuRef.current && !tabsMenuRef.current.contains(e.target as Node)) {
-        setIsTabsMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [isTabsMenuOpen]);
-
   useEffect(() => {
     const checkMobile = () => {
       const nextIsMobile = window.innerWidth < 768;
       setIsMobile(nextIsMobile);
-      // Arrange mode is a touch-only affordance (its toggle lives on the mobile
-      // tab strip), so never leave it latched once we grow into desktop layout.
-      if (!nextIsMobile) setIsArrangingTabs(false);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -1571,7 +1552,7 @@ export default function DayScratchpad({
     setActivePadId(id);
     setIsDeletePadConfirming(false);
     setIsClearConfirming(false);
-    setIsTabsMenuOpen(false);
+    setIsTabsModalOpen(false);
     try { localStorage.setItem(STORAGE_ACTIVE_PAD_ID_KEY, id); } catch {}
   };
 
@@ -1607,12 +1588,10 @@ export default function DayScratchpad({
     setEditingPadId(null);
   };
 
-  /** The strip only renders `visiblePads`, so re-apply the hidden remainder behind them */
-  const handleReorderPads = (reorderedVisible: Scratchpad[]) => {
-    const hiddenIds = new Set(hiddenPads.map((p) => p.id));
-    const updated = [...reorderedVisible, ...pads.filter((p) => hiddenIds.has(p.id))];
-    setPads(updated);
-    savePads(updated);
+  /** All pads are visible; the modal reorders the full pads array directly */
+  const handleReorderPads = (reordered: Scratchpad[]) => {
+    setPads(reordered);
+    savePads(reordered);
   };
 
   const handleDeleteCurrentPad = () => {
@@ -1791,9 +1770,11 @@ export default function DayScratchpad({
     ? todayPad.items.filter((i) => !i.isCompleted && (i.dateKey === activeDate.toISOString().slice(0, 10) || !i.dateKey)).length
     : isOnSchedulePad
     ? (todayPad.anchors || []).filter((a) => !a.isCompleted && (a.dateKey || todayDateKey()) === scratchpadDate.toISOString().slice(0, 10)).length
+    : isOnNotesPad
+    ? 0
     : items.filter((i) => !i.isCompleted && !i.isConverted && i.text.trim().length > 0).length;
 
-  const hasDoneItems = !isOnTodayPad && !isOnSchedulePad && items.some((i) => i.isCompleted || i.isConverted);
+  const hasDoneItems = !isOnTodayPad && !isOnSchedulePad && !isOnNotesPad && items.some((i) => i.isCompleted || i.isConverted);
 
   const todayPadProxy = { id: TODAY_PAD_ID, name: todayPad.name, items: todayPad.items };
 
@@ -1840,10 +1821,10 @@ export default function DayScratchpad({
   );
 
   const renderTabsRow = (mobileView: boolean) => (
-    <div className={`flex-none flex items-center gap-1 ${mobileView ? 'px-3 py-2' : 'px-3 py-1.5'} bg-stone-900/60 border-b border-stone-800/70`}>
-      {/* Tabs scroll sideways once they outgrow the row — pad titles are never truncated.
-          The overflow menu / New button stay pinned outside the scroll area. */}
+    <div className={`flex-none flex items-center ${mobileView ? 'px-3 py-2' : 'px-3 py-1.5'} bg-stone-900/60 border-b border-stone-800/70`}>
+      {/* Tabs scroll sideways smoothly with touch swipe or mouse wheel */}
       <div className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        {/* ── System Views Group ── */}
         <PadTab
           pad={todayPadProxy}
           isActive={isOnTodayPad}
@@ -1882,135 +1863,54 @@ export default function DayScratchpad({
           }
         />
 
-        <Reorder.Group as="div" axis="x" values={visiblePads} onReorder={handleReorderPads} className="flex items-center gap-1 shrink-0">
-          {/* Touch needs an explicit grip (arrange mode); desktop keeps free dragging */}
-          {visiblePads.map((pad) => (
-            <PadTab
-              key={pad.id}
-              pad={pad}
-              isActive={pad.id === activePadId}
-              isDragTarget={pad.id === dragOverPadId}
-              editingPadId={editingPadId}
-              editingPadName={editingPadName}
-              onSelect={handleSelectPad}
-              onStartRename={handleStartRenamePad}
-              onRenameChange={setEditingPadName}
-              onSaveRename={handleSaveRenamePad}
-              onCancelRename={() => setEditingPadId(null)}
-              isMobile={mobileView}
-              draggable={!mobileView || isArrangingTabs}
-              isArranging={mobileView && isArrangingTabs}
-            />
-          ))}
-        </Reorder.Group>
-      </div>
+        <PadTab
+          pad={{ id: NOTES_PAD_ID, name: 'Notes', items: [] }}
+          isActive={isOnNotesPad}
+          isDragTarget={dragOverPadId === NOTES_PAD_ID}
+          editingPadId={null}
+          editingPadName=""
+          onSelect={handleSelectPad}
+          onStartRename={() => {}}
+          onRenameChange={() => {}}
+          onSaveRename={() => {}}
+          onCancelRename={() => {}}
+          isMobile={mobileView}
+          pinned
+        />
 
-      {/* Arrange mode is touch-only — desktops already drag tabs freely, so the toggle is hidden there */}
-      {mobileView && (pads.length > 1 || isArrangingTabs) && (
-        <button
-          type="button"
-          onClick={() => setIsArrangingTabs((v) => !v)}
-          aria-pressed={isArrangingTabs}
-          aria-label={isArrangingTabs ? 'Done reordering pads' : 'Reorder pads'}
-          title={isArrangingTabs ? 'Done reordering pads' : 'Reorder pads — drag the grip handles'}
-          className={tabStripActionClass(isArrangingTabs)}
-        >
-          {isArrangingTabs ? <Check className="w-3.5 h-3.5" /> : <ArrowLeftRight className="w-3.5 h-3.5" />}
-        </button>
-      )}
+        {/* ── Visual Separator between Default System tabs and Custom User tabs ── */}
+        <div className="h-4 w-[1px] bg-stone-800/80 mx-1 shrink-0" aria-hidden="true" />
 
-      {hasTabOverflow ? (
-        /* Overflow menu — adopts the active pad's identity when it has no tab of its own */
-        <div ref={tabsMenuRef} className="relative shrink-0">
-          <button
-            type="button"
-            onClick={() => setIsTabsMenuOpen((v) => !v)}
-            className={`flex items-center h-7 gap-1.5 rounded-lg text-xs font-mono transition-colors cursor-pointer shrink-0 border select-none ${
-              activeHiddenPad ? 'px-2.5 max-w-[110px]' : 'px-2'
-            } ${
-              isTabsMenuOpen || activeHiddenPad
-                ? 'bg-amber-500/15 border-amber-500/40 text-amber-500 font-bold shadow-xs'
-                : 'bg-stone-900/60 border-stone-800/80 text-stone-500 hover:text-stone-300 hover:bg-stone-900'
-            }`}
-            aria-label="More pads"
-            aria-expanded={isTabsMenuOpen}
-            title={
-              activeHiddenPad
-                ? `Current pad: ${activeHiddenPad.name}`
-                : `${hiddenPads.length} more pad${hiddenPads.length > 1 ? 's' : ''}`
-            }
-          >
-            {activeHiddenPad && <span className="truncate">{activeHiddenPad.name}</span>}
-            <ChevronDown className="w-3.5 h-3.5 shrink-0" />
-          </button>
+        {/* ── Custom User Tabs Group (All custom pads, horizontally scrollable) ── */}
+        {pads.map((pad) => (
+          <PadTab
+            key={pad.id}
+            pad={pad}
+            isActive={pad.id === activePadId}
+            isDragTarget={pad.id === dragOverPadId}
+            editingPadId={editingPadId}
+            editingPadName={editingPadName}
+            onSelect={handleSelectPad}
+            onStartRename={handleStartRenamePad}
+            onRenameChange={setEditingPadName}
+            onSaveRename={handleSaveRenamePad}
+            onCancelRename={() => setEditingPadId(null)}
+            isMobile={mobileView}
+            draggable={false}
+          />
+        ))}
 
-          {isTabsMenuOpen && (
-            <div className="absolute right-0 top-full mt-1 z-[60] w-56 bg-stone-900 border border-stone-700 rounded-xl shadow-2xl p-1.5 select-none">
-              <div className="px-2 py-1 text-[9px] font-mono text-stone-500 uppercase tracking-wide">
-                Switch pad
-              </div>
-              <div className="max-h-56 overflow-y-auto space-y-0.5">
-                <button
-                  type="button"
-                  onClick={() => handleSelectPad(TODAY_PAD_ID)}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-mono transition-colors cursor-pointer ${
-                    isOnTodayPad ? 'bg-amber-500/15 text-amber-500 font-bold' : 'text-stone-300 hover:bg-stone-800 hover:text-stone-100'
-                  }`}
-                >
-                  <span className="truncate flex-1 text-left">{todayPad.name}</span>
-                  <span className="text-[9px] opacity-60 shrink-0">
-                    {todayPad.items.filter((i) => !i.isCompleted).length}/{TODAY_PAD_MAX_ITEMS}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelectPad(SCHEDULE_PAD_ID)}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-mono transition-colors cursor-pointer ${
-                    isOnSchedulePad ? 'bg-amber-500/15 text-amber-500 font-bold' : 'text-stone-300 hover:bg-stone-800 hover:text-stone-100'
-                  }`}
-                >
-                  <span className="truncate flex-1 text-left">Schedule</span>
-                  <span className="text-[9px] opacity-60 shrink-0">Grid</span>
-                </button>
-                {pads.map((pad) => (
-                  <button
-                    key={pad.id}
-                    type="button"
-                    onClick={() => handleSelectPad(pad.id)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-mono transition-colors cursor-pointer ${
-                      pad.id === activePadId ? 'bg-amber-500/15 text-amber-500 font-bold' : 'text-stone-300 hover:bg-stone-800 hover:text-stone-100'
-                    }`}
-                  >
-                    <span className="truncate flex-1 text-left">{pad.name}</span>
-                    <span className="text-[9px] opacity-60 shrink-0">
-                      {pad.items.filter((i) => !i.isCompleted).length}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <div className="mt-1 pt-1 border-t border-stone-800">
-                <button
-                  type="button"
-                  onClick={handleCreateNewPad}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-mono text-stone-400 hover:text-amber-500 hover:bg-stone-800 transition-colors cursor-pointer"
-                >
-                  <Plus className="w-3 h-3 shrink-0" /> New Pad
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
+        {/* Quick New Pad button at the end of custom tabs */}
         <button
           type="button"
           onClick={handleCreateNewPad}
           aria-label="New pad"
           title="New pad"
-          className={tabStripActionClass()}
+          className="flex items-center justify-center w-7 h-7 rounded-lg text-stone-500 hover:text-amber-400 bg-stone-900/40 hover:bg-stone-900 border border-stone-800/60 hover:border-amber-500/30 transition-colors shrink-0 cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
         </button>
-      )}
+      </div>
     </div>
   );
 
@@ -2124,13 +2024,22 @@ export default function DayScratchpad({
                   <span className="text-[11px] font-mono text-stone-400 bg-stone-900 px-2 py-0.5 rounded border border-stone-800">
                     {uncompletedCount} active
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsTabsModalOpen(true)}
+                    className="flex items-center gap-1 text-[11px] font-mono text-stone-400 hover:text-amber-400 bg-stone-900 hover:bg-stone-800 border border-stone-800 hover:border-amber-500/40 px-2 py-0.5 rounded-md transition-colors cursor-pointer select-none"
+                    title="Manage Tabs (reorder, rename, delete)"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Tabs</span>
+                  </button>
                 </div>
                 {renderHeaderActions(true)}
               </div>
 
               {renderTabsRow(true)}
 
-              <div className={`flex-1 ${isOnSchedulePad ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}>
+              <div className={`flex-1 ${isOnSchedulePad || isOnNotesPad ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}>
                 {isOnTodayPad ? (
                   <div className="p-4">
                     <TodayPad todayPad={todayPad} onUpdate={handleTodayPadUpdate} viewMode={viewMode} scratchpadDate={scratchpadDate} onScratchpadDateChange={setScratchpadDate} isMobile={true} />
@@ -2144,6 +2053,10 @@ export default function DayScratchpad({
                       onUpdateTodayPad={handleTodayPadUpdate}
                       isMobile={true}
                     />
+                  </div>
+                ) : isOnNotesPad ? (
+                  <div className="p-4 flex-1 flex flex-col min-h-0 overflow-hidden">
+                    <QuickNotesTab isMobile={true} />
                   </div>
                 ) : (
                   <div className="p-4 space-y-2">
@@ -2234,6 +2147,15 @@ export default function DayScratchpad({
                   <span className="text-[10px] font-mono text-stone-500 bg-stone-900 px-1.5 py-0.5 rounded border border-stone-800">
                     {uncompletedCount} active
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsTabsModalOpen(true)}
+                    className="flex items-center gap-1 text-[10px] font-mono text-stone-400 hover:text-amber-400 bg-stone-900 hover:bg-stone-800 border border-stone-800 hover:border-amber-500/40 px-2 py-0.5 rounded-md transition-colors cursor-pointer select-none ml-0.5"
+                    title="Manage Tabs (reorder, rename, delete)"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Tabs</span>
+                  </button>
                 </div>
                 {renderHeaderActions(false)}
               </div>
@@ -2241,7 +2163,7 @@ export default function DayScratchpad({
               {renderTabsRow(false)}
 
               {/* Content */}
-              <div className={`flex-1 p-3.5 ${isOnSchedulePad ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}>
+              <div className={`flex-1 p-3.5 ${isOnSchedulePad || isOnNotesPad ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}>
                 {isOnTodayPad ? (
                   <TodayPad todayPad={todayPad} onUpdate={handleTodayPadUpdate} viewMode={viewMode} scratchpadDate={scratchpadDate} onScratchpadDateChange={setScratchpadDate} isMobile={false} />
                 ) : isOnSchedulePad ? (
@@ -2254,6 +2176,10 @@ export default function DayScratchpad({
                       isMobile={false}
                     />
                   </div>
+                ) : isOnNotesPad ? (
+                  <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                    <QuickNotesTab isMobile={false} />
+                  </div>
                 ) : (
                   renderRegularPadItems()
                 )}
@@ -2261,11 +2187,268 @@ export default function DayScratchpad({
 
               {/* Footer hint */}
               <div className="flex-none px-4 py-2 bg-stone-900/80 border-t border-stone-800/60 text-[10px] font-mono text-stone-500 flex justify-between items-center">
-                <span>{isOnSchedulePad ? 'Drag down to create block • Edge to resize' : 'Anchors = Time-Specific • Engine = 5 Active Slots'}</span>
-                <span>{isOnSchedulePad ? 'Syncs with Today Anchors' : 'Click tab title to rename'}</span>
+                <span>{isOnSchedulePad ? 'Drag down to create block • Edge to resize' : isOnNotesPad ? 'Google Keep style quick notes • Auto-synced' : 'Anchors = Time-Specific • Engine = 5 Active Slots'}</span>
+                <span>{isOnSchedulePad ? 'Syncs with Today Anchors' : isOnNotesPad ? 'Stack of random thought cards' : 'Click tab title to rename'}</span>
               </div>
             </motion.div>
           )
+        )}
+      </AnimatePresence>
+
+      {/* ── Tab Management Modal ── */}
+      <AnimatePresence>
+        {isTabsModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs font-sans"
+            onClick={() => setIsTabsModalOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.15 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-stone-900 border border-stone-700/80 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-stone-800 bg-stone-850/80">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-amber-500" />
+                  <span className="text-sm font-bold font-serif text-stone-100">
+                    Manage Tabs
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsTabsModalOpen(false)}
+                  className="p-1 text-stone-400 hover:text-stone-200 hover:bg-stone-800 rounded-lg transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-4 overflow-y-auto space-y-4">
+                {/* Section 1: Default System Views */}
+                <div>
+                  <div className="text-[10px] font-mono text-stone-500 uppercase tracking-wider mb-1.5 px-1">
+                    Default Views
+                  </div>
+                  <div className="space-y-1">
+                    {/* Today Tab */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleSelectPad(TODAY_PAD_ID);
+                        setIsTabsModalOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-mono transition-colors cursor-pointer border ${
+                        isOnTodayPad
+                          ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 font-bold'
+                          : 'bg-stone-900/60 hover:bg-stone-800/80 border-stone-800/80 text-stone-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <StickyNote className="w-3.5 h-3.5 text-amber-500" />
+                        <span>{todayPad.name}</span>
+                      </div>
+                      <span className="text-[10px] text-stone-400 bg-stone-950/60 px-1.5 py-0.5 rounded border border-stone-800">
+                        {todayPad.items.filter((i) => !i.isCompleted).length}/{TODAY_PAD_MAX_ITEMS} active
+                      </span>
+                    </button>
+
+                    {/* Schedule Tab */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleSelectPad(SCHEDULE_PAD_ID);
+                        setIsTabsModalOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-mono transition-colors cursor-pointer border ${
+                        isOnSchedulePad
+                          ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 font-bold'
+                          : 'bg-stone-900/60 hover:bg-stone-800/80 border-stone-800/80 text-stone-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Schedule</span>
+                      </div>
+                      <span className="text-[10px] text-stone-400 bg-stone-950/60 px-1.5 py-0.5 rounded border border-stone-800">
+                        Timeline Grid
+                      </span>
+                    </button>
+
+                    {/* Notes Tab */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleSelectPad(NOTES_PAD_ID);
+                        setIsTabsModalOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-mono transition-colors cursor-pointer border ${
+                        isOnNotesPad
+                          ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 font-bold'
+                          : 'bg-stone-900/60 hover:bg-stone-800/80 border-stone-800/80 text-stone-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Quick Notes</span>
+                      </div>
+                      <span className="text-[10px] text-stone-400 bg-stone-950/60 px-1.5 py-0.5 rounded border border-stone-800">
+                        Keep Cards
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Section 2: Custom Pads (Vertical Drag to Reorder) */}
+                <div>
+                  <div className="flex items-center justify-between text-[10px] font-mono text-stone-500 uppercase tracking-wider mb-1.5 px-1">
+                    <span>Custom Pads ({pads.length})</span>
+                    <span className="text-[9px] text-amber-500/80 font-normal">
+                      Drag handles to reorder
+                    </span>
+                  </div>
+
+                  <Reorder.Group
+                    as="div"
+                    axis="y"
+                    values={pads}
+                    onReorder={(newPads) => {
+                      setPads(newPads);
+                      savePads(newPads);
+                    }}
+                    className="space-y-1.5"
+                  >
+                    {pads.map((pad) => {
+                      const isActive = pad.id === activePadId;
+                      const isEditing = editingPadId === pad.id;
+
+                      return (
+                        <Reorder.Item
+                          key={pad.id}
+                          value={pad}
+                          as="div"
+                          layout="position"
+                          transition={{ layout: { duration: 0.15 } }}
+                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border transition-all ${
+                            isActive
+                              ? 'bg-amber-500/10 border-amber-500/40 text-amber-300 font-bold'
+                              : 'bg-stone-900/80 hover:bg-stone-850 border-stone-800/80 text-stone-300'
+                          }`}
+                        >
+                          {/* Grip Handle for Vertical Drag */}
+                          <div className="text-stone-600 hover:text-stone-300 cursor-grab active:cursor-grabbing p-1 touch-none">
+                            <GripVertical className="w-3.5 h-3.5" />
+                          </div>
+
+                          {/* Pad Title (or Inline Rename Input) */}
+                          <div className="flex-1 min-w-0">
+                            {isEditing ? (
+                              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={editingPadName}
+                                  onChange={(e) => setEditingPadName(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveRenamePad();
+                                    if (e.key === 'Escape') setEditingPadId(null);
+                                  }}
+                                  onBlur={handleSaveRenamePad}
+                                  className="bg-stone-950 border border-amber-500/60 rounded px-1.5 py-0.5 text-xs text-amber-400 focus:outline-none w-full font-mono"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleSaveRenamePad}
+                                  className="text-emerald-500 p-0.5 cursor-pointer"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div
+                                onClick={() => {
+                                  handleSelectPad(pad.id);
+                                  setIsTabsModalOpen(false);
+                                }}
+                                className="flex items-center gap-2 cursor-pointer truncate"
+                                title="Click to open pad"
+                              >
+                                <span className="text-xs font-mono truncate">{pad.name}</span>
+                                <span className="text-[10px] font-mono text-stone-500">
+                                  ({pad.items.filter((i) => !i.isCompleted).length} active)
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Actions: Rename & Delete */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            {!isEditing && (
+                              <button
+                                type="button"
+                                onClick={(e) => handleStartRenamePad(pad.id, pad.name, e)}
+                                className="p-1 text-stone-500 hover:text-stone-200 hover:bg-stone-800 rounded transition-colors cursor-pointer"
+                                title="Rename pad"
+                              >
+                                <NotebookPen className="w-3 h-3" />
+                              </button>
+                            )}
+                            {pads.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const updated = pads.filter((p) => p.id !== pad.id);
+                                  setPads(updated);
+                                  savePads(updated);
+                                  if (activePadId === pad.id) {
+                                    handleSelectPad(TODAY_PAD_ID);
+                                  }
+                                }}
+                                className="p-1 text-stone-500 hover:text-rose-400 hover:bg-stone-800 rounded transition-colors cursor-pointer"
+                                title="Delete pad"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </Reorder.Item>
+                      );
+                    })}
+                  </Reorder.Group>
+                </div>
+              </div>
+
+              {/* Footer: + New Pad Button */}
+              <div className="p-3 border-t border-stone-800 bg-stone-850/60 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleCreateNewPad();
+                    setIsTabsModalOpen(false);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-bold bg-amber-500 text-stone-950 hover:bg-amber-400 transition-colors cursor-pointer shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>New Pad</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsTabsModalOpen(false)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-mono text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </>
