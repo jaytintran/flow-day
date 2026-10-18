@@ -53,6 +53,7 @@ import CategoryIcon from '../CategoryIcon';
 import InlineIconColorPopover from '../InlineIconColorPopover';
 import SortableCategorySidebarItem from './lists/SortableCategorySidebarItem';
 import MarkdownPreview from '../MarkdownPreview';
+import RecordFormModal from '../RecordFormModal';
 
 interface RecordsViewProps {
   entries: TimelineEntry[];
@@ -147,7 +148,6 @@ export default function RecordsView({
   const [modalPinned, setModalPinned] = useState(false);
   const [modalStarred, setModalStarred] = useState(false);
   const [modalCategoryIds, setModalCategoryIds] = useState<string[]>([]);
-  const [isModalMaximized, setIsModalMaximized] = useState(false);
 
   // Dedicated Drag Sensor for Custom Categories in Sidebar
   const categorySensors = useSensors(
@@ -373,36 +373,6 @@ export default function RecordsView({
     }
     setModalCategoryIds(initialCats);
     setIsDetailModalOpen(true);
-  };
-
-  // Save from Detail Modal
-  const handleSaveDetailRecord = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = modalTitle.trim();
-    if (!trimmed) return;
-
-    const entryId = crypto.randomUUID();
-    const now = new Date();
-    const newEntry: TimelineEntry = {
-      id: entryId,
-      type: modalType,
-      title: trimmed,
-      content: modalContent.trim(),
-      timestamp: now,
-      created_at: now,
-      scheduled_at: now,
-      pinned: modalPinned,
-      starred: modalStarred,
-      ...(modalCategoryIds.length > 0 ? { category_ids: modalCategoryIds } : {}),
-    };
-
-    await db.entries.add(newEntry);
-    setIsDetailModalOpen(false);
-    setModalTitle('');
-    setModalContent('');
-    setModalPinned(false);
-    setModalStarred(false);
-    setQuickRecordTitle('');
   };
 
   // Render an individual card
@@ -1303,233 +1273,19 @@ export default function RecordsView({
       )}
 
       {/* ─── RICH DETAIL CREATION MODAL ─── */}
-      <AnimatePresence>
-        {isDetailModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 md:p-8">
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsDetailModalOpen(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
-            />
-
-            {/* Modal Dialog */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 12 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-              className={`relative z-10 w-full ${
-                isModalMaximized ? 'max-w-6xl h-[92vh]' : 'max-w-4xl max-h-[88vh]'
-              } bg-[#141414] border border-stone-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 font-sans`}
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-stone-850/80 bg-stone-950/50 shrink-0">
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  {/* Type Selector (Note vs Event) */}
-                  <div className="flex items-center gap-1 bg-[#1c1c1c] border border-stone-800 rounded-xl p-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setModalType('note')}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                        modalType === 'note'
-                          ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30 shadow-sm'
-                          : 'text-stone-400 hover:text-stone-200'
-                      }`}
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>Note</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setModalType('event')}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                        modalType === 'event'
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm'
-                          : 'text-stone-400 hover:text-stone-200'
-                      }`}
-                    >
-                      <Calendar className="w-3.5 h-3.5" />
-                      <span>Event</span>
-                    </button>
-                  </div>
-
-                  {/* Pin Toggle */}
-                  <button
-                    type="button"
-                    onClick={() => setModalPinned(!modalPinned)}
-                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer border ${
-                      modalPinned
-                        ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
-                        : 'bg-stone-900 border-stone-800 text-stone-500 hover:text-stone-300'
-                    }`}
-                  >
-                    <Pin className={`w-3 h-3 ${modalPinned ? 'fill-current' : ''}`} />
-                    <span>Pin</span>
-                  </button>
-
-                  {/* Star / Highlight Toggle */}
-                  <button
-                    type="button"
-                    onClick={() => setModalStarred(!modalStarred)}
-                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer border ${
-                      modalStarred
-                        ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
-                        : 'bg-stone-900 border-stone-800 text-stone-500 hover:text-stone-300'
-                    }`}
-                  >
-                    <Star className={`w-3 h-3 ${modalStarred ? 'fill-current' : ''}`} />
-                    <span>Highlight</span>
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  {/* Maximize / Restore Toggle */}
-                  <button
-                    type="button"
-                    onClick={() => setIsModalMaximized(!isModalMaximized)}
-                    className="p-1.5 text-stone-500 hover:text-stone-300 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
-                    title={isModalMaximized ? 'Restore window size' : 'Maximize editor'}
-                  >
-                    {isModalMaximized ? (
-                      <Minimize2 className="w-4 h-4" />
-                    ) : (
-                      <Maximize2 className="w-4 h-4" />
-                    )}
-                  </button>
-
-                  {/* Close button */}
-                  <button
-                    type="button"
-                    onClick={() => setIsDetailModalOpen(false)}
-                    className="p-1.5 text-stone-500 hover:text-stone-300 hover:bg-stone-850 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Form body */}
-              <form
-                onSubmit={handleSaveDetailRecord}
-                className="px-6 sm:px-8 py-5 flex flex-col flex-1 min-h-0 space-y-4 overflow-hidden"
-              >
-                {/* Title */}
-                <div className="space-y-1 border-b border-stone-850/80 pb-3 shrink-0">
-                  <input
-                    type="text"
-                    required
-                    autoFocus
-                    value={modalTitle}
-                    onChange={(e) => setModalTitle(e.target.value)}
-                    className={`w-full bg-transparent text-stone-100 text-2xl font-serif font-bold tracking-tight focus:outline-none placeholder-stone-700 py-1 ${
-                      modalType === 'event'
-                        ? 'focus:border-amber-500/50'
-                        : 'focus:border-blue-500/50'
-                    }`}
-                    placeholder={
-                      modalType === 'event'
-                        ? 'Event title (e.g. Project briefing presentation tomorrow at 10am)...'
-                        : 'Note title (e.g. Weekly reflections, ideas & brainstorming)...'
-                    }
-                  />
-                </div>
-
-                {/* Categories Selector Strip */}
-                {categories.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap shrink-0">
-                    <span className="text-[10px] uppercase tracking-wider font-mono text-stone-500 font-bold mr-1">
-                      Categories:
-                    </span>
-                    {categories.map((cat) => {
-                      const isAssigned = modalCategoryIds.includes(cat.id);
-                      const cs = CAT_COLORS[cat.color] ?? CAT_COLORS['violet'];
-                      return (
-                        <button
-                          key={cat.id}
-                          type="button"
-                          onClick={() => {
-                            setModalCategoryIds((prev) =>
-                              prev.includes(cat.id)
-                                ? prev.filter((id) => id !== cat.id)
-                                : [...prev, cat.id],
-                            );
-                          }}
-                          className={`inline-flex items-center gap-1 text-[10px] font-mono px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
-                            isAssigned
-                              ? `${cs.active} font-semibold`
-                              : 'bg-stone-900/60 border-stone-800 text-stone-400 hover:text-stone-200 hover:border-stone-700'
-                          }`}
-                        >
-                          <CategoryIcon
-                            name={cat.icon}
-                            color={cat.color}
-                            className="w-3 h-3"
-                            fallback="Tag"
-                          />
-                          <span>{cat.name}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Markdown Description */}
-                <div className="flex-1 flex flex-col min-h-[260px] max-h-[55vh] overflow-y-auto pr-1 space-y-2">
-                  <span className="text-[10px] uppercase tracking-wider font-mono text-stone-500 font-bold block">
-                    {modalType === 'event'
-                      ? 'Event Description / Agenda'
-                      : 'Content & Markdown Notes'}
-                  </span>
-                  <div className="flex-1 flex flex-col min-h-[220px]">
-                    <MarkdownPreview
-                      text={modalContent}
-                      value={modalContent}
-                      placeholder={
-                        modalType === 'event'
-                          ? 'Write event description, agenda, location, or notes...'
-                          : 'Write structured thoughts, reflections, details, checklists, or markdown...'
-                      }
-                      editable={true}
-                      onChange={setModalContent}
-                    />
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="pt-3 border-t border-stone-850/80 flex items-center justify-between shrink-0">
-                  <span className="text-[10px] text-stone-600 font-mono hidden sm:inline">
-                    Ctrl+Enter or Esc to save/cancel
-                  </span>
-                  <div className="flex items-center gap-2.5 ml-auto">
-                    <button
-                      type="button"
-                      onClick={() => setIsDetailModalOpen(false)}
-                      className="px-4 py-2 bg-stone-900 hover:bg-stone-850 text-stone-300 text-xs font-mono uppercase tracking-wider rounded-xl border border-stone-800 transition-all cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={!modalTitle.trim()}
-                      className={`px-5 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded-xl border transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${
-                        modalType === 'event'
-                          ? 'bg-amber-500 hover:bg-amber-400 text-[#0e0c08] border-amber-400'
-                          : 'bg-blue-500 hover:bg-blue-400 text-[#070a0e] border-blue-400'
-                      }`}
-                    >
-                      <span>{modalType === 'event' ? 'Save Event' : 'Save Note'}</span>
-                      <Send className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      <RecordFormModal
+        open={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        initialType={modalType}
+        initialTitle={modalTitle}
+        initialContent={modalContent}
+        initialPinned={modalPinned}
+        initialStarred={modalStarred}
+        initialCategoryIds={modalCategoryIds}
+        onSaved={() => {
+          setQuickRecordTitle('');
+        }}
+      />
     </div>
   );
 }

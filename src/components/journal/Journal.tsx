@@ -1290,7 +1290,7 @@ export default function Journal({
 							{!isEditingTitle ? (
 								<div
 									onClick={() => setIsEditingTitle(true)}
-									className="w-full text-stone-100 font-serif font-bold text-2xl sm:text-3xl tracking-tight cursor-pointer hover:text-stone-300 transition-colors break-words py-1"
+									className="w-full text-stone-100 font-serif font-bold text-xl sm:text-2xl tracking-tight cursor-pointer hover:text-stone-300 transition-colors break-words py-1"
 								>
 									{editTitle.trim() || (
 										<span className="text-stone-700 italic">
@@ -1325,7 +1325,7 @@ export default function Journal({
 													? "Time Block Title"
 													: "Note Title"
 									}
-									className="w-full bg-transparent text-stone-100 font-serif font-bold text-2xl sm:text-3xl tracking-tight focus:outline-none placeholder-stone-700 py-1 border-none"
+									className="w-full bg-transparent text-stone-100 font-serif font-bold text-xl sm:text-2xl tracking-tight focus:outline-none placeholder-stone-700 py-1 border-none"
 								/>
 							)}
 						</div>
