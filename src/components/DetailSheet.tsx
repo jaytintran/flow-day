@@ -43,7 +43,7 @@ export default function DetailSheet({
   headerContent,
   isMobile: isMobileProp,
   children,
-  disableDrag = false,
+  disableDrag = true,
   fullScreen = true,
   showMaximizeToggle = true,
 }: DetailSheetProps) {
@@ -104,14 +104,6 @@ export default function DetailSheet({
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              drag={disableDrag ? false : 'y'}
-              dragConstraints={{ top: 0 }}
-              dragElastic={{ top: 0, bottom: 0.5 }}
-              onDragEnd={(_, info) => {
-                if (!disableDrag && (info.offset.y > 100 || info.velocity.y > 300)) {
-                  onClose();
-                }
-              }}
               transition={{ type: 'spring', damping: 32, stiffness: 340, mass: 0.7 }}
               style={{ willChange: 'transform' }}
               className={`relative w-full bg-[#121212] z-10 flex flex-col overflow-hidden shadow-2xl ${
@@ -123,20 +115,6 @@ export default function DetailSheet({
               {/* Safe area spacer — pushes content below the phone's status bar / notch on full-screen mode */}
               {(fullScreen || isMaximized) && (
                 <div className="flex-none" style={{ height: 'env(safe-area-inset-top, 0px)' }} />
-              )}
-
-              {/* Optional Drag Handle Pill (hidden when disableDrag is true) */}
-              {!disableDrag && (
-                <div className="flex-none flex flex-col items-center pt-2.5 pb-1 bg-stone-950/60 cursor-pointer">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    aria-label="Close sheet"
-                    className="p-1.5 flex items-center justify-center group"
-                  >
-                    <div className="w-12 h-1.5 bg-stone-700 group-hover:bg-stone-500 rounded-full transition-colors" />
-                  </button>
-                </div>
               )}
 
               {/* Header */}

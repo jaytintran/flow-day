@@ -22,6 +22,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { toLocalDateString } from '../../utils';
+import { soundService } from '../../services/audio';
 
 type StatusFilter = 'all' | 'pending' | 'done';
 type TypeFilter = 'all' | 'task' | 'log' | 'note' | 'event' | 'time-block';
@@ -33,6 +34,7 @@ interface TimelineViewProps {
   getDayRenderItems: (dayEntries: TimelineEntry[]) => RenderItem[];
   collapsedDays: Set<string>;
   toggleDayCollapse: (dayStr: string) => void;
+  activeDate?: Date;
   setActiveDate: (date: Date) => void;
   deletingId: string | null;
   activeTaskId: string | null;
@@ -52,6 +54,7 @@ export default function TimelineView({
   getDayRenderItems,
   collapsedDays,
   toggleDayCollapse,
+  activeDate,
   setActiveDate,
   deletingId,
   activeTaskId,
@@ -67,6 +70,47 @@ export default function TimelineView({
   const containerRef = useRef<HTMLDivElement>(null);
   const [showJumpToday, setShowJumpToday] = useState(false);
   const todayStr = toLocalDateString(new Date());
+
+  // Swipe left/right date shifting on mobile
+  const timelineTouchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      timelineTouchStartRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+      };
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!timelineTouchStartRef.current || e.changedTouches.length === 0) return;
+    const deltaX = e.changedTouches[0].clientX - timelineTouchStartRef.current.x;
+    const deltaY = e.changedTouches[0].clientY - timelineTouchStartRef.current.y;
+    timelineTouchStartRef.current = null;
+
+    // Predominantly horizontal swipe and at least 55px travel distance
+    if (Math.abs(deltaX) > 55 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+      const baseDate = activeDate || new Date();
+      if (deltaX < 0) {
+        // Swipe left -> Next day
+        const next = new Date(baseDate);
+        next.setDate(next.getDate() + 1);
+        setActiveDate(next);
+        try {
+          soundService.playTick();
+        } catch {}
+      } else {
+        // Swipe right -> Previous day
+        const prev = new Date(baseDate);
+        prev.setDate(prev.getDate() - 1);
+        setActiveDate(prev);
+        try {
+          soundService.playTick();
+        } catch {}
+      }
+    }
+  };
 
   // Filter and Sort states with persistent localStorage
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
@@ -238,7 +282,12 @@ export default function TimelineView({
   const remainingDaysCount = filteredDaysData.validDays.length - visibleDaysCount;
 
   return (
-    <div className="space-y-3" ref={containerRef}>
+    <div
+      className="space-y-3"
+      ref={containerRef}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* ─── Timeline Top Filter & Sort Bar ───────────────────────────────── */}
       <div className="sticky top-0 z-30 bg-stone-950 pt-2 pb-2 sm:pt-3 sm:pb-2 transition-all">
         <div className="bg-stone-900 border border-stone-800/80 rounded-2xl p-2 sm:p-2.5">

@@ -88,6 +88,48 @@ export default function DayNavigator({
   const [isDayRangeDropdownOpen, setIsDayRangeDropdownOpen] = useState(false);
   const dayRangeDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Swipe view switcher on mobile header
+  const headerTouchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const VIEW_ORDER: ViewMode[] = ['lists', 'day', 'timeline', 'records', 'habits', 'hub'];
+
+  const handleHeaderTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      headerTouchStartRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+      };
+    }
+  };
+
+  const handleHeaderTouchEnd = (e: React.TouchEvent) => {
+    if (!headerTouchStartRef.current || e.changedTouches.length === 0) return;
+    const deltaX = e.changedTouches[0].clientX - headerTouchStartRef.current.x;
+    const deltaY = e.changedTouches[0].clientY - headerTouchStartRef.current.y;
+    headerTouchStartRef.current = null;
+
+    // Must be predominantly horizontal and meet minimum distance threshold (45px)
+    if (Math.abs(deltaX) > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+      const currentIndex = VIEW_ORDER.indexOf(viewMode);
+      if (currentIndex !== -1) {
+        if (deltaX < 0) {
+          // Swipe left -> Next view
+          const nextIndex = (currentIndex + 1) % VIEW_ORDER.length;
+          setViewMode(VIEW_ORDER[nextIndex]);
+          try {
+            soundService.playTick();
+          } catch {}
+        } else {
+          // Swipe right -> Previous view
+          const prevIndex = (currentIndex - 1 + VIEW_ORDER.length) % VIEW_ORDER.length;
+          setViewMode(VIEW_ORDER[prevIndex]);
+          try {
+            soundService.playTick();
+          } catch {}
+        }
+      }
+    }
+  };
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (mobileViewMenuRef.current && !mobileViewMenuRef.current.contains(e.target as Node)) {
@@ -668,7 +710,11 @@ export default function DayNavigator({
         className="md:max-w-9xl max-md:max-w-4xl mx-auto px-5 md:px-6 py-3 flex flex-col gap-3 w-full"
         id="day-navigator-container"
       >
-        <div className="flex md:flex-row flex-col items-center justify-between gap-4 w-full">
+        <div
+          className="flex md:flex-row flex-col items-center justify-between gap-4 w-full touch-pan-y"
+          onTouchStart={handleHeaderTouchStart}
+          onTouchEnd={handleHeaderTouchEnd}
+        >
           {/* 1. Day Navigator Controls / Records Catalog Title */}
           {viewMode === 'records' || viewMode === 'lists' || viewMode === 'habits' || viewMode === 'hub' ? (
             <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">

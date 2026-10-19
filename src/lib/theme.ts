@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-export type ThemeMode = 'dark' | 'sepia';
+export type ThemeMode = 'dark' | 'sepia' | 'nordic' | 'charcoal';
 
 const STORAGE_KEY = 'flowday_theme';
 const THEME_CHANGE_EVENT = 'flowday-theme-change';
@@ -8,7 +8,7 @@ const THEME_CHANGE_EVENT = 'flowday-theme-change';
 export function getStoredTheme(): ThemeMode {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'sepia' || stored === 'dark') {
+    if (stored === 'sepia' || stored === 'dark' || stored === 'nordic' || stored === 'charcoal') {
       return stored;
     }
   } catch {}
@@ -20,7 +20,13 @@ export function applyTheme(theme: ThemeMode) {
     document.documentElement.setAttribute('data-theme', theme);
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
     if (metaThemeColor) {
-      metaThemeColor.setAttribute('content', theme === 'sepia' ? '#f3e8ce' : '#121212');
+      const colorMap: Record<ThemeMode, string> = {
+        dark: '#121212',
+        sepia: '#f3e8ce',
+        nordic: '#f1f5f9',
+        charcoal: '#1c1c1c',
+      };
+      metaThemeColor.setAttribute('content', colorMap[theme] || '#121212');
     }
   } catch {}
 }

@@ -18,6 +18,8 @@ import {
   Info,
   Moon,
   Sun,
+  Wind,
+  Square,
   Sliders,
   Cloud,
   Keyboard,
@@ -393,20 +395,20 @@ export default function Settings({
                 {activeTab === 'preferences' && (
                   <div className="space-y-4">
                     {/* Theme / Appearance */}
-                    <div className="flex items-center justify-between p-3.5 bg-stone-950/60 border border-stone-850 rounded-2xl">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-stone-950/60 border border-stone-850 rounded-2xl">
                       <div className="flex flex-col gap-0.5 pr-4">
                         <span className="text-xs text-stone-200 font-semibold">
                           Theme &amp; Appearance
                         </span>
                         <span className="text-[11px] font-mono text-stone-500">
-                          Obsidian Dark or Warm Sepia for reduced eye fatigue.
+                          Obsidian Dark, Warm Sepia, Nordic Light, or Charcoal Minimalist.
                         </span>
                       </div>
-                      <div className="flex items-center gap-1 bg-stone-900 border border-stone-800 p-1 rounded-xl shrink-0">
+                      <div className="flex items-center gap-1 bg-stone-900 border border-stone-800 p-1 rounded-xl shrink-0 overflow-x-auto scrollbar-none">
                         <button
                           type="button"
                           onClick={() => setTheme('dark')}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                             theme === 'dark'
                               ? 'bg-amber-500 text-stone-950 shadow-xs'
                               : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
@@ -417,8 +419,20 @@ export default function Settings({
                         </button>
                         <button
                           type="button"
+                          onClick={() => setTheme('charcoal')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                            theme === 'charcoal'
+                              ? 'bg-amber-500 text-stone-950 shadow-xs'
+                              : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
+                          }`}
+                        >
+                          <Square className="w-3.5 h-3.5" />
+                          <span>Charcoal</span>
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setTheme('sepia')}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                             theme === 'sepia'
                               ? 'bg-amber-500 text-stone-950 shadow-xs'
                               : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
@@ -426,6 +440,18 @@ export default function Settings({
                         >
                           <Sun className="w-3.5 h-3.5" />
                           <span>Sepia</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTheme('nordic')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                            theme === 'nordic'
+                              ? 'bg-amber-500 text-stone-950 shadow-xs'
+                              : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800'
+                          }`}
+                        >
+                          <Wind className="w-3.5 h-3.5" />
+                          <span>Nordic</span>
                         </button>
                       </div>
                     </div>

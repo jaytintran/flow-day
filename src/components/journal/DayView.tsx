@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import DayTimeline, { RenderItem } from './DayTimeline';
 import { TimelineEntry, Task, DayRange } from '../../types';
 import { ChevronDown, ChevronRight, Calendar, Trash2, Sparkles, AlertCircle, Play, Plus } from 'lucide-react';
@@ -11,6 +11,7 @@ import EntryContextMenu from '../EntryContextMenu';
 import { toLocalDateString, formatDateLabel, isSameDay, getEffectiveDate } from '../../utils';
 import SchedulePlannerTab from './SchedulePlannerTab';
 import { loadTodayPad, saveTodayPad, TodayPadData } from './DayScratchpad';
+import { soundService } from '../../services/audio';
 
 interface DayViewProps {
   activeDate: Date;
@@ -87,6 +88,46 @@ export default function DayView({
 
   // Synchronize TodayPad data so creating timeblocks updates Day Scratchpad anchors
   const [todayPad, setTodayPad] = useState<TodayPadData>(loadTodayPad);
+
+  // Swipe left/right date shifting on mobile
+  const dayTouchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      dayTouchStartRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+      };
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!dayTouchStartRef.current || e.changedTouches.length === 0) return;
+    const deltaX = e.changedTouches[0].clientX - dayTouchStartRef.current.x;
+    const deltaY = e.changedTouches[0].clientY - dayTouchStartRef.current.y;
+    dayTouchStartRef.current = null;
+
+    // Predominantly horizontal swipe and at least 55px travel distance
+    if (Math.abs(deltaX) > 55 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+      if (deltaX < 0) {
+        // Swipe left -> Next day
+        const next = new Date(activeDate);
+        next.setDate(next.getDate() + 1);
+        setActiveDate(next);
+        try {
+          soundService.playTick();
+        } catch {}
+      } else {
+        // Swipe right -> Previous day
+        const prev = new Date(activeDate);
+        prev.setDate(prev.getDate() - 1);
+        setActiveDate(prev);
+        try {
+          soundService.playTick();
+        } catch {}
+      }
+    }
+  };
 
   useEffect(() => {
     const handleSync = () => {
@@ -308,7 +349,11 @@ export default function DayView({
   // 1D View Mode: Split-pane on desktop (lg:), single timeline on mobile
   if (dayRange === '1D') {
     return (
-      <div className="space-y-6">
+      <div
+        className="space-y-6"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         {renderOverdueSection()}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -378,7 +423,11 @@ export default function DayView({
       : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7';
 
   return (
-    <div className="space-y-6 w-full">
+    <div
+      className="space-y-6 w-full"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {renderOverdueSection()}
 
       {/* Multi-Day Columns Grid */}

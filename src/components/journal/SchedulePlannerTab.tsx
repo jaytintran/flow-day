@@ -40,6 +40,10 @@ function snapToMinutes(minutes: number): number {
   return Math.min(TOTAL_MINUTES, Math.max(0, Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES));
 }
 
+function snapDeltaMinutes(minutes: number): number {
+  return Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES;
+}
+
 function formatMinutesToTime(totalMins: number): string {
   const normalized = Math.min(TOTAL_MINUTES - 1, Math.max(0, totalMins));
   const hours = Math.floor(normalized / 60);
@@ -109,12 +113,14 @@ export default function SchedulePlannerTab({
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>('');
 
-  // Moving or resizing an existing block
+  // Moving or resizing an existing block (with live interactive preview)
   const [activeInteraction, setActiveInteraction] = useState<{
     type: 'move' | 'resize-top' | 'resize-bottom';
     blockId: string;
     origStartMin: number;
     origEndMin: number;
+    currentStartMin: number;
+    currentEndMin: number;
     anchorPointerY: number;
   } | null>(null);
 
@@ -197,10 +203,19 @@ export default function SchedulePlannerTab({
     if (dayBlocks.length === 0) return [];
 
     const parsed = dayBlocks.map((b) => {
-      const s = new Date(b.start_at);
-      const e = new Date(b.end_at);
-      const startMin = s.getHours() * 60 + s.getMinutes();
-      const endMin = Math.max(startMin + 15, e.getHours() * 60 + e.getMinutes());
+      let startMin: number;
+      let endMin: number;
+
+      if (activeInteraction && activeInteraction.blockId === b.id) {
+        startMin = activeInteraction.currentStartMin;
+        endMin = activeInteraction.currentEndMin;
+      } else {
+        const s = new Date(b.start_at);
+        const e = new Date(b.end_at);
+        startMin = s.getHours() * 60 + s.getMinutes();
+        endMin = Math.max(startMin + 15, e.getHours() * 60 + e.getMinutes());
+      }
+
       const linkedAnchor = linkedAnchorMap.get(b.id);
       return {
         block: b,
@@ -261,7 +276,7 @@ export default function SchedulePlannerTab({
     });
 
     return parsed;
-  }, [dayBlocks, linkedAnchorMap, hourHeight]);
+  }, [dayBlocks, linkedAnchorMap, hourHeight, activeInteraction]);
 
   // ── Database & Anchor Sync Helpers ──────────────────────────────────────────
 
@@ -521,51 +536,80 @@ export default function SchedulePlannerTab({
     endMin: number,
   ) => {
     e.stopPropagation();
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    e.preventDefault();
     setActiveInteraction({
       type,
       blockId,
       origStartMin: startMin,
       origEndMin: endMin,
+      currentStartMin: startMin,
+      currentEndMin: endMin,
       anchorPointerY: e.clientY,
     });
   };
 
-  const handleInteractionPointerMove = (e: React.PointerEvent) => {
+  // Window-level pointer tracking for resize & move interactions
+  useEffect(() => {
     if (!activeInteraction) return;
-    const deltaPixels = e.clientY - activeInteraction.anchorPointerY;
-    const deltaMinutes = snapToMinutes(deltaPixels / (hourHeight / 60));
 
-    if (activeInteraction.type === 'move') {
-      const duration = activeInteraction.origEndMin - activeInteraction.origStartMin;
-      const newStart = Math.min(
-        TOTAL_MINUTES - duration,
-        Math.max(0, activeInteraction.origStartMin + deltaMinutes),
-      );
-      const newEnd = newStart + duration;
-      handleUpdateBlockTimes(activeInteraction.blockId, newStart, newEnd);
-    } else if (activeInteraction.type === 'resize-bottom') {
-      const newEnd = Math.min(
-        TOTAL_MINUTES,
-        Math.max(activeInteraction.origStartMin + 15, activeInteraction.origEndMin + deltaMinutes),
-      );
-      handleUpdateBlockTimes(activeInteraction.blockId, activeInteraction.origStartMin, newEnd);
-    } else if (activeInteraction.type === 'resize-top') {
-      const newStart = Math.max(
-        0,
-        Math.min(activeInteraction.origEndMin - 15, activeInteraction.origStartMin + deltaMinutes),
-      );
-      handleUpdateBlockTimes(activeInteraction.blockId, newStart, activeInteraction.origEndMin);
-    }
-  };
+    const onWindowPointerMove = (e: PointerEvent) => {
+      const deltaPixels = e.clientY - activeInteraction.anchorPointerY;
+      const deltaMinutes = snapDeltaMinutes(deltaPixels / (hourHeight / 60));
 
-  const handleInteractionPointerUp = (e: React.PointerEvent) => {
-    if (!activeInteraction) return;
-    try {
-      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch {}
-    setActiveInteraction(null);
-  };
+      if (activeInteraction.type === 'move') {
+        const duration = activeInteraction.origEndMin - activeInteraction.origStartMin;
+        const newStart = Math.min(
+          TOTAL_MINUTES - duration,
+          Math.max(0, activeInteraction.origStartMin + deltaMinutes),
+        );
+        const newEnd = newStart + duration;
+        setActiveInteraction((prev) =>
+          prev ? { ...prev, currentStartMin: newStart, currentEndMin: newEnd } : null,
+        );
+      } else if (activeInteraction.type === 'resize-bottom') {
+        const newEnd = Math.min(
+          TOTAL_MINUTES,
+          Math.max(activeInteraction.origStartMin + 15, activeInteraction.origEndMin + deltaMinutes),
+        );
+        setActiveInteraction((prev) =>
+          prev ? { ...prev, currentEndMin: newEnd } : null,
+        );
+      } else if (activeInteraction.type === 'resize-top') {
+        const newStart = Math.max(
+          0,
+          Math.min(activeInteraction.origEndMin - 15, activeInteraction.origStartMin + deltaMinutes),
+        );
+        setActiveInteraction((prev) =>
+          prev ? { ...prev, currentStartMin: newStart } : null,
+        );
+      }
+    };
+
+    const onWindowPointerUp = () => {
+      // Commit the updated times to Dexie database and anchors
+      if (
+        activeInteraction.currentStartMin !== activeInteraction.origStartMin ||
+        activeInteraction.currentEndMin !== activeInteraction.origEndMin
+      ) {
+        handleUpdateBlockTimes(
+          activeInteraction.blockId,
+          activeInteraction.currentStartMin,
+          activeInteraction.currentEndMin,
+        );
+      }
+      setActiveInteraction(null);
+    };
+
+    window.addEventListener('pointermove', onWindowPointerMove);
+    window.addEventListener('pointerup', onWindowPointerUp);
+    window.addEventListener('pointercancel', onWindowPointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', onWindowPointerMove);
+      window.removeEventListener('pointerup', onWindowPointerUp);
+      window.removeEventListener('pointercancel', onWindowPointerUp);
+    };
+  }, [activeInteraction, hourHeight]);
 
   // Commit pending block
   const commitPendingBlock = () => {
@@ -783,22 +827,22 @@ export default function SchedulePlannerTab({
                     left: `calc(${leftPct}% + 4px)`,
                     width: `calc(${widthPct}% - 8px)`,
                   }}
-                  className={`group absolute z-10 rounded-md border transition-all flex flex-col justify-between overflow-hidden shadow-xs select-none ${
+                  className={`group absolute z-10 rounded-md border transition-all flex flex-col justify-between overflow-hidden shadow-xs select-none touch-none ${
                     isCompleted
                       ? 'bg-stone-900/50 border-stone-800 text-stone-500 opacity-60'
                       : 'bg-amber-500/15 hover:bg-amber-500/20 border-amber-500/40 hover:border-amber-400/80 text-stone-200'
                   }`}
-                  onPointerMove={handleInteractionPointerMove}
-                  onPointerUp={handleInteractionPointerUp}
                 >
-                  {/* Top Resize Handle - overlay */}
+                  {/* Top Resize Handle - overlay with enlarged touch target */}
                   <div
                     onPointerDown={(e) =>
                       handleInteractionPointerDown(e, 'resize-top', block.id, startMin, endMin)
                     }
-                    className="absolute inset-x-0 top-0 h-1.5 cursor-ns-resize z-20 hover:bg-amber-400/40 transition-colors"
+                    className="absolute inset-x-0 top-0 h-3 cursor-ns-resize z-30 touch-none group/top"
                     title="Drag to resize start time"
-                  />
+                  >
+                    <div className="w-full h-1 bg-amber-400/0 group-hover/top:bg-amber-400/60 transition-colors" />
+                  </div>
 
                   {/* Block Content Body */}
                   <div className={`flex-1 px-1.5 flex items-center justify-between gap-1 min-w-0 h-full ${isShort ? 'py-0' : 'py-0.5 items-start'}`}>
@@ -903,14 +947,16 @@ export default function SchedulePlannerTab({
                     </div>
                   </div>
 
-                  {/* Bottom Resize Handle - overlay */}
+                  {/* Bottom Resize Handle - overlay with enlarged touch target */}
                   <div
                     onPointerDown={(e) =>
                       handleInteractionPointerDown(e, 'resize-bottom', block.id, startMin, endMin)
                     }
-                    className="absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize z-20 hover:bg-amber-400/40 transition-colors"
+                    className="absolute inset-x-0 bottom-0 h-3 cursor-ns-resize z-30 touch-none flex flex-col justify-end group/bottom"
                     title="Drag to resize end time"
-                  />
+                  >
+                    <div className="w-full h-1 bg-amber-400/0 group-hover/bottom:bg-amber-400/60 transition-colors" />
+                  </div>
                 </div>
               );
             })}

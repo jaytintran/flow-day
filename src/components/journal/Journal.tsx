@@ -1238,6 +1238,7 @@ export default function Journal({
 						getDayRenderItems={getDayRenderItems}
 						collapsedDays={collapsedDays}
 						toggleDayCollapse={toggleDayCollapse}
+						activeDate={activeDate}
 						setActiveDate={setActiveDate}
 						deletingId={deletingId}
 						activeTaskId={activeTaskId}

@@ -314,6 +314,348 @@
   }
 }
 
+/* ========================================================================== */
+/* CHARCOAL MINIMALIST THEME (Soft Linear-Style Dark Mode)                   */
+/* ========================================================================== */
+[data-theme="charcoal"] {
+  --stone-950: #141414;
+  --stone-900: #1c1c1c;
+  --stone-850: #242424;
+  --stone-800: #303030;
+  --stone-750: #3d3d3d;
+  --stone-700: #4a4a4a;
+  --stone-600: #666666;
+  --stone-500: #888888;
+  --stone-400: #b0b0b0;
+  --stone-350: #c4c4c4;
+  --stone-300: #d8d8d8;
+  --stone-250: #e2e2e2;
+  --stone-200: #ececec;
+  --stone-150: #f4f4f4;
+  --stone-100: #f8f8f8;
+  --stone-50: #ffffff;
+
+  --app-bg: #141414;
+  --app-text: #d8d8d8;
+  --scrollbar-track: #141414;
+  --scrollbar-thumb: #303030;
+  --scrollbar-thumb-hover: #4a4a4a;
+  --task-card-hover-border: rgba(255, 255, 255, 0.28);
+
+  /* Surface mapping for hardcoded hexes */
+  .bg-\[\#0a0a0a\],
+  .bg-\[\#080808\],
+  .bg-\[\#000000\],
+  .bg-\[\#0c0c0c\],
+  .bg-\[\#0d0d0d\],
+  .bg-\[\#0e0e0e\],
+  .bg-\[\#0f0f0f\] {
+    background-color: var(--stone-950) !important;
+  }
+  .bg-\[\#121212\],
+  .bg-\[\#111111\],
+  .bg-\[\#131313\],
+  .bg-\[\#141414\],
+  .bg-\[\#151515\],
+  .bg-\[\#161616\],
+  .bg-\[\#171717\],
+  .bg-\[\#181818\],
+  .bg-\[\#191919\],
+  .bg-\[\#1a1a1a\],
+  .bg-\[\#1b1b1b\],
+  .bg-\[\#1c1c1c\],
+  .bg-\[\#1d1d1d\],
+  .bg-\[\#1e1e1e\],
+  .bg-\[\#1f1f1f\],
+  .bg-\[\#202020\],
+  .bg-\[\#222222\],
+  .bg-\[\#262626\] {
+    background-color: var(--stone-900) !important;
+  }
+  .custom-scrollbar {
+    scrollbar-color: var(--stone-800) transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--stone-800);
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--stone-700);
+  }
+}
+
+/* ========================================================================== */
+/* NORDIC FROST THEME (Clean Light Mode with Slate & Ice Tint)               */
+/* ========================================================================== */
+[data-theme="nordic"] {
+  --stone-950: #f8fafc;
+  --stone-900: #f1f5f9;
+  --stone-850: #e2e8f0;
+  --stone-800: #cbd5e1;
+  --stone-750: #94a3b8;
+  --stone-700: #64748b;
+  --stone-600: #475569;
+  --stone-500: #334155;
+  --stone-400: #1e293b;
+  --stone-350: #172033;
+  --stone-300: #0f172a;
+  --stone-250: #0b1120;
+  --stone-200: #090e1a;
+  --stone-150: #060912;
+  --stone-100: #03050a;
+  --stone-50: #000000;
+
+  --app-bg: #f8fafc;
+  --app-text: #0f172a;
+  --scrollbar-track: #f8fafc;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+  --task-card-hover-border: #64748b;
+
+  ::selection {
+    background-color: #cbd5e1;
+    color: #0f172a;
+  }
+
+  /* Universal dark background utilities -> crisp Nordic paper surfaces */
+  .bg-\[\#0a0a0a\],
+  .bg-\[\#080808\],
+  .bg-\[\#000000\],
+  .bg-\[\#0c0c0c\],
+  .bg-\[\#0d0d0d\],
+  .bg-\[\#0e0e0e\],
+  .bg-\[\#0f0f0f\] {
+    background-color: var(--stone-950) !important;
+  }
+  .bg-\[\#121212\],
+  .bg-\[\#111111\],
+  .bg-\[\#131313\],
+  .bg-\[\#141414\],
+  .bg-\[\#151515\],
+  .bg-\[\#161616\],
+  .bg-\[\#171717\],
+  .bg-\[\#181818\],
+  .bg-\[\#191919\],
+  .bg-\[\#1a1a1a\],
+  .bg-\[\#1b1b1b\],
+  .bg-\[\#1c1c1c\],
+  .bg-\[\#1d1d1d\],
+  .bg-\[\#1e1e1e\],
+  .bg-\[\#1f1f1f\],
+  .bg-\[\#202020\],
+  .bg-\[\#222222\],
+  .bg-\[\#262626\] {
+    background-color: var(--stone-900) !important;
+  }
+
+  /* Semi-transparent dark background classes in quick docks, headers, cards and overlays */
+  .bg-\[\#121212\]\/95,
+  .bg-\[\#141414\]\/95,
+  .bg-\[\#0a0a0a\]\/95,
+  .bg-\[\#0e0e0e\]\/90,
+  .bg-\[\#141414\]\/90 {
+    background-color: rgba(241, 245, 249, 0.95) !important;
+  }
+  .bg-\[\#141414\]\/80,
+  .bg-\[\#121212\]\/80,
+  .bg-\[\#181818\]\/80,
+  .bg-\[\#1a1a1a\]\/80,
+  .bg-\[\#1b1b1b\]\/80,
+  .bg-\[\#111111\]\/70,
+  .bg-\[\#101010\]\/60,
+  .bg-\[\#0a0a0a\]\/80 {
+    background-color: var(--stone-850) !important;
+  }
+  .hover\:bg-\[\#181818\]:hover,
+  .hover\:bg-\[\#1f1f1f\]:hover,
+  .hover\:bg-stone-850:hover,
+  .focus-within\:bg-\[\#202020\]:focus-within {
+    background-color: var(--stone-800) !important;
+  }
+
+  /* Modal backdrops in Nordic mode */
+  .bg-black\/75,
+  .bg-black\/80,
+  .bg-black\/60,
+  .bg-black\/70,
+  .bg-black\/50 {
+    background-color: rgba(15, 23, 42, 0.45) !important;
+  }
+
+  /* Selected sidebar / tab background highlights */
+  .bg-white\/\[0\.08\],
+  .bg-white\/10,
+  .bg-white\/5,
+  .bg-white\/\[0\.05\] {
+    background-color: rgba(15, 23, 42, 0.08) !important;
+  }
+  .bg-white\/\[0\.03\] {
+    background-color: rgba(15, 23, 42, 0.04) !important;
+  }
+  .bg-white\/\[0\.12\] {
+    background-color: rgba(15, 23, 42, 0.12) !important;
+  }
+  .border-white\/20,
+  .border-white\/10,
+  .border-white\/30 {
+    border-color: rgba(15, 23, 42, 0.2) !important;
+  }
+  .border-white\/\[0\.08\] {
+    border-color: rgba(15, 23, 42, 0.12) !important;
+  }
+
+  /* Lists View: Task card statuses & Container surfaces in nordic mode */
+  .bg-\[\#14120e\],
+  .bg-\[\#161410\],
+  .bg-\[\#101010\]\/60,
+  .bg-\[\#101010\],
+  .bg-\[\#111\]\/40 {
+    background-color: var(--stone-900) !important;
+  }
+  .bg-\[\#18140a\],
+  .bg-\[\#1c1608\] {
+    background-color: rgba(245, 158, 11, 0.12) !important;
+  }
+  .bg-indigo-950\/10,
+  .bg-\[\#141422\] {
+    background-color: rgba(99, 102, 241, 0.08) !important;
+  }
+  .border-indigo-900\/30,
+  .border-indigo-900\/40 {
+    border-color: rgba(99, 102, 241, 0.25) !important;
+  }
+  .bg-rose-950\/10,
+  .bg-\[\#181111\] {
+    background-color: rgba(244, 63, 94, 0.08) !important;
+  }
+  .border-rose-900\/30 {
+    border-color: rgba(244, 63, 94, 0.25) !important;
+  }
+
+  /* Daylight Phases and Gradients in Nordic (clean crisp daytime frost palette) */
+  .via-\[\#111111\]\/70 {
+    --tw-gradient-via: rgba(241, 245, 249, 0.85) !important;
+  }
+  .to-\[\#0e0e0e\]\/90 {
+    --tw-gradient-to: rgba(226, 232, 240, 0.95) !important;
+  }
+  .from-amber-950\/15 {
+    --tw-gradient-from: rgba(245, 158, 11, 0.12) !important;
+  }
+  .from-yellow-950\/15 {
+    --tw-gradient-from: rgba(234, 179, 8, 0.12) !important;
+  }
+  .from-orange-950\/15 {
+    --tw-gradient-from: rgba(249, 115, 22, 0.12) !important;
+  }
+  /* Schedule Planner & Right Side Panel in Nordic */
+  .bg-\[\#111111\]\/90 {
+    background-color: rgba(241, 245, 249, 0.95) !important;
+  }
+  .bg-stone-950\/40,
+  .bg-stone-900\/30,
+  .bg-stone-900\/80 {
+    background-color: var(--stone-900) !important;
+  }
+  .border-stone-850\/60,
+  .border-stone-800\/40,
+  .border-stone-800\/60,
+  .border-stone-800\/80 {
+    border-color: var(--stone-850) !important;
+  }
+
+  /* Time block highlights in Nordic light mode */
+  .bg-amber-500\/15 {
+    background-color: rgba(245, 158, 11, 0.16) !important;
+  }
+  .hover\:bg-amber-500\/20:hover {
+    background-color: rgba(245, 158, 11, 0.22) !important;
+  }
+  .border-amber-500\/40 {
+    border-color: rgba(245, 158, 11, 0.45) !important;
+  }
+
+  /* High contrast badge and chip text colors in Nordic light mode */
+  .text-amber-300 {
+    color: #b45309 !important;
+  }
+  .text-amber-400 {
+    color: #d97706 !important;
+  }
+  .text-yellow-300 {
+    color: #a16207 !important;
+  }
+  .text-yellow-400 {
+    color: #ca8a04 !important;
+  }
+  .text-orange-300 {
+    color: #c2410c !important;
+  }
+  .text-orange-400 {
+    color: #ea580c !important;
+  }
+  .text-indigo-300 {
+    color: #4338ca !important;
+  }
+  .text-indigo-400 {
+    color: #4f46e5 !important;
+  }
+  .text-rose-300 {
+    color: #be123c !important;
+  }
+  .text-rose-400 {
+    color: #e11d48 !important;
+  }
+  .text-emerald-300 {
+    color: #047857 !important;
+  }
+  .text-emerald-400 {
+    color: #059669 !important;
+  }
+
+  /* Inverted text colors for light theme */
+  .text-white,
+  .text-stone-50,
+  .text-stone-100 {
+    color: var(--stone-100) !important;
+  }
+  .text-stone-200 {
+    color: var(--stone-200) !important;
+  }
+  .text-stone-300 {
+    color: var(--stone-300) !important;
+  }
+  .text-stone-400 {
+    color: var(--stone-400) !important;
+  }
+  .text-stone-500 {
+    color: var(--stone-500) !important;
+  }
+  .text-stone-600 {
+    color: var(--stone-600) !important;
+  }
+
+  input,
+  textarea,
+  select {
+    color: var(--stone-100) !important;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--stone-500) !important;
+    opacity: 0.85;
+  }
+
+  .custom-scrollbar {
+    scrollbar-color: var(--stone-800) transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--stone-800);
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--stone-700);
+  }
+}
+
 @layer base {
   body {
     background-color: var(--app-bg, #0a0a0a);
