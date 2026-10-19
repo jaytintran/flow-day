@@ -230,6 +230,23 @@ export default function Settings({
     } catch {}
   };
 
+  const [enableTimeGutterDrag, setEnableTimeGutterDrag] = useState(() => {
+    try {
+      const stored = localStorage.getItem('flowday_enable_time_gutter_drag');
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const handleToggleTimeGutterDrag = (val: boolean) => {
+    setEnableTimeGutterDrag(val);
+    try {
+      localStorage.setItem('flowday_enable_time_gutter_drag', String(val));
+      window.dispatchEvent(new CustomEvent('flowday-settings-change'));
+    } catch {}
+  };
+
   const [desktopHubLayout, setDesktopHubLayout] = useState<'canvas' | 'classic'>(() => {
     try {
       const stored = localStorage.getItem('flowday_desktop_hub_layout');
@@ -492,6 +509,27 @@ export default function Settings({
                           type="checkbox"
                           checked={showDayPhases}
                           onChange={(e) => handleToggleShowDayPhases(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-stone-800 rounded-full peer peer-focus:outline-none peer-checked:bg-amber-500/80 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-stone-400 peer-checked:after:bg-stone-950 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
+                      </label>
+                    </div>
+
+                    {/* Time Gutter Drag Adjustment */}
+                    <div className="flex items-center justify-between p-3.5 bg-stone-950/60 border border-stone-850 rounded-2xl">
+                      <div className="flex flex-col gap-0.5 pr-4">
+                        <span className="text-xs text-stone-200 font-semibold">
+                          Time Gutter Drag Adjustment
+                        </span>
+                        <span className="text-[11px] font-mono text-stone-500">
+                          Hold and drag the time gutter up/down on Day View to readjust times directly.
+                        </span>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={enableTimeGutterDrag}
+                          onChange={(e) => handleToggleTimeGutterDrag(e.target.checked)}
                           className="sr-only peer"
                         />
                         <div className="w-9 h-5 bg-stone-800 rounded-full peer peer-focus:outline-none peer-checked:bg-amber-500/80 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-stone-400 peer-checked:after:bg-stone-950 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>

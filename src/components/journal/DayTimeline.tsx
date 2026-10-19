@@ -217,6 +217,15 @@ export default function DayTimeline({
     }
   });
 
+  const [enableTimeGutterDrag, setEnableTimeGutterDrag] = useState(() => {
+    try {
+      const stored = localStorage.getItem('flowday_enable_time_gutter_drag');
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  });
+
   useEffect(() => {
     const handleSettingsChange = () => {
       try {
@@ -228,6 +237,8 @@ export default function DayTimeline({
         setSleepEnabled(storedSleepEnabled === null ? true : storedSleepEnabled === 'true');
         const storedPhases = localStorage.getItem('flowday_show_day_phases');
         setShowDayPhases(storedPhases === null ? true : storedPhases === 'true');
+        const storedGutterDrag = localStorage.getItem('flowday_enable_time_gutter_drag');
+        setEnableTimeGutterDrag(storedGutterDrag === null ? true : storedGutterDrag === 'true');
       } catch {}
     };
     window.addEventListener('flowday-settings-change', handleSettingsChange);
@@ -274,7 +285,7 @@ export default function DayTimeline({
         className="group relative flex items-center gap-2.5 py-2 rounded select-none z-10"
       >
         {/* Left Column 1: Time Gutter */}
-        <div className="w-16 text-right shrink-0 select-none whitespace-nowrap">
+        <div className="w-14 sm:w-16 text-right shrink-0 select-none whitespace-nowrap">
           <span className="text-[9px] font-mono font-bold tracking-wider text-amber-400 bg-amber-500/15 border border-amber-500/40 px-1.5 py-0.5 rounded shadow-[0_0_8px_rgba(245,158,11,0.25)]">
             NOW
           </span>
@@ -329,7 +340,7 @@ export default function DayTimeline({
         </div>
 
         {/* Left Column 2: Icon */}
-        <div className="w-5 h-5 flex items-center justify-center relative shrink-0 z-10 bg-[#0a0a0a] rounded-full">
+        <div className="w-6 h-6 flex items-center justify-center relative shrink-0 z-10 bg-[#0a0a0a] rounded-full">
           <div className="w-6 h-6 rounded-full border border-violet-500/20 bg-violet-500/10 text-violet-400 flex items-center justify-center">
             <span className="text-[11px]">🌙</span>
           </div>
@@ -489,22 +500,24 @@ export default function DayTimeline({
 
     if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
 
-    holdTimerRef.current = setTimeout(() => {
-      if (dragStartPosRef.current) {
-        setActiveRulerState({
-          entry: dragStartPosRef.current.entry,
-          initialDate: dragStartPosRef.current.initialDate,
-          initialEndDate: dragStartPosRef.current.initialEndDate,
-          mode: dragStartPosRef.current.mode,
-          originY: startY,
-          originX: startX,
-        });
-      }
-    }, 180);
+    if (enableTimeGutterDrag) {
+      holdTimerRef.current = setTimeout(() => {
+        if (dragStartPosRef.current) {
+          setActiveRulerState({
+            entry: dragStartPosRef.current.entry,
+            initialDate: dragStartPosRef.current.initialDate,
+            initialEndDate: dragStartPosRef.current.initialEndDate,
+            mode: dragStartPosRef.current.mode,
+            originY: startY,
+            originX: startX,
+          });
+        }
+      }, 180);
+    }
   };
 
   const handleGutterPointerMove = (e: React.PointerEvent) => {
-    if (!dragStartPosRef.current || activeRulerState) return;
+    if (!enableTimeGutterDrag || !dragStartPosRef.current || activeRulerState) return;
     const dist = Math.hypot(
       e.clientX - dragStartPosRef.current.x,
       e.clientY - dragStartPosRef.current.y,
@@ -746,7 +759,11 @@ export default function DayTimeline({
               onPointerUp={(e) => handleGutterPointerUp(e, entry)}
               onPointerCancel={handleGutterPointerCancel}
               onClick={(e) => e.stopPropagation()}
-              title="Click to edit · Hold & drag for time ruler"
+              title={
+                enableTimeGutterDrag
+                  ? 'Click to edit · Hold & drag for time ruler'
+                  : 'Click to edit time'
+              }
               className={`text-[10px] font-mono font-semibold tracking-tight cursor-pointer hover:text-amber-400 transition-colors touch-none whitespace-nowrap ${
                 isCompletedTask || isHabitLog
                   ? 'text-emerald-500 font-bold'
@@ -1587,7 +1604,7 @@ export default function DayTimeline({
 
       {/* Continuous timeline spine line passing through exact center of icons */}
       {isFromTimelineView && !isCollapsed && (
-        <div className="absolute top-0 bottom-0 left-[86px] w-px pointer-events-none z-0">
+        <div className="absolute top-0 bottom-0 left-[78px] sm:left-[86px] w-px pointer-events-none z-0">
           <div
             className={`w-full h-full ${
               isToday
