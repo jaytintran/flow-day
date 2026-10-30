@@ -24,6 +24,7 @@ import {
   RotateCcw,
   AlertTriangle,
   Clock,
+  Settings,
   Zap,
   Anchor as AnchorIcon,
   Calendar as CalendarIcon,
@@ -73,6 +74,8 @@ export interface TodayPadData {
   items: ScratchpadItem[];
   /** Manual anchor items added to the Anchors section */
   anchors?: AnchorItem[];
+  /** Configurable max slots for the active engine (defaults to 5) */
+  maxSlots?: number;
 }
 
 interface DayScratchpadProps {
@@ -106,6 +109,17 @@ function formatDateKey(key: string): string {
     const d = new Date(key + 'T00:00:00');
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   } catch { return key; }
+}
+
+function formatItemTime(isoStr?: string): string | null {
+  if (!isoStr) return null;
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return null;
+  }
 }
 
 /** Format the day-navigation label in the Anchors header (e.g. "Mon, Sep 29") */
@@ -689,10 +703,23 @@ function TodayPad({ todayPad, onUpdate, viewMode, scratchpadDate, onScratchpadDa
     () => new Set(sortedDateKeys.slice(0, 1)),
   );
   const [rolledOverDismissed, setRolledOverDismissed] = useState(false);
+  const [isEditingMaxSlots, setIsEditingMaxSlots] = useState(false);
+  const [maxSlotsInput, setMaxSlotsInput] = useState(String(todayPad.maxSlots ?? TODAY_PAD_MAX_ITEMS));
 
+  const maxSlots = Math.max(1, Math.min(50, todayPad.maxSlots ?? TODAY_PAD_MAX_ITEMS));
   const slotsUsed = todayActiveItems.length;
-  const slotsLeft = TODAY_PAD_MAX_ITEMS - slotsUsed;
+  const slotsLeft = maxSlots - slotsUsed;
   const isFull = slotsLeft <= 0;
+
+  const handleSaveMaxSlots = () => {
+    const parsed = parseInt(maxSlotsInput, 10);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= 50) {
+      onUpdate({ ...todayPad, maxSlots: parsed });
+    } else {
+      setMaxSlotsInput(String(maxSlots));
+    }
+    setIsEditingMaxSlots(false);
+  };
 
   const updateItems = (newItems: ScratchpadItem[]) => {
     onUpdate({ ...todayPad, items: newItems });
@@ -1180,40 +1207,93 @@ function TodayPad({ todayPad, onUpdate, viewMode, scratchpadDate, onScratchpadDa
           <button
             type="button"
             onClick={() => setIsAddingAnchor(true)}
-            className="w-full py-1 px-2 border border-dashed border-stone-800 hover:border-amber-500/30 rounded-lg text-stone-500 hover:text-amber-500 text-[10px] font-mono flex items-center justify-center gap-1 transition-colors cursor-pointer mt-0.5"
+            className="w-full py-1.5 px-2.5 border border-dashed border-stone-800 hover:border-amber-500/30 rounded-lg text-stone-500 hover:text-amber-500 text-xs font-mono flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
           >
-            <Plus className="w-3 h-3" /> Add Anchor (e.g. 3pm Meeting or tomorrow 10am)
+            <Plus className="w-3.5 h-3.5" /> Add Anchor (e.g. 3pm Meeting or tomorrow 10am)
           </button>
         )}
       </div>
 
-      {/* ─── SECTION 2: THE 5-SLOT ACTIVE ENGINE ───────────────────────── */}
+      {/* ─── SECTION 2: THE CUSTOM-SLOT ACTIVE ENGINE ───────────────────────── */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between px-0.5">
           <div className="flex items-center gap-1.5">
-            <Zap className="w-3.5 h-3.5 text-amber-500" />
+            <button
+              type="button"
+              onClick={() => {
+                setMaxSlotsInput(String(maxSlots));
+                setIsEditingMaxSlots((prev) => !prev);
+              }}
+              title="Edit number of slots"
+              className="p-0.5 rounded text-stone-400 hover:text-amber-400 hover:bg-stone-800 transition-colors cursor-pointer"
+            >
+              <Settings className="w-3.5 h-3.5" />
+            </button>
             <h4 className="text-xs font-mono font-bold text-stone-200 tracking-wide uppercase">
-              5-Slot Active Engine
+              {maxSlots}-Slot Active Engine
             </h4>
           </div>
 
           {/* Slot progress bar */}
           <div className="flex items-center gap-2">
             <div className="flex gap-1">
-              {Array.from({ length: TODAY_PAD_MAX_ITEMS }).map((_, i) => (
+              {Array.from({ length: maxSlots }).map((_, i) => (
                 <div
                   key={i}
-                  className={`h-1 w-4 rounded-full transition-colors ${
+                  className={`h-1 ${maxSlots > 10 ? 'w-2' : maxSlots > 6 ? 'w-3' : 'w-4'} rounded-full transition-colors ${
                     i < slotsUsed ? 'bg-amber-500/70' : 'bg-stone-800'
                   }`}
                 />
               ))}
             </div>
             <span className="text-[9px] font-mono text-stone-500">
-              {slotsUsed}/{TODAY_PAD_MAX_ITEMS}
+              {slotsUsed}/{maxSlots}
             </span>
           </div>
         </div>
+
+        {/* Inline edit max slots form */}
+        <AnimatePresence>
+          {isEditingMaxSlots && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="flex items-center gap-2 bg-stone-900/90 border border-stone-800 rounded-lg px-2.5 py-1.5">
+                <span className="text-[10px] font-mono text-stone-400 shrink-0">Max active slots:</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={maxSlotsInput}
+                  onChange={(e) => setMaxSlotsInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveMaxSlots();
+                    if (e.key === 'Escape') setIsEditingMaxSlots(false);
+                  }}
+                  autoFocus
+                  className="w-14 bg-stone-950 border border-amber-500/40 rounded px-1.5 py-0.5 text-xs text-amber-400 font-mono text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveMaxSlots}
+                  className="px-2 py-0.5 bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 rounded text-[10px] font-mono font-bold cursor-pointer"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingMaxSlots(false)}
+                  className="p-0.5 text-stone-500 hover:text-stone-300 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Roll-over banner */}
         <AnimatePresence>
@@ -1316,7 +1396,7 @@ function TodayPad({ todayPad, onUpdate, viewMode, scratchpadDate, onScratchpadDa
         {isFull ? (
           <div className="flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg border border-stone-800/50 bg-stone-900/20 text-[9px] font-mono text-stone-500">
             <AlertTriangle className="w-3 h-3 text-stone-500" />
-            All 5 slots filled — complete one to add more.
+            All {maxSlots} slots filled — complete one to add more.
           </div>
         ) : (
           <button
@@ -1414,44 +1494,52 @@ function TodayPad({ todayPad, onUpdate, viewMode, scratchpadDate, onScratchpadDa
                       className="overflow-hidden"
                     >
                       <div className="space-y-px pb-1.5 px-1">
-                        {dayItems.map((item) => (
-                          <div
-                            key={item.id}
-                            className="group flex items-start gap-1.5 px-2 py-1.5 rounded-lg hover:bg-stone-900/40 transition-colors"
-                          >
-                            <div className="w-3 h-3 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
-                              <Check className="w-2 h-2 stroke-[3]" />
-                            </div>
-                            <span className="flex-1 text-xs text-stone-500 select-text break-words leading-normal pr-1">
-                              {item.text}
-                            </span>
-                            <div className="flex items-center gap-1 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                              {item.isConverted && (
-                                <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-amber-500/10 text-amber-400/70 border border-amber-500/20">
-                                  Task
+                        {dayItems.map((item) => {
+                          const timeStr = formatItemTime(item.completedAt);
+                          return (
+                            <div
+                              key={item.id}
+                              className="group flex items-start gap-1.5 px-2 py-1.5 rounded-lg hover:bg-stone-900/40 transition-colors"
+                            >
+                              <div className="w-3 h-3 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                                <Check className="w-2 h-2 stroke-[3]" />
+                              </div>
+                              <span className="flex-1 text-xs text-stone-500 select-text break-words leading-normal pr-1">
+                                {item.text}
+                              </span>
+                              {timeStr && (
+                                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400/80 border border-emerald-500/20 shrink-0 self-center">
+                                  {timeStr}
                                 </span>
                               )}
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteItem(item.id)}
-                                className="p-0.5 text-stone-500 hover:text-stone-300 cursor-pointer rounded"
-                                title="Remove from pad"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                              {(item.convertedTaskId || item.completedLogId) && (
+                              <div className="flex items-center gap-1 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                {item.isConverted && (
+                                  <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-amber-500/10 text-amber-400/70 border border-amber-500/20">
+                                    Task
+                                  </span>
+                                )}
                                 <button
                                   type="button"
-                                  onClick={() => handleDeleteFromTimeline(item)}
-                                  className="p-0.5 text-stone-500 hover:text-rose-400 cursor-pointer rounded"
-                                  title="Remove from pad + delete from timeline"
+                                  onClick={() => handleDeleteItem(item.id)}
+                                  className="p-0.5 text-stone-500 hover:text-stone-300 cursor-pointer rounded"
+                                  title="Remove from pad"
                                 >
-                                  <Trash2 className="w-3 h-3" />
+                                  <X className="w-3 h-3" />
                                 </button>
-                              )}
+                                {(item.convertedTaskId || item.completedLogId) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteFromTimeline(item)}
+                                    className="p-0.5 text-stone-500 hover:text-rose-400 cursor-pointer rounded"
+                                    title="Remove from pad + delete from timeline"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </motion.div>
                   )}
@@ -1781,9 +1869,10 @@ export default function DayScratchpad({
   const todayActiveBadge = (() => {
     const dk = activeDate.toISOString().slice(0, 10);
     const count = todayPad.items.filter((i) => !i.isCompleted && (i.dateKey === dk || !i.dateKey)).length;
+    const max = todayPad.maxSlots ?? TODAY_PAD_MAX_ITEMS;
     return (
       <span className="text-[9px] font-mono opacity-70 bg-stone-950/60 px-1 rounded-full">
-        {count}/{TODAY_PAD_MAX_ITEMS}
+        {count}/{max}
       </span>
     );
   })();
@@ -2187,7 +2276,7 @@ export default function DayScratchpad({
 
               {/* Footer hint */}
               <div className="flex-none px-4 py-2 bg-stone-900/80 border-t border-stone-800/60 text-[10px] font-mono text-stone-500 flex justify-between items-center">
-                <span>{isOnSchedulePad ? 'Drag down to create block • Edge to resize' : isOnNotesPad ? 'Google Keep style quick notes • Auto-synced' : 'Anchors = Time-Specific • Engine = 5 Active Slots'}</span>
+                <span>{isOnSchedulePad ? 'Drag down to create block • Edge to resize' : isOnNotesPad ? 'Google Keep style quick notes • Auto-synced' : `Anchors = Time-Specific • Engine = ${todayPad.maxSlots ?? TODAY_PAD_MAX_ITEMS} Active Slots`}</span>
                 <span>{isOnSchedulePad ? 'Syncs with Today Anchors' : isOnNotesPad ? 'Stack of random thought cards' : 'Click tab title to rename'}</span>
               </div>
             </motion.div>
@@ -2256,7 +2345,7 @@ export default function DayScratchpad({
                         <span>{todayPad.name}</span>
                       </div>
                       <span className="text-[10px] text-stone-400 bg-stone-950/60 px-1.5 py-0.5 rounded border border-stone-800">
-                        {todayPad.items.filter((i) => !i.isCompleted).length}/{TODAY_PAD_MAX_ITEMS} active
+                        {todayPad.items.filter((i) => !i.isCompleted).length}/{todayPad.maxSlots ?? TODAY_PAD_MAX_ITEMS} active
                       </span>
                     </button>
 
