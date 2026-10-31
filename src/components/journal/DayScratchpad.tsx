@@ -1601,8 +1601,17 @@ export default function DayScratchpad({
   const [dragOverPadId, setDragOverPadId] = useState<string | null>(null);
   const dragOverPadIdRef = useRef<string | null>(null);
 
+  const [scheduleEnabled, setScheduleEnabled] = useState(() => {
+    try {
+      const stored = localStorage.getItem('flowday_feature_schedule_enabled');
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  });
+
   const isOnTodayPad = activePadId === TODAY_PAD_ID;
-  const isOnSchedulePad = activePadId === SCHEDULE_PAD_ID;
+  const isOnSchedulePad = scheduleEnabled && activePadId === SCHEDULE_PAD_ID;
   const isOnNotesPad = activePadId === NOTES_PAD_ID;
   const currentPad = (isOnTodayPad || isOnSchedulePad || isOnNotesPad)
     ? null
@@ -1610,6 +1619,23 @@ export default function DayScratchpad({
   const items = currentPad?.items ?? [];
   const activeItems = items.filter((i) => !i.isCompleted);
   const completedItems = items.filter((i) => i.isCompleted);
+
+  useEffect(() => {
+    const handleSettingsChange = () => {
+      try {
+        const stored = localStorage.getItem('flowday_feature_schedule_enabled');
+        const enabled = stored === null ? true : stored === 'true';
+        setScheduleEnabled(enabled);
+        if (!enabled && activePadId === SCHEDULE_PAD_ID) {
+          handleSelectPad(TODAY_PAD_ID);
+        }
+      } catch {}
+    };
+    window.addEventListener('flowday-settings-change', handleSettingsChange);
+    return () => {
+      window.removeEventListener('flowday-settings-change', handleSettingsChange);
+    };
+  }, [activePadId]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -1930,27 +1956,29 @@ export default function DayScratchpad({
           badge={todayActiveBadge}
         />
 
-        <PadTab
-          pad={{ id: SCHEDULE_PAD_ID, name: 'Schedule', items: [] }}
-          isActive={isOnSchedulePad}
-          isDragTarget={dragOverPadId === SCHEDULE_PAD_ID}
-          editingPadId={null}
-          editingPadName=""
-          onSelect={handleSelectPad}
-          onStartRename={() => {}}
-          onRenameChange={() => {}}
-          onSaveRename={() => {}}
-          onCancelRename={() => {}}
-          isMobile={mobileView}
-          pinned
-          badge={
-            (todayPad.anchors && todayPad.anchors.length > 0) ? (
-              <span className="text-[9px] font-mono opacity-70 bg-stone-950/60 px-1 rounded-full text-amber-500">
-                {todayPad.anchors.filter((a) => (a.dateKey || todayDateKey()) === scratchpadDate.toISOString().slice(0, 10)).length}
-              </span>
-            ) : null
-          }
-        />
+        {scheduleEnabled && (
+          <PadTab
+            pad={{ id: SCHEDULE_PAD_ID, name: 'Schedule', items: [] }}
+            isActive={isOnSchedulePad}
+            isDragTarget={dragOverPadId === SCHEDULE_PAD_ID}
+            editingPadId={null}
+            editingPadName=""
+            onSelect={handleSelectPad}
+            onStartRename={() => {}}
+            onRenameChange={() => {}}
+            onSaveRename={() => {}}
+            onCancelRename={() => {}}
+            isMobile={mobileView}
+            pinned
+            badge={
+              (todayPad.anchors && todayPad.anchors.length > 0) ? (
+                <span className="text-[9px] font-mono opacity-70 bg-stone-950/60 px-1 rounded-full text-amber-500">
+                  {todayPad.anchors.filter((a) => (a.dateKey || todayDateKey()) === scratchpadDate.toISOString().slice(0, 10)).length}
+                </span>
+              ) : null
+            }
+          />
+        )}
 
         <PadTab
           pad={{ id: NOTES_PAD_ID, name: 'Notes', items: [] }}
@@ -2350,26 +2378,28 @@ export default function DayScratchpad({
                     </button>
 
                     {/* Schedule Tab */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleSelectPad(SCHEDULE_PAD_ID);
-                        setIsTabsModalOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-mono transition-colors cursor-pointer border ${
-                        isOnSchedulePad
-                          ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 font-bold'
-                          : 'bg-stone-900/60 hover:bg-stone-800/80 border-stone-800/80 text-stone-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Schedule</span>
-                      </div>
-                      <span className="text-[10px] text-stone-400 bg-stone-950/60 px-1.5 py-0.5 rounded border border-stone-800">
-                        Timeline Grid
-                      </span>
-                    </button>
+                    {scheduleEnabled && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleSelectPad(SCHEDULE_PAD_ID);
+                          setIsTabsModalOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-mono transition-colors cursor-pointer border ${
+                          isOnSchedulePad
+                            ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 font-bold'
+                            : 'bg-stone-900/60 hover:bg-stone-800/80 border-stone-800/80 text-stone-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Schedule</span>
+                        </div>
+                        <span className="text-[10px] text-stone-400 bg-stone-950/60 px-1.5 py-0.5 rounded border border-stone-800">
+                          Timeline Grid
+                        </span>
+                      </button>
+                    )}
 
                     {/* Notes Tab */}
                     <button

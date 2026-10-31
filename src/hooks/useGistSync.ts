@@ -149,6 +149,7 @@ export function useGistSync() {
     let scratchpadItems = [];
     let todayPad = null;
     let scratchpadQuickNotes = [];
+    let featureScheduleEnabled = true;
     try {
       const rawPads = localStorage.getItem('flowday_scratchpad_pads_v1');
       if (rawPads) {
@@ -165,6 +166,10 @@ export function useGistSync() {
       const rawNotes = localStorage.getItem('flowday_scratchpad_quick_notes_v1');
       if (rawNotes) {
         scratchpadQuickNotes = JSON.parse(rawNotes);
+      }
+      const rawSchedule = localStorage.getItem('flowday_feature_schedule_enabled');
+      if (rawSchedule !== null) {
+        featureScheduleEnabled = rawSchedule === 'true';
       }
     } catch {}
 
@@ -183,6 +188,7 @@ export function useGistSync() {
       today_pad: todayPad,
       scratchpad_items: scratchpadItems,
       scratchpad_quick_notes: scratchpadQuickNotes,
+      feature_schedule_enabled: featureScheduleEnabled,
     };
   };
 
@@ -235,6 +241,17 @@ export function useGistSync() {
             JSON.stringify(data.scratchpad_quick_notes),
           );
           window.dispatchEvent(new CustomEvent('scratchpad_sync_update'));
+        } catch {}
+      }
+
+      // Restore Schedule feature enabled flag if present in backup
+      if (typeof data.feature_schedule_enabled === 'boolean') {
+        try {
+          localStorage.setItem(
+            'flowday_feature_schedule_enabled',
+            String(data.feature_schedule_enabled),
+          );
+          window.dispatchEvent(new CustomEvent('flowday-settings-change'));
         } catch {}
       }
 
@@ -493,6 +510,7 @@ export function useGistSync() {
     });
 
     window.addEventListener('scratchpad_sync_update', onWrite);
+    window.addEventListener('flowday-settings-change', onWrite);
 
     return () => {
       tables.forEach((t) => {
@@ -501,6 +519,7 @@ export function useGistSync() {
         t.hook('deleting').unsubscribe(onWrite);
       });
       window.removeEventListener('scratchpad_sync_update', onWrite);
+      window.removeEventListener('flowday-settings-change', onWrite);
       if (autoPushTimerRef.current) {
         clearTimeout(autoPushTimerRef.current);
       }

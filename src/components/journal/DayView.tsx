@@ -89,6 +89,30 @@ export default function DayView({
   // Synchronize TodayPad data so creating timeblocks updates Day Scratchpad anchors
   const [todayPad, setTodayPad] = useState<TodayPadData>(loadTodayPad);
 
+  const [scheduleEnabled, setScheduleEnabled] = useState(() => {
+    try {
+      const stored = localStorage.getItem('flowday_feature_schedule_enabled');
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    const handleSettingsChange = () => {
+      try {
+        const stored = localStorage.getItem('flowday_feature_schedule_enabled');
+        setScheduleEnabled(stored === null ? true : stored === 'true');
+      } catch {}
+    };
+    window.addEventListener('flowday-settings-change', handleSettingsChange);
+    window.addEventListener('storage', handleSettingsChange);
+    return () => {
+      window.removeEventListener('flowday-settings-change', handleSettingsChange);
+      window.removeEventListener('storage', handleSettingsChange);
+    };
+  }, []);
+
   // Swipe left/right date shifting on mobile
   const dayTouchStartRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -356,9 +380,9 @@ export default function DayView({
       >
         {renderOverdueSection()}
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className={`grid grid-cols-1 ${scheduleEnabled ? 'lg:grid-cols-12' : 'max-w-4xl mx-auto'} gap-6 items-start`}>
           {/* Left Pane: Day Stream Timeline */}
-          <div className="lg:col-span-7 min-w-0">
+          <div className={`${scheduleEnabled ? 'lg:col-span-7' : 'w-full'} min-w-0`}>
             <DayTimeline
               items={dayRenderItems}
               labelString={activeDayString}
@@ -380,18 +404,20 @@ export default function DayView({
           </div>
 
           {/* Right Pane: 24h Schedule Grid (Desktop only) */}
-          <div className="hidden lg:block lg:col-span-5 sticky top-2 min-w-0">
-            <div className="bg-[#111111]/90 backdrop-blur-md rounded-2xl border border-stone-850 p-3 h-[calc(100vh-210px)] min-h-[580px] shadow-sm flex flex-col overflow-hidden">
-              <SchedulePlannerTab
-                scratchpadDate={activeDate}
-                onScratchpadDateChange={setActiveDate}
-                todayPad={todayPad}
-                onUpdateTodayPad={handleUpdateTodayPad}
-                isMobile={false}
-                showDateNav={false}
-              />
+          {scheduleEnabled && (
+            <div className="hidden lg:block lg:col-span-5 sticky top-2 min-w-0">
+              <div className="bg-[#111111]/90 backdrop-blur-md rounded-2xl border border-stone-850 p-3 h-[calc(100vh-210px)] min-h-[580px] shadow-sm flex flex-col overflow-hidden">
+                <SchedulePlannerTab
+                  scratchpadDate={activeDate}
+                  onScratchpadDateChange={setActiveDate}
+                  todayPad={todayPad}
+                  onUpdateTodayPad={handleUpdateTodayPad}
+                  isMobile={false}
+                  showDateNav={false}
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {contextMenu && (
