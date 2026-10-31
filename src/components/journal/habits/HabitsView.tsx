@@ -17,6 +17,9 @@ import {
   Archive,
   RotateCcw,
   Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
 } from 'lucide-react';
 import { db } from '../../../db';
 import { Habit, HabitLog, Purpose, Domain, RoutineSlot } from '../../../types';
@@ -47,7 +50,11 @@ export default function HabitsView({
     return 'matrix';
   });
 
-  const [daysRange, setDaysRange] = useState<number>(14);
+  const [daysRange, setDaysRange] = useState<number>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) return 7;
+    return 14;
+  });
+  const [windowOffset, setWindowOffset] = useState<number>(0); // 0 = current, -1 = previous period, +1 = next period
   const [searchQuery, setSearchQuery] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [selectedDomainFilter, setSelectedDomainFilter] = useState<string | null>(
@@ -67,16 +74,36 @@ export default function HabitsView({
     } catch {}
   };
 
-  // Queries: Window habit-logs to 90-day range around activeDate for matrix/routines/analytics
+  // Calculate anchor date for matrix based on activeDate + windowOffset * daysRange
+  const matrixAnchorDate = useMemo(() => {
+    const d = new Date(activeDate);
+    if (windowOffset !== 0) {
+      d.setDate(d.getDate() + windowOffset * daysRange);
+    }
+    return d;
+  }, [activeDate, windowOffset, daysRange]);
+
+  // Format label for current matrix period
+  const periodLabel = useMemo(() => {
+    const end = new Date(matrixAnchorDate);
+    const start = new Date(matrixAnchorDate);
+    start.setDate(start.getDate() - (daysRange - 1));
+
+    const startStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const endStr = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${startStr} – ${endStr}`;
+  }, [matrixAnchorDate, daysRange]);
+
+  // Queries: Window habit-logs to 180-day range around matrixAnchorDate for matrix/routines/analytics
   const allHabits = useLiveQuery(() => db.habits.toArray()) || [];
   const allLogs =
     (useLiveQuery(async () => {
-      const windowStart = new Date(activeDate);
-      windowStart.setDate(windowStart.getDate() - 75);
+      const windowStart = new Date(matrixAnchorDate);
+      windowStart.setDate(windowStart.getDate() - 120);
       windowStart.setHours(0, 0, 0, 0);
 
-      const windowEnd = new Date(activeDate);
-      windowEnd.setDate(windowEnd.getDate() + 15);
+      const windowEnd = new Date(matrixAnchorDate);
+      windowEnd.setDate(windowEnd.getDate() + 60);
       windowEnd.setHours(23, 59, 59, 999);
 
       return (await db.entries
@@ -87,7 +114,7 @@ export default function HabitsView({
           return t >= windowStart.getTime() && t <= windowEnd.getTime();
         })
         .toArray()) as HabitLog[];
-    }, [activeDate]) || []) as HabitLog[];
+    }, [matrixAnchorDate]) || []) as HabitLog[];
   const purposes = (useLiveQuery(() => db.purposes.toArray()) || []) as Purpose[];
   const domains = (useLiveQuery(() => db.domains.toArray()) || []) as Domain[];
 
@@ -178,27 +205,69 @@ export default function HabitsView({
             </button>
           </div>
 
-          {/* Matrix Date Range Selector (Only when in Matrix view) */}
+          {/* Matrix Controls: Range (7D/14D/30D) + Period Navigation */}
           {subView === 'matrix' && (
-            <div className="flex items-center p-1 rounded-xl bg-[#121212] border border-stone-800 text-[11px] font-mono">
-              {[
-                { label: '7D', val: 7 },
-                { label: '14D', val: 14 },
-                { label: '30D', val: 30 },
-              ].map((r) => (
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Range Pills */}
+              <div className="flex items-center p-1 rounded-xl bg-[#121212] border border-stone-800 text-[11px] font-mono">
+                {[
+                  { label: '7D', val: 7 },
+                  { label: '14D', val: 14 },
+                  { label: '30D', val: 30 },
+                ].map((r) => (
+                  <button
+                    key={r.val}
+                    type="button"
+                    onClick={() => {
+                      setDaysRange(r.val);
+                      setWindowOffset(0);
+                    }}
+                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                      daysRange === r.val
+                        ? 'bg-stone-800 text-stone-100 font-bold'
+                        : 'text-stone-500 hover:text-stone-300'
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Date Cycling Pager: < [Oct 18 – Oct 31] > [Today] */}
+              <div className="flex items-center gap-1 bg-[#121212] border border-stone-800 rounded-xl p-1 text-xs font-mono">
                 <button
-                  key={r.val}
                   type="button"
-                  onClick={() => setDaysRange(r.val)}
-                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-                    daysRange === r.val
-                      ? 'bg-stone-800 text-stone-100 font-bold'
-                      : 'text-stone-500 hover:text-stone-300'
-                  }`}
+                  onClick={() => setWindowOffset((prev) => prev - 1)}
+                  className="p-1 rounded-lg text-stone-400 hover:text-stone-100 hover:bg-stone-800 transition-colors cursor-pointer"
+                  title="Previous period"
                 >
-                  {r.label}
+                  <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
-              ))}
+
+                <span className="px-2 text-[11px] text-stone-300 font-semibold select-none whitespace-nowrap">
+                  {periodLabel}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setWindowOffset((prev) => prev + 1)}
+                  className="p-1 rounded-lg text-stone-400 hover:text-stone-100 hover:bg-stone-800 transition-colors cursor-pointer"
+                  title="Next period"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+
+                {windowOffset !== 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setWindowOffset(0)}
+                    className="ml-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 transition-all cursor-pointer"
+                    title="Jump back to current period"
+                  >
+                    Today
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -252,7 +321,7 @@ export default function HabitsView({
           <HabitMatrixGrid
             habits={filteredHabits}
             allLogs={allLogs}
-            activeDate={activeDate}
+            activeDate={matrixAnchorDate}
             daysRange={daysRange}
             onEditHabit={(h) => {
               setEditingHabit(h);

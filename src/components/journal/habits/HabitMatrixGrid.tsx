@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { Check, Flame, Shield, Calendar, Plus, MoreHorizontal } from 'lucide-react';
+import { Check, Flame, Shield, Calendar, Plus, MoreHorizontal, Settings2, Sparkles } from 'lucide-react';
 import { Habit, HabitLog, Purpose, Domain } from '../../../types';
 import { getHabitTheme, calculateStreak, isHabitScheduledForDate } from '../../../lib/habitUtils';
 import { soundService } from '../../../services/audio';
@@ -127,23 +127,23 @@ export default function HabitMatrixGrid({
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col min-h-0 md:max-h-[70vh] bg-[#0c0c0c] border border-stone-850 rounded-2xl shadow-xl overflow-hidden select-none">
+    <div className="w-full flex-1 flex flex-col min-h-0 bg-[#0c0c0c] border border-stone-850 rounded-2xl shadow-xl overflow-hidden select-none">
       {/* Scrollable Matrix Table Container */}
-      <div className="flex-1 overflow-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-stone-800 [&::-webkit-scrollbar-track]:bg-transparent">
+      <div className="flex-1 overflow-auto max-h-[calc(100dvh-220px)] md:max-h-none [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-stone-800 [&::-webkit-scrollbar-track]:bg-transparent">
         <table className="w-full text-left border-collapse min-w-max">
           {/* Table Header */}
           <thead>
             <tr className="border-b border-stone-800 bg-[#121212] sticky top-0 z-30">
               {/* Sticky Frozen Column Header */}
-              <th className="sticky left-0 z-40 bg-[#141414] py-3.5 px-4 min-w-[220px] sm:min-w-[280px] max-w-[320px] border-r border-stone-800 shadow-[4px_0_12px_rgba(0,0,0,0.5)]">
+              <th className="sticky left-0 z-40 bg-[#141414] py-3 px-3 sm:px-4 w-36 sm:w-64 max-w-[280px] border-r border-stone-800 shadow-[4px_0_12px_rgba(0,0,0,0.5)]">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-mono uppercase tracking-wider text-stone-400 font-bold">
-                    Habit / Routine ({habits.length})
+                  <span className="text-[10px] sm:text-[11px] font-mono uppercase tracking-wider text-stone-400 font-bold truncate">
+                    Habits ({habits.length})
                   </span>
                   <button
                     type="button"
                     onClick={onAddNewHabit}
-                    className="p-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 transition-all cursor-pointer"
+                    className="p-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 transition-all cursor-pointer shrink-0"
                     title="Add Habit"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -205,30 +205,32 @@ export default function HabitMatrixGrid({
               return (
                 <tr key={habit.id} className="hover:bg-stone-900/40 transition-colors group">
                   {/* Sticky Frozen Habit Row Header */}
-                  <td className="sticky left-0 z-20 bg-[#111111] group-hover:bg-[#151515] py-2.5 px-4 border-r border-stone-800 shadow-[4px_0_12px_rgba(0,0,0,0.5)] transition-colors">
-                    <div className="flex items-center justify-between gap-2 min-w-0">
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <td className="sticky left-0 z-20 bg-[#111111] group-hover:bg-[#161616] py-2 sm:py-2.5 px-2.5 sm:px-4 w-36 sm:w-64 max-w-[280px] border-r border-stone-800 shadow-[4px_0_12px_rgba(0,0,0,0.5)] transition-colors">
+                    <div className="flex items-center justify-between gap-1 sm:gap-2 min-w-0">
+                      {/* Clickable Habit Name Cell */}
+                      <button
+                        type="button"
+                        onClick={() => onEditHabit(habit)}
+                        className="flex items-center gap-2 min-w-0 flex-1 text-left p-1 -ml-1 rounded-lg hover:bg-stone-800/60 transition-all cursor-pointer group/title"
+                        title={`Click to view & edit habit: "${habit.title}"`}
+                      >
                         {/* Theme Dot */}
                         <span className={`w-2 h-2 rounded-full ${theme.dot} shrink-0`} />
 
-                        {/* Title & Routine Badge */}
-                        <div className="min-w-0 flex-1">
-                          <button
-                            type="button"
-                            onClick={() => onEditHabit(habit)}
-                            className="text-xs font-medium text-stone-200 hover:text-white truncate block text-left max-w-[180px] sm:max-w-[220px] cursor-pointer"
-                            title={habit.title}
-                          >
+                        {/* Title & Interactive Affordance */}
+                        <div className="min-w-0 flex-1 flex items-center gap-1">
+                          <span className="text-xs font-medium text-stone-200 group-hover/title:text-emerald-300 truncate transition-colors">
                             {habit.title}
-                          </button>
+                          </span>
+                          <Settings2 className="w-2.5 h-2.5 text-stone-500 opacity-0 group-hover/title:opacity-100 transition-opacity shrink-0 hidden sm:inline" />
                         </div>
-                      </div>
+                      </button>
 
                       {/* Streak Badge & Calendar Trigger */}
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-center gap-1 shrink-0">
                         {/* Streak Badge */}
                         <div
-                          className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                          className={`flex items-center gap-0.5 px-1 sm:px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-mono font-bold ${
                             streakInfo.currentStreak > 0
                               ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
                               : 'text-stone-600'
@@ -236,7 +238,7 @@ export default function HabitMatrixGrid({
                           title={`Current Streak: ${streakInfo.currentStreak}d | Best: ${streakInfo.longestStreak}d`}
                         >
                           <Flame
-                            className={`w-3 h-3 ${
+                            className={`w-2.5 h-2.5 sm:w-3 sm:h-3 ${
                               streakInfo.currentStreak > 0 ? 'text-amber-400' : 'text-stone-700'
                             }`}
                           />
@@ -247,10 +249,10 @@ export default function HabitMatrixGrid({
                         <button
                           type="button"
                           onClick={() => onOpenCalendar(habit)}
-                          className="p-1 rounded text-stone-600 hover:text-stone-300 hover:bg-stone-800 opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                          className="p-1 rounded text-stone-500 hover:text-stone-200 hover:bg-stone-800 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
                           title="View Consistency Calendar"
                         >
-                          <Calendar className="w-3.5 h-3.5" />
+                          <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -300,9 +302,9 @@ export default function HabitMatrixGrid({
           {/* Table Summary Footer */}
           <tfoot>
             <tr className="border-t border-stone-800 bg-[#121212] font-mono">
-              <td className="sticky left-0 z-20 bg-[#141414] py-3 px-4 border-r border-stone-800 shadow-[4px_0_12px_rgba(0,0,0,0.5)]">
-                <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider">
-                  Daily Completion Total
+              <td className="sticky left-0 z-20 bg-[#141414] py-3 px-3 sm:px-4 w-36 sm:w-64 max-w-[280px] border-r border-stone-800 shadow-[4px_0_12px_rgba(0,0,0,0.5)]">
+                <span className="text-[10px] sm:text-[11px] font-bold text-stone-400 uppercase tracking-wider truncate block">
+                  Completed Total
                 </span>
               </td>
 

@@ -5,11 +5,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Sparkles, Sun, Zap, Moon, Clock, Calendar, Check, Compass, Globe } from 'lucide-react';
+import { X, Sparkles, Sun, Zap, Moon, Clock, Calendar, Check, Compass, Globe, Trash2, Archive } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../../db';
 import { Habit, RoutineSlot, HabitFrequencyType, Purpose, Domain } from '../../../types';
 import { HABIT_THEMES, ROUTINE_SLOTS } from '../../../lib/habitUtils';
+import DetailSheet from '../../DetailSheet';
 
 interface HabitFormModalProps {
   open: boolean;
@@ -131,85 +132,63 @@ export default function HabitFormModal({ open, onClose, habitToEdit }: HabitForm
   };
 
   return (
-    <AnimatePresence>
-      {open && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-3 md:p-4 font-sans">
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/75 backdrop-blur-sm"
-          />
-
-          {/* Modal Container */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 12 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-            className="relative w-full max-w-lg bg-[#121212] border border-stone-800 rounded-2xl shadow-2xl overflow-hidden z-10 flex flex-col max-h-[90vh]"
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-stone-850 bg-[#151515]">
-              <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-stone-100">
-                    {isEditing ? 'Edit Habit & Routine' : 'Create New Habit'}
-                  </h3>
-                  <p className="text-[10px] font-mono text-stone-500 uppercase tracking-widest">
-                    Flow Day Routines Engine
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-1.5 rounded-lg text-stone-500 hover:text-stone-300 hover:bg-stone-800 transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Form Body */}
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-5">
-              {/* Title & Color */}
-              <div className="space-y-2">
-                <label className="text-[11px] font-mono uppercase tracking-wider text-stone-400">
-                  Habit Title
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    required
-                    autoFocus
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="e.g. Morning 20m Meditation, Drink Water, Read 30m..."
-                    className="flex-1 bg-[#0a0a0a] text-stone-100 border border-stone-800 focus:border-emerald-500/60 rounded-xl px-3.5 py-2.5 text-sm placeholder-stone-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 transition-all shadow-inner"
+    <DetailSheet
+      open={open}
+      onClose={onClose}
+      fullScreen={true}
+      disableDrag={true}
+      showMaximizeToggle={false}
+      headerContent={
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+            <Sparkles className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-stone-100">
+              {isEditing ? 'Edit Habit & Routine' : 'Create New Habit'}
+            </h3>
+            <p className="text-[10px] font-mono text-stone-500 uppercase tracking-widest">
+              Flow Day Routines Engine
+            </p>
+          </div>
+        </div>
+      }
+    >
+      <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-between space-y-5 max-w-xl mx-auto w-full py-1">
+        <div className="space-y-5 flex-1 overflow-y-auto pr-1">
+          {/* Title & Color */}
+          <div className="space-y-2">
+            <label className="text-[11px] font-mono uppercase tracking-wider text-stone-400">
+              Habit Title
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                required
+                autoFocus
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Morning 20m Meditation, Drink Water, Read 30m..."
+                className="flex-1 bg-[#0a0a0a] text-stone-100 border border-stone-800 focus:border-emerald-500/60 rounded-xl px-3.5 py-2.5 text-sm placeholder-stone-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 transition-all shadow-inner"
+              />
+              {/* Color dots */}
+              <div className="flex items-center gap-1.5 bg-[#0a0a0a] p-1.5 rounded-xl border border-stone-800">
+                {Object.values(HABIT_THEMES).map((theme) => (
+                  <button
+                    key={theme.key}
+                    type="button"
+                    onClick={() => setColor(theme.key)}
+                    className={`w-4 h-4 rounded-full ${theme.dot} transition-all cursor-pointer ${
+                      color === theme.key
+                        ? `ring-2 ring-offset-2 ring-offset-[#121212] ${theme.ring} scale-110`
+                        : 'opacity-40 hover:opacity-80'
+                    }`}
+                    title={theme.label}
                   />
-                  {/* Color dots */}
-                  <div className="flex items-center gap-1.5 bg-[#0a0a0a] p-1.5 rounded-xl border border-stone-800">
-                    {Object.values(HABIT_THEMES).map((theme) => (
-                      <button
-                        key={theme.key}
-                        type="button"
-                        onClick={() => setColor(theme.key)}
-                        className={`w-4 h-4 rounded-full ${theme.dot} transition-all cursor-pointer ${
-                          color === theme.key
-                            ? `ring-2 ring-offset-2 ring-offset-[#121212] ${theme.ring} scale-110`
-                            : 'opacity-40 hover:opacity-80'
-                        }`}
-                        title={theme.label}
-                      />
-                    ))}
-                  </div>
-                </div>
+                ))}
               </div>
+            </div>
+          </div>
 
               {/* Circadian Routine Slot */}
               <div className="space-y-2">
@@ -433,26 +412,45 @@ export default function HabitFormModal({ open, onClose, habitToEdit }: HabitForm
                 )}
               </div>
 
-              {/* Submit / Cancel Footer */}
-              <div className="pt-4 border-t border-stone-850 flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 rounded-xl text-xs font-mono text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-mono font-bold uppercase tracking-wider bg-emerald-500 text-black hover:bg-emerald-400 transition-all active:scale-95 shadow-lg shadow-emerald-950/40 cursor-pointer flex items-center gap-1.5"
-                >
-                  {isEditing ? 'Save Changes' : 'Create Habit'}
-                </button>
-              </div>
-            </form>
-          </motion.div>
         </div>
-      )}
-    </AnimatePresence>
+
+        {/* Submit / Cancel / Delete Footer */}
+        <div className="pt-3 border-t border-stone-850 flex items-center justify-between gap-2.5 shrink-0">
+          <div>
+            {isEditing && habitToEdit && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (window.confirm(`Are you sure you want to delete habit "${habitToEdit.title}"?`)) {
+                    await db.habits.delete(habitToEdit.id);
+                    onClose();
+                  }
+                }}
+                className="px-3 py-1.5 rounded-xl text-xs font-mono text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete</span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-xs font-mono text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-xl text-xs font-mono font-bold uppercase tracking-wider bg-emerald-500 text-black hover:bg-emerald-400 transition-all active:scale-95 shadow-lg shadow-emerald-950/40 cursor-pointer flex items-center gap-1.5"
+            >
+              {isEditing ? 'Save Changes' : 'Create Habit'}
+            </button>
+          </div>
+        </div>
+      </form>
+    </DetailSheet>
   );
 }
