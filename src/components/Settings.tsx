@@ -292,6 +292,10 @@ export default function Settings({
     isConfigured,
     isAutoSyncEnabled,
     setAutoSyncEnabled,
+    pushInterval,
+    setPushInterval,
+    pullInterval,
+    setPullInterval,
     reload,
     pushToCloud,
     pullFromCloud,
@@ -876,49 +880,100 @@ export default function Settings({
 
                     {/* Auto-Sync (Ambient) Mode Toggle */}
                     <div
-                      className={`p-3.5 bg-stone-950/60 border rounded-2xl flex items-center justify-between transition-colors ${
+                      className={`p-3.5 bg-stone-950/60 border rounded-2xl flex flex-col gap-3 transition-colors ${
                         isConfigured ? 'border-stone-850' : 'border-stone-850/50 opacity-60'
                       }`}
                     >
-                      <div className="flex flex-col gap-0.5 pr-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-stone-200 font-semibold">
-                            Auto-Sync (Ambient)
-                          </span>
-                          {isAutoSyncEnabled && isConfigured && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                              ACTIVE
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-0.5 pr-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-stone-200 font-semibold">
+                              Auto-Sync (Ambient)
                             </span>
-                          )}
+                            {isAutoSyncEnabled && isConfigured && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                ACTIVE
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[11px] font-mono text-stone-500 leading-normal">
+                            {isConfigured
+                              ? 'Automatically syncs changes across devices in the background.'
+                              : 'Requires PAT and Gist ID setup first.'}
+                          </span>
                         </div>
-                        <span className="text-[11px] font-mono text-stone-500 leading-normal">
-                          {isConfigured
-                            ? 'Auto-saves changes after 20s idle and pulls updates when returning to this tab.'
-                            : 'Requires PAT and Gist ID setup first.'}
-                        </span>
+
+                        <button
+                          type="button"
+                          disabled={!isConfigured}
+                          onClick={() => setAutoSyncEnabled(!isAutoSyncEnabled)}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            !isConfigured
+                              ? 'opacity-40 cursor-not-allowed bg-stone-800'
+                              : isAutoSyncEnabled
+                                ? 'bg-emerald-500'
+                                : 'bg-stone-800 hover:bg-stone-700'
+                          }`}
+                          role="switch"
+                          aria-checked={isAutoSyncEnabled}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              isAutoSyncEnabled && isConfigured ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
                       </div>
 
-                      <button
-                        type="button"
-                        disabled={!isConfigured}
-                        onClick={() => setAutoSyncEnabled(!isAutoSyncEnabled)}
-                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                          !isConfigured
-                            ? 'opacity-40 cursor-not-allowed bg-stone-800'
-                            : isAutoSyncEnabled
-                              ? 'bg-emerald-500'
-                              : 'bg-stone-800 hover:bg-stone-700'
-                        }`}
-                        role="switch"
-                        aria-checked={isAutoSyncEnabled}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            isAutoSyncEnabled && isConfigured ? 'translate-x-5' : 'translate-x-0'
-                          }`}
-                        />
-                      </button>
+                      {/* Configurable Sync Frequency Editor */}
+                      {isAutoSyncEnabled && isConfigured && (
+                        <div className="pt-2 border-t border-stone-850/80 space-y-2.5">
+                          {/* Auto-Push Frequency */}
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex flex-col">
+                              <span className="text-[11px] font-mono font-medium text-stone-300">
+                                Auto-Push Delay
+                              </span>
+                              <span className="text-[10px] font-mono text-stone-500">
+                                Idle wait after local edits
+                              </span>
+                            </div>
+                            <select
+                              value={pushInterval}
+                              onChange={(e) => setPushInterval(e.target.value as any)}
+                              className="bg-[#121212] border border-stone-800 hover:border-stone-700 text-stone-200 text-xs font-mono rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500/40 cursor-pointer"
+                            >
+                              <option value="10">10s idle (Fast)</option>
+                              <option value="30">30s idle (Balanced)</option>
+                              <option value="60">1m idle (Relaxed)</option>
+                              <option value="manual">On tab close / blur only</option>
+                            </select>
+                          </div>
+
+                          {/* Auto-Pull Frequency */}
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex flex-col">
+                              <span className="text-[11px] font-mono font-medium text-stone-300">
+                                Auto-Pull Heartbeat
+                              </span>
+                              <span className="text-[10px] font-mono text-stone-500">
+                                Checks Gist for remote edits
+                              </span>
+                            </div>
+                            <select
+                              value={pullInterval}
+                              onChange={(e) => setPullInterval(e.target.value as any)}
+                              className="bg-[#121212] border border-stone-800 hover:border-stone-700 text-stone-200 text-xs font-mono rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500/40 cursor-pointer"
+                            >
+                              <option value="2">Every 2 minutes</option>
+                              <option value="5">Every 5 minutes (Recommended)</option>
+                              <option value="15">Every 15 minutes</option>
+                              <option value="focus_only">On tab focus only</option>
+                            </select>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Push / Pull Big Action Cards */}

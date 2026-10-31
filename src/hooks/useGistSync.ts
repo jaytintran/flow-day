@@ -13,7 +13,12 @@ export const GIST_STORAGE_KEYS = {
   LAST_SYNC_ISO: 'flow_day_last_sync_iso',
   DIRTY: 'flow_day_dirty',
   AUTO_SYNC: 'flow_day_auto_sync',
+  PUSH_INTERVAL: 'flow_day_sync_push_interval', // '10' | '30' | '60' | 'manual'
+  PULL_INTERVAL: 'flow_day_sync_pull_interval', // '2' | '5' | '15' | 'focus_only'
 };
+
+export type PushIntervalOption = '10' | '30' | '60' | 'manual';
+export type PullIntervalOption = '2' | '5' | '15' | 'focus_only';
 
 export type SyncStatus = 'idle' | 'loading' | 'success' | 'error';
 
@@ -70,6 +75,16 @@ export function useGistSync() {
     () => localStorage.getItem(GIST_STORAGE_KEYS.AUTO_SYNC) === '1',
   );
 
+  // Push debounce interval in seconds or 'manual' (default: '30')
+  const [pushInterval, setPushIntervalState] = useState<PushIntervalOption>(
+    () => (localStorage.getItem(GIST_STORAGE_KEYS.PUSH_INTERVAL) as PushIntervalOption) || '30',
+  );
+
+  // Pull idle heartbeat interval in minutes or 'focus_only' (default: '5')
+  const [pullInterval, setPullIntervalState] = useState<PullIntervalOption>(
+    () => (localStorage.getItem(GIST_STORAGE_KEYS.PULL_INTERVAL) as PullIntervalOption) || '5',
+  );
+
   // Dirty flag: true whenever local DB has changes that haven't been pushed yet.
   // Initialized from localStorage so it survives page refreshes.
   const [isDirty, setIsDirty] = useState<boolean>(
@@ -91,6 +106,12 @@ export function useGistSync() {
     setLastSync(localStorage.getItem(GIST_STORAGE_KEYS.LAST_SYNC) || null);
     setIsAutoSyncEnabledState(localStorage.getItem(GIST_STORAGE_KEYS.AUTO_SYNC) === '1');
     setIsDirty(localStorage.getItem(GIST_STORAGE_KEYS.DIRTY) === '1');
+    setPushIntervalState(
+      ((localStorage.getItem(GIST_STORAGE_KEYS.PUSH_INTERVAL) as PushIntervalOption) || '30'),
+    );
+    setPullIntervalState(
+      ((localStorage.getItem(GIST_STORAGE_KEYS.PULL_INTERVAL) as PullIntervalOption) || '5'),
+    );
   }, []);
 
   const setAutoSyncEnabled = useCallback((enabled: boolean) => {
@@ -99,11 +120,29 @@ export function useGistSync() {
     window.dispatchEvent(new CustomEvent('flowday-autosync-change', { detail: { enabled } }));
   }, []);
 
+  const setPushInterval = useCallback((val: PushIntervalOption) => {
+    localStorage.setItem(GIST_STORAGE_KEYS.PUSH_INTERVAL, val);
+    setPushIntervalState(val);
+    window.dispatchEvent(new CustomEvent('flowday-autosync-change'));
+  }, []);
+
+  const setPullInterval = useCallback((val: PullIntervalOption) => {
+    localStorage.setItem(GIST_STORAGE_KEYS.PULL_INTERVAL, val);
+    setPullIntervalState(val);
+    window.dispatchEvent(new CustomEvent('flowday-autosync-change'));
+  }, []);
+
   useEffect(() => {
     reload();
 
     const handleAutoSyncChange = () => {
       setIsAutoSyncEnabledState(localStorage.getItem(GIST_STORAGE_KEYS.AUTO_SYNC) === '1');
+      setPushIntervalState(
+        ((localStorage.getItem(GIST_STORAGE_KEYS.PUSH_INTERVAL) as PushIntervalOption) || '30'),
+      );
+      setPullIntervalState(
+        ((localStorage.getItem(GIST_STORAGE_KEYS.PULL_INTERVAL) as PullIntervalOption) || '5'),
+      );
     };
 
     window.addEventListener('flowday-autosync-change', handleAutoSyncChange);
@@ -173,6 +212,9 @@ export function useGistSync() {
       }
     } catch {}
 
+    const syncPushInterval = localStorage.getItem(GIST_STORAGE_KEYS.PUSH_INTERVAL) || '30';
+    const syncPullInterval = localStorage.getItem(GIST_STORAGE_KEYS.PULL_INTERVAL) || '5';
+
     return {
       version: 2,
       exportedAt: new Date().toISOString(),
@@ -189,6 +231,8 @@ export function useGistSync() {
       scratchpad_items: scratchpadItems,
       scratchpad_quick_notes: scratchpadQuickNotes,
       feature_schedule_enabled: featureScheduleEnabled,
+      sync_push_interval: syncPushInterval,
+      sync_pull_interval: syncPullInterval,
     };
   };
 
@@ -252,6 +296,20 @@ export function useGistSync() {
             String(data.feature_schedule_enabled),
           );
           window.dispatchEvent(new CustomEvent('flowday-settings-change'));
+        } catch {}
+      }
+
+      // Restore Sync Intervals if present in backup
+      if (typeof data.sync_push_interval === 'string') {
+        try {
+          localStorage.setItem(GIST_STORAGE_KEYS.PUSH_INTERVAL, data.sync_push_interval);
+          setPushIntervalState(data.sync_push_interval as PushIntervalOption);
+        } catch {}
+      }
+      if (typeof data.sync_pull_interval === 'string') {
+        try {
+          localStorage.setItem(GIST_STORAGE_KEYS.PULL_INTERVAL, data.sync_pull_interval);
+          setPullIntervalState(data.sync_pull_interval as PullIntervalOption);
         } catch {}
       }
 
@@ -481,14 +539,19 @@ export function useGistSync() {
       const autoSyncOn = localStorage.getItem(GIST_STORAGE_KEYS.AUTO_SYNC) === '1';
       const storedPat = localStorage.getItem(GIST_STORAGE_KEYS.PAT) || '';
       const storedGistId = localStorage.getItem(GIST_STORAGE_KEYS.GIST_ID) || '';
+      const pushPref = (localStorage.getItem(GIST_STORAGE_KEYS.PUSH_INTERVAL) as PushIntervalOption) || '30';
 
       if (autoSyncOn && storedPat.trim() && storedGistId.trim()) {
         if (autoPushTimerRef.current) {
           clearTimeout(autoPushTimerRef.current);
         }
+        // If manual/on-blur only, don't trigger timer-based push
+        if (pushPref === 'manual') return;
+
+        const delayMs = pushPref === '10' ? 10000 : pushPref === '60' ? 60000 : 30000;
         autoPushTimerRef.current = setTimeout(() => {
           pushToCloud({ silent: true });
-        }, 20000); // 20-second debounce
+        }, delayMs);
       }
     };
 
@@ -575,8 +638,43 @@ export function useGistSync() {
     window.addEventListener('focus', handleFocus);
     window.addEventListener('online', handleOnline);
 
+    // Idle heartbeat according to user pull frequency preference
+    const pullPref = (localStorage.getItem(GIST_STORAGE_KEYS.PULL_INTERVAL) as PullIntervalOption) || '5';
+    let heartbeatInterval: NodeJS.Timeout | null = null;
+    if (pullPref !== 'focus_only') {
+      const intervalMs = (pullPref === '2' ? 2 : pullPref === '15' ? 15 : 5) * 60 * 1000;
+      heartbeatInterval = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          checkAndAutoPull();
+        }
+      }, intervalMs);
+    }
+
+    // On window blur / hidden tab, immediately flush any unpushed dirty changes
+    const handleHiddenFlush = () => {
+      if (document.visibilityState === 'hidden') {
+        const autoSyncOn = localStorage.getItem(GIST_STORAGE_KEYS.AUTO_SYNC) === '1';
+        const dirty = localStorage.getItem(GIST_STORAGE_KEYS.DIRTY) === '1';
+        const storedPat = localStorage.getItem(GIST_STORAGE_KEYS.PAT) || '';
+        const storedGistId = localStorage.getItem(GIST_STORAGE_KEYS.GIST_ID) || '';
+
+        if (autoSyncOn && dirty && storedPat.trim() && storedGistId.trim()) {
+          if (autoPushTimerRef.current) {
+            clearTimeout(autoPushTimerRef.current);
+          }
+          pushToCloud({ silent: true });
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleHiddenFlush);
+
+    // Also check on initial mount
+    checkAndAutoPull();
+
     return () => {
+      clearInterval(heartbeatInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', handleHiddenFlush);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('online', handleOnline);
     };
@@ -660,6 +758,10 @@ export function useGistSync() {
     isDirty,
     isAutoSyncEnabled,
     setAutoSyncEnabled,
+    pushInterval,
+    setPushInterval,
+    pullInterval,
+    setPullInterval,
     reload,
     pushToCloud,
     pullFromCloud,
