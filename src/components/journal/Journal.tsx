@@ -33,6 +33,7 @@ import GenericEntitySheet from "./hub/GenericEntitySheet";
 import FocusSheet from "../FocusSheet";
 import { Delete, Trash, Star, Pin, Sparkles, X, Trophy } from "lucide-react";
 import MarkdownPreview from "../MarkdownPreview";
+import RichNoteEditor from "../RichNoteEditor";
 
 interface JournalProps {
 	activeDate: Date;
@@ -431,6 +432,8 @@ export default function Journal({
 	const [isDetailOpen, setIsDetailOpen] = useState(false);
 	const [editTitle, setEditTitle] = useState("");
 	const [editContent, setEditContent] = useState("");
+	const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "">("");
+	const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 	const [hubSubView, setHubSubView] = useState<"mindmap" | "skilltree">("mindmap");
 	const [isEditingContent, setIsEditingContent] = useState(false);
 	const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -537,64 +540,101 @@ export default function Journal({
 		}
 	}, [selectedEntry]);
 
+	// Debounced autosave mechanism for DetailSheet
+	const triggerAutoSave = (updatedTitle: string, updatedContent: string) => {
+		if (!selectedEntry) return;
+		setSaveStatus("saving");
+		if (autoSaveTimerRef.current) {
+			clearTimeout(autoSaveTimerRef.current);
+		}
+		autoSaveTimerRef.current = setTimeout(async () => {
+			try {
+				const id = selectedEntry.id;
+				const type = selectedEntry.type;
+				const trimmedTitle = updatedTitle.trim();
+				const trimmedContent = updatedContent.trim();
+
+				if (type === "note" || type === "task" || type === "event") {
+					await db.entries.update(id, {
+						title: trimmedTitle,
+						content: trimmedContent,
+					} as any);
+				} else if (type === "time-block") {
+					await db.entries.update(id, {
+						title: trimmedTitle,
+					} as any);
+				}
+				setSaveStatus("saved");
+			} catch (err) {
+				console.error("AutoSave error:", err);
+				setSaveStatus("");
+			}
+		}, 600);
+	};
+
 	// Open detail sheet for a given entry
 	const handleOpenDetail = (entry: TimelineEntry) => {
 		setSelectedEntry(entry);
+		setSaveStatus("");
 		setIsDetailOpen(true);
 	};
 
-	// Close detail sheet and persist changes
+	// Close detail sheet and ensure any pending changes are flushed
 	const handleCloseDetail = async () => {
-		if (!selectedEntry) return;
+		if (autoSaveTimerRef.current) {
+			clearTimeout(autoSaveTimerRef.current);
+		}
+		if (selectedEntry) {
+			const id = selectedEntry.id;
+			const type = selectedEntry.type;
 
-		const id = selectedEntry.id;
-		const type = selectedEntry.type;
-
-		switch (type) {
-			case "note": {
-				await db.entries.update(id, {
-					title: editTitle.trim(),
-					content: editContent.trim(),
-				} as any);
-				break;
-			}
-			case "task": {
-				await db.entries.update(id, {
-					title: editTitle.trim(),
-					content: editContent.trim(),
-				} as any);
-				break;
-			}
-			case "event": {
-				const newTimestamp = editTimestamp
-					? new Date(editTimestamp)
-					: undefined;
-				await db.entries.update(id, {
-					title: editTitle.trim(),
-					content: editContent.trim(),
-					...(newTimestamp ? { timestamp: newTimestamp } : {}),
-				} as any);
-				break;
-			}
-			case "time-block": {
-				const newStart = editStartAt ? new Date(editStartAt) : undefined;
-				const newEnd = editEndAt ? new Date(editEndAt) : undefined;
-				await db.entries.update(id, {
-					title: editTitle.trim(),
-					...(newStart ? { start_at: newStart } : {}),
-					...(newEnd ? { end_at: newEnd } : {}),
-				} as any);
-				break;
+			switch (type) {
+				case "note": {
+					await db.entries.update(id, {
+						title: editTitle.trim(),
+						content: editContent.trim(),
+					} as any);
+					break;
+				}
+				case "task": {
+					await db.entries.update(id, {
+						title: editTitle.trim(),
+						content: editContent.trim(),
+					} as any);
+					break;
+				}
+				case "event": {
+					const newTimestamp = editTimestamp
+						? new Date(editTimestamp)
+						: undefined;
+					await db.entries.update(id, {
+						title: editTitle.trim(),
+						content: editContent.trim(),
+						...(newTimestamp ? { timestamp: newTimestamp } : {}),
+					} as any);
+					break;
+				}
+				case "time-block": {
+					const newStart = editStartAt ? new Date(editStartAt) : undefined;
+					const newEnd = editEndAt ? new Date(editEndAt) : undefined;
+					await db.entries.update(id, {
+						title: editTitle.trim(),
+						...(newStart ? { start_at: newStart } : {}),
+						...(newEnd ? { end_at: newEnd } : {}),
+					} as any);
+					break;
+				}
 			}
 		}
 
 		setIsDetailOpen(false);
 		setSelectedEntry(null);
+		setSaveStatus("");
 	};
 
 	const handleCancelDetail = () => {
-		setIsDetailOpen(false);
-		setSelectedEntry(null);
+		// Even on cancel/backdrop click, flush current changes so nothing is lost
+		handleCloseDetail();
 	};
 
 	// Track which days are collapsed in timeline view
@@ -1282,53 +1322,66 @@ export default function Journal({
 									? "amber"
 									: "blue"
 				}
+				headerContent={
+					<div className="flex items-center gap-2">
+						<span
+							className={`text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border ${
+								selectedEntry?.type === "task"
+									? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+									: selectedEntry?.type === "event"
+										? "text-indigo-400 bg-indigo-500/10 border-indigo-500/20"
+										: selectedEntry?.type === "note"
+											? "text-blue-400 bg-blue-500/10 border-blue-500/20"
+											: "text-amber-400 bg-amber-500/10 border-amber-500/20"
+							}`}
+						>
+							{selectedEntry?.type === "task"
+								? "Task Details"
+								: selectedEntry?.type === "event"
+									? "Event Details"
+									: selectedEntry?.type === "note"
+										? "Note Details"
+										: "Time Block"}
+						</span>
+						{saveStatus === "saving" && (
+							<span className="text-[11px] font-mono text-stone-500 flex items-center gap-1">
+								<span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+								Saving...
+							</span>
+						)}
+						{saveStatus === "saved" && (
+							<span className="text-[11px] font-mono text-stone-500 flex items-center gap-1">
+								<span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+								Saved
+							</span>
+						)}
+					</div>
+				}
 				isMobile={isMobile}
 			>
 				{selectedEntry && (
 					<>
 						{/* Title Header Container */}
 						<div className="border-b border-stone-850/80 pb-3 mb-4">
-							{!isEditingTitle ? (
-								<div
-									onClick={() => setIsEditingTitle(true)}
-									className="w-full text-stone-100 font-serif font-bold text-xl sm:text-2xl tracking-tight cursor-pointer hover:text-stone-300 transition-colors break-words py-1"
-								>
-									{editTitle.trim() || (
-										<span className="text-stone-700 italic">
-											{selectedEntry.type === "task"
-												? "Task Title"
-												: selectedEntry.type === "event"
-													? "Event Title"
-													: selectedEntry.type === "time-block"
-														? "Time Block Title"
-														: "Note Title"}
-										</span>
-									)}
-								</div>
-							) : (
-								<input
-									type="text"
-									autoFocus
-									value={editTitle}
-									onChange={(e) => setEditTitle(e.target.value)}
-									onBlur={() => setIsEditingTitle(false)}
-									onKeyDown={(e) => {
-										if (e.key === "Enter") {
-											setIsEditingTitle(false);
-										}
-									}}
-									placeholder={
-										selectedEntry.type === "task"
-											? "Task Title"
-											: selectedEntry.type === "event"
-												? "Event Title"
-												: selectedEntry.type === "time-block"
-													? "Time Block Title"
-													: "Note Title"
-									}
-									className="w-full bg-transparent text-stone-100 font-serif font-bold text-xl sm:text-2xl tracking-tight focus:outline-none placeholder-stone-700 py-1 border-none"
-								/>
-							)}
+							<input
+								type="text"
+								value={editTitle}
+								onChange={(e) => {
+									const val = e.target.value;
+									setEditTitle(val);
+									triggerAutoSave(val, editContent);
+								}}
+								placeholder={
+									selectedEntry.type === "task"
+										? "Task Title..."
+										: selectedEntry.type === "event"
+											? "Event Title..."
+											: selectedEntry.type === "time-block"
+												? "Time Block Title..."
+												: "Note Title..."
+								}
+								className="w-full bg-transparent text-stone-100 font-serif font-bold text-xl sm:text-2xl tracking-tight focus:outline-none placeholder-stone-700 py-1 border-none"
+							/>
 						</div>
 
 						{/* ── TASK ── */}
@@ -1482,11 +1535,13 @@ export default function Journal({
 
 								{/* Content */}
 								<div className="flex-1 border-t border-stone-850/70 pt-3 flex flex-col min-h-[160px]">
-									<MarkdownPreview
-										text={editContent}
+									<RichNoteEditor
+										initialContent={editContent}
 										placeholder="Add context, links, notes about this task..."
-										editable={true}
-										onChange={setEditContent}
+										onChange={(val) => {
+											setEditContent(val);
+											triggerAutoSave(editTitle, val);
+										}}
 									/>
 								</div>
 							</div>
@@ -1565,11 +1620,13 @@ export default function Journal({
 								</div>
 								{/* Content */}
 								<div className="flex-1 border-t border-stone-850/70 pt-3 flex flex-col min-h-[240px]">
-									<MarkdownPreview
-										text={editContent}
-										placeholder="Tap to start typing your thoughts..."
-										editable={true}
-										onChange={setEditContent}
+									<RichNoteEditor
+										initialContent={editContent}
+										placeholder="Start typing your thoughts, notes, checklist, or ideas..."
+										onChange={(val) => {
+											setEditContent(val);
+											triggerAutoSave(editTitle, val);
+										}}
 									/>
 								</div>
 							</div>
@@ -1648,11 +1705,13 @@ export default function Journal({
 								</div>
 								{/* Content */}
 								<div className="flex-1 border-t border-stone-850/70 pt-3 flex flex-col min-h-[180px]">
-									<MarkdownPreview
-										text={editContent}
-										placeholder="Event description, notes, or details..."
-										editable={true}
-										onChange={setEditContent}
+									<RichNoteEditor
+										initialContent={editContent}
+										placeholder="Event description, agenda, meeting link, or details..."
+										onChange={(val) => {
+											setEditContent(val);
+											triggerAutoSave(editTitle, val);
+										}}
 									/>
 								</div>
 							</div>

@@ -26,6 +26,7 @@ import { parseSmartDate, parseSmartTimeSpan } from '../lib/parser';
 import DetailSheet from './DetailSheet';
 import CategoryIcon, { getCategoryColor } from './CategoryIcon';
 import MarkdownPreview from './MarkdownPreview';
+import RichNoteEditor from './RichNoteEditor';
 
 // Identical to category color styles in RecordsView for visual cohesion
 const RECORD_CAT_COLORS: Record<string, { active: string; dot: string; text: string }> = {
@@ -665,15 +666,13 @@ export default function RecordFormModal({
           </div>
 
           <div className="flex-1 flex flex-col min-h-0 bg-[#0c0c0c] border border-stone-850 rounded-xl p-3 overflow-y-auto">
-            <MarkdownPreview
-              text={content}
-              value={content}
+            <RichNoteEditor
+              initialContent={content}
               placeholder={
                 modalType === 'event'
                   ? 'Write event agenda, meeting link, attendees, checklist, or location...'
-                  : 'Write structured notes, ideas, reflections, checklists, or markdown thoughts...'
+                  : 'Write structured notes, ideas, reflections, checklists, or thoughts...'
               }
-              editable={true}
               onChange={setContent}
             />
           </div>
