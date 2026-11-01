@@ -29,6 +29,7 @@ import { formatDuration, toLocalDateString } from '../../utils';
 import TimePickerSheet from '../TimePickerSheet';
 import TimeRulerOverlay from './TimeRulerOverlay';
 import EntryContextMenu from '../EntryContextMenu';
+import SerpentineHabitGrid from './SerpentineHabitGrid';
 import { db } from '../../db';
 
 function truncateText(text?: string, limit = 100): string {
@@ -1691,74 +1692,15 @@ export default function DayTimeline({
               );
             })}
 
-            {/* Habit logs grouped into a sleek horizontal ritual strip */}
-            {(() => {
-              const habitItems = items.filter(
-                (item) => item.type === 'standalone' && item.entry.type === 'habit-log',
-              );
-              if (habitItems.length === 0) return null;
-
-              return (
-                <div className="pt-2.5 pb-1 relative z-10">
-                  {/* Section Header */}
-                  <div className="flex items-center justify-between px-3 mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
-                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400/90">
-                        Habits Completed ({habitItems.length})
-                      </span>
-                    </div>
-                    {habitItems.length > 2 && (
-                      <span className="text-[9px] font-mono text-stone-600 hidden sm:inline">
-                        Scroll for more →
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Horizontal Scrollable Rail */}
-                  <div className="flex items-center gap-2 overflow-x-auto px-3 py-1 scrollbar-none">
-                    {habitItems.map((item) => {
-                      const entry = (item as { type: 'standalone'; entry: TimelineEntry }).entry as HabitLog;
-                      const emojiMatch = entry.title?.match(
-                        /^(\p{Extended_Pictographic}|\p{Emoji_Presentation})/u,
-                      );
-                      const emoji = emojiMatch ? emojiMatch[0] : null;
-                      const cleanTitle = emoji
-                        ? entry.title.replace(emoji, '').trim()
-                        : entry.title;
-
-                      return (
-                        <div
-                          key={entry.id}
-                          onClick={() => handleOpenDetail(entry)}
-                          className="group/habit flex items-center gap-2.5 px-3 py-1.5 bg-[#121212] hover:bg-[#181818] border border-emerald-500/20 hover:border-emerald-500/40 rounded-xl transition-all cursor-pointer select-none shrink-0 shadow-sm"
-                          title="Click to view details"
-                        >
-                          {/* Circular Habit Icon */}
-                          <div className="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.2)]">
-                            {emoji ? (
-                              <span className="text-xs leading-none">{emoji}</span>
-                            ) : (
-                              <Repeat2 className="w-3 h-3 text-emerald-400" />
-                            )}
-                          </div>
-
-                          {/* Title & Done Time */}
-                          <div className="flex flex-col min-w-0 pr-1">
-                            <span className="text-xs font-sans font-semibold text-stone-200 group-hover/habit:text-white truncate max-w-[130px]">
-                              {cleanTitle}
-                            </span>
-                            <span className="text-[9px] font-mono text-emerald-400 font-medium leading-tight">
-                              ✔ {formatTime(entry.timestamp)}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
+            {/* Serpentine Habit Grid (Boustrophedon flow) */}
+            <SerpentineHabitGrid
+              habitItems={items.filter(
+                (item): item is { type: 'standalone'; entry: TimelineEntry; sortTime: number } =>
+                  item.type === 'standalone' && item.entry.type === 'habit-log',
+              )}
+              onOpenDetail={handleOpenDetail}
+              formatTime={formatTime}
+            />
 
             {/* Sleep row rendered at the end */}
             {(() => {
@@ -1789,74 +1731,15 @@ export default function DayTimeline({
                 return null;
               })}
 
-            {/* Habit logs grouped into a sleek horizontal ritual strip */}
-            {(() => {
-              const habitItems = items.filter(
-                (item) => item.type === 'standalone' && item.entry.type === 'habit-log',
-              );
-              if (habitItems.length === 0) return null;
-
-              return (
-                <div className="pt-2.5 pb-1 relative z-10">
-                  {/* Section Header */}
-                  <div className="flex items-center justify-between px-3 mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
-                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400/90">
-                        Habits Completed ({habitItems.length})
-                      </span>
-                    </div>
-                    {habitItems.length > 2 && (
-                      <span className="text-[9px] font-mono text-stone-600 hidden sm:inline">
-                        Scroll for more →
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Horizontal Scrollable Rail */}
-                  <div className="flex items-center gap-2 overflow-x-auto px-3 py-1 scrollbar-none">
-                    {habitItems.map((item) => {
-                      const entry = (item as { type: 'standalone'; entry: TimelineEntry }).entry as HabitLog;
-                      const emojiMatch = entry.title?.match(
-                        /^(\p{Extended_Pictographic}|\p{Emoji_Presentation})/u,
-                      );
-                      const emoji = emojiMatch ? emojiMatch[0] : null;
-                      const cleanTitle = emoji
-                        ? entry.title.replace(emoji, '').trim()
-                        : entry.title;
-
-                      return (
-                        <div
-                          key={entry.id}
-                          onClick={() => handleOpenDetail(entry)}
-                          className="group/habit flex items-center gap-2.5 px-3 py-1.5 bg-[#121212] hover:bg-[#181818] border border-emerald-500/20 hover:border-emerald-500/40 rounded-xl transition-all cursor-pointer select-none shrink-0 shadow-sm"
-                          title="Click to view details"
-                        >
-                          {/* Circular Habit Icon */}
-                          <div className="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.2)]">
-                            {emoji ? (
-                              <span className="text-xs leading-none">{emoji}</span>
-                            ) : (
-                              <Repeat2 className="w-3 h-3 text-emerald-400" />
-                            )}
-                          </div>
-
-                          {/* Title & Done Time */}
-                          <div className="flex flex-col min-w-0 pr-1">
-                            <span className="text-xs font-sans font-semibold text-stone-200 group-hover/habit:text-white truncate max-w-[130px]">
-                              {cleanTitle}
-                            </span>
-                            <span className="text-[9px] font-mono text-emerald-400 font-medium leading-tight">
-                              ✔ {formatTime(entry.timestamp)}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
+            {/* Serpentine Habit Grid (Boustrophedon flow) */}
+            <SerpentineHabitGrid
+              habitItems={items.filter(
+                (item): item is { type: 'standalone'; entry: TimelineEntry; sortTime: number } =>
+                  item.type === 'standalone' && item.entry.type === 'habit-log',
+              )}
+              onOpenDetail={handleOpenDetail}
+              formatTime={formatTime}
+            />
 
             {/* Sleep row rendered at the end */}
             {(() => {
