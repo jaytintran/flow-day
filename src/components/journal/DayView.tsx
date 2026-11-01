@@ -117,6 +117,7 @@ export default function DayView({
   const dayTouchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    if ((e.target as HTMLElement)?.closest?.('[data-habit-container], .group\\/habit, [data-no-swipe]')) return;
     if (e.touches.length === 1) {
       dayTouchStartRef.current = {
         x: e.touches[0].clientX,
@@ -126,6 +127,10 @@ export default function DayView({
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    if ((e.target as HTMLElement)?.closest?.('[data-habit-container], .group\\/habit, [data-no-swipe]')) {
+      dayTouchStartRef.current = null;
+      return;
+    }
     if (!dayTouchStartRef.current || e.changedTouches.length === 0) return;
     const deltaX = e.changedTouches[0].clientX - dayTouchStartRef.current.x;
     const deltaY = e.changedTouches[0].clientY - dayTouchStartRef.current.y;

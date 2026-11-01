@@ -75,6 +75,7 @@ export default function TimelineView({
   const timelineTouchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    if ((e.target as HTMLElement)?.closest?.('[data-habit-container], .group\\/habit, [data-no-swipe]')) return;
     if (e.touches.length === 1) {
       timelineTouchStartRef.current = {
         x: e.touches[0].clientX,
@@ -84,6 +85,10 @@ export default function TimelineView({
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    if ((e.target as HTMLElement)?.closest?.('[data-habit-container], .group\\/habit, [data-no-swipe]')) {
+      timelineTouchStartRef.current = null;
+      return;
+    }
     if (!timelineTouchStartRef.current || e.changedTouches.length === 0) return;
     const deltaX = e.changedTouches[0].clientX - timelineTouchStartRef.current.x;
     const deltaY = e.changedTouches[0].clientY - timelineTouchStartRef.current.y;
