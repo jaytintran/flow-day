@@ -652,36 +652,24 @@ export default function DayNavigator({
       </div>
 
       {/* Scratchpad, Habits Drawer, Calendar & Highlights (Star) Buttons */}
-      <div className="flex items-center gap-0.5 bg-[#0a0a0a] border border-stone-800 rounded-lg p-0.5 h-9 shrink-0">
+      <div className="flex items-center gap-1 bg-[#0a0a0a] border border-stone-850 rounded-xl p-1 h-9 shrink-0 shadow-inner">
         {toggleScratchpad && (
           <button
             id="toggle-scratchpad-btn"
             onClick={toggleScratchpad}
-            className={`h-full px-2 rounded-md active:scale-95 transition-all flex items-center justify-center cursor-pointer relative ${
+            className={`h-full px-2.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer relative ${
               isScratchpadOpen
-                ? 'bg-amber-500 text-stone-950 shadow-sm'
-                : 'text-stone-500 hover:text-amber-400 hover:bg-stone-800/50'
+                ? 'bg-amber-500 text-stone-950 font-medium shadow-sm'
+                : 'text-stone-400 hover:text-amber-400 hover:bg-stone-850'
             }`}
             title="Scratchpad"
           >
-            <StickyNote className="w-[18px] h-[18px]" />
+            <StickyNote className="w-4 h-4" />
           </button>
         )}
-        <button
-          id="toggle-calendar-btn"
-          onClick={() => {
-            setIsCalendarOpen(!isCalendarOpen);
-            setIsMobileViewMenuOpen(false);
-          }}
-          className={`h-full px-2 rounded-md active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
-            isCalendarOpen
-              ? 'bg-amber-500/10 text-amber-500'
-              : 'text-stone-500 hover:text-stone-300 hover:bg-stone-800/50'
-          }`}
-          title="Choose specific date"
-        >
-          <Calendar className="w-[18px] h-[18px]" />
-        </button>
+        {toggleScratchpad && toggleHighlights && (
+          <span className="w-[1px] h-3.5 bg-stone-800/80 shrink-0" />
+        )}
         {toggleHighlights && (
           <button
             id="toggle-highlights-btn"
@@ -690,14 +678,14 @@ export default function DayNavigator({
               setIsCalendarOpen(false);
               setIsMobileViewMenuOpen(false);
             }}
-            className={`h-full px-2 rounded-md active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
+            className={`h-full px-2.5 rounded-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
               isHighlightsOpen
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                : 'text-stone-500 hover:text-amber-400 hover:bg-stone-800/50'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-medium'
+                : 'text-stone-400 hover:text-amber-400 hover:bg-stone-850'
             }`}
             title="Highlights of Days"
           >
-            <Star className="w-[18px] h-[18px]" />
+            <Star className="w-4 h-4" />
           </button>
         )}
       </div>
@@ -722,7 +710,22 @@ export default function DayNavigator({
                 <span className="py-1.5 text-stone-100 text-sm font-mono tracking-widest uppercase text-center font-bold flex items-center gap-2">
                   {viewMode === 'records' ? (
                     <>
-                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_#f59e0b]" />
+                      <button
+                        id="toggle-calendar-btn"
+                        type="button"
+                        onClick={() => {
+                          setIsCalendarOpen(!isCalendarOpen);
+                          setIsMobileViewMenuOpen(false);
+                        }}
+                        className={`p-1 rounded-md active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
+                          isCalendarOpen
+                            ? 'text-amber-400 bg-amber-500/15'
+                            : 'text-stone-400 hover:text-amber-400 hover:bg-stone-800/60'
+                        }`}
+                        title="Choose specific date"
+                      >
+                        <Calendar className="w-4 h-4" />
+                      </button>
                       Personal Catalog Index
                     </>
                   ) : viewMode === 'lists' ? (
@@ -807,14 +810,34 @@ export default function DayNavigator({
                   <ChevronLeft className="w-4 h-4" />
                 </button>
 
-                <button
-                  id="jump-today-btn"
-                  onClick={handleJumpToToday}
-                  className="text-stone-100 hover:text-amber-500 text-sm font-mono tracking-widest uppercase cursor-pointer transition-colors text-center font-bold flex items-center gap-2"
-                  title="Back to Today"
-                >
-                  {formatDateLabel(activeDate)}
-                </button>
+                <div className="flex items-center gap-1.5">
+                  {(viewMode === 'day' || viewMode === 'timeline') && (
+                    <button
+                      id="toggle-calendar-btn"
+                      type="button"
+                      onClick={() => {
+                        setIsCalendarOpen(!isCalendarOpen);
+                        setIsMobileViewMenuOpen(false);
+                      }}
+                      className={`p-1 rounded-md active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
+                        isCalendarOpen
+                          ? 'text-amber-400 bg-amber-500/15'
+                          : 'text-stone-400 hover:text-amber-400 hover:bg-stone-800/60'
+                      }`}
+                      title="Choose specific date"
+                    >
+                      <Calendar className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button
+                    id="jump-today-btn"
+                    onClick={handleJumpToToday}
+                    className="text-stone-100 hover:text-amber-500 text-sm font-mono tracking-widest uppercase cursor-pointer transition-colors text-center font-bold flex items-center gap-2"
+                    title="Back to Today"
+                  >
+                    {formatDateLabel(activeDate)}
+                  </button>
+                </div>
 
                 <button
                   id="next-day-btn"
@@ -1068,7 +1091,7 @@ export default function DayNavigator({
                               ? `Uncheck "${habit.title}" for today · hold to edit week`
                               : `Check "${habit.title}" for today · hold to edit week`
                           }
-                          className={`flex flex-col justify-between gap-1 px-2.5 py-1.5 rounded-xl border transition-all shrink-0 select-none shadow-sm text-left cursor-pointer active:scale-[0.97] touch-manipulation min-w-[105px] min-h-[46px] ${theme.cardBg} ${theme.border}`}
+                          className={`flex flex-col justify-between gap-0.5 px-2.5 py-1.5 rounded-xl border transition-all shrink-0 select-none shadow-sm text-left cursor-pointer active:scale-[0.97] touch-manipulation min-w-[105px] min-h-[40px] ${theme.cardBg} ${theme.border}`}
                         >
                           {/* Row 1: Habit Flame / Dot + Title + Streak */}
                           <div className="flex items-center gap-1.5 w-full">
@@ -1092,7 +1115,7 @@ export default function DayNavigator({
                           {/* Row 2: read-only 7-day sparkline (no tap targets — card ticks today) */}
                           <div
                             aria-hidden="true"
-                            className="flex items-center justify-between gap-[3px] pt-1 border-t border-stone-850/60 w-full"
+                            className="flex items-center justify-between gap-[3px] pt-0.5 w-full"
                           >
                             {habitWeekDays.map((d) => {
                               const isDone = loggedDayStrings.has(d.dateStr);
@@ -1100,7 +1123,7 @@ export default function DayNavigator({
                               return (
                                 <span
                                   key={d.dateStr}
-                                  className={`flex-1 h-1.5 rounded-[1.5px] transition-colors ${
+                                  className={`flex-1 h-1 rounded-[1px] transition-colors ${
                                     isDone
                                       ? theme.activeDash
                                       : d.isToday

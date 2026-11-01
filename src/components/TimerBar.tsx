@@ -973,7 +973,7 @@ export default function TimerBar({
               transition={{ duration: 0.15 }}
               className="flex items-center gap-1.5 shrink-0"
             >
-              {/* Direct Split Push / Pull Segmented Pod (Mobile & Desktop) */}
+              {/* Push & Pull buttons (unboxed, styled similarly to Settings button) */}
               {!isSyncConfigured ? (
                 <button
                   id="quick-sync-config-btn"
@@ -985,42 +985,13 @@ export default function TimerBar({
                       }),
                     );
                   }}
-                  className="flex items-center gap-1.5 px-2.5 h-8 bg-[#0a0a0a] hover:bg-stone-900 border border-stone-850 rounded-xl text-stone-400 hover:text-stone-200 transition-all cursor-pointer text-xs font-mono"
+                  className="p-2 bg-transparent text-stone-400 hover:text-stone-200 active:scale-95 transition-all h-9 w-9 rounded-xl hover:bg-stone-850 flex items-center justify-center cursor-pointer shrink-0 select-none"
                   title="Configure GitHub Gist Sync"
                 >
-                  <Cloud className="w-3.5 h-3.5 text-stone-500" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-stone-600 shrink-0" />
+                  <Cloud className="w-4.5 h-4.5 shrink-0 text-stone-500" />
                 </button>
               ) : (
-                <div className="flex items-center gap-0.5 bg-[#0a0a0a] border border-stone-850 rounded-xl p-0.5 shadow-inner">
-                  {/* Sync Status Dot Indicator */}
-                  <div
-                    className="px-1.5 py-1 flex items-center justify-center cursor-default"
-                    title={
-                      syncStatus === 'loading'
-                        ? 'Syncing in progress...'
-                        : syncStatus === 'error'
-                          ? syncStatusMsg || 'Sync error occurred'
-                          : isSyncDirty
-                            ? 'Unpushed local changes — click Push to backup'
-                            : 'All changes synced with GitHub Gist'
-                    }
-                  >
-                    {syncStatus === 'loading' ? (
-                      <RefreshCw className="w-3 h-3 text-amber-400 animate-spin" />
-                    ) : syncStatus === 'error' ? (
-                      <AlertTriangle className="w-3 h-3 text-red-400" />
-                    ) : (
-                      <span
-                        className={`w-2 h-2 rounded-full ${
-                          isSyncDirty
-                            ? 'bg-amber-400 shadow-[0_0_8px_#f59e0b] animate-pulse'
-                            : 'bg-emerald-400 shadow-[0_0_8px_#34d399]'
-                        }`}
-                      />
-                    )}
-                  </div>
-
+                <>
                   {/* Push Button */}
                   <button
                     id="quick-push-btn"
@@ -1032,13 +1003,17 @@ export default function TimerBar({
                         ? 'Push to Cloud (Unsaved changes ready for backup)'
                         : 'Push to Cloud (Backup local data)'
                     }
-                    className={`px-2 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                    className={`p-2 bg-transparent active:scale-95 transition-all h-9 w-9 rounded-xl flex items-center justify-center cursor-pointer shrink-0 select-none disabled:opacity-50 disabled:cursor-not-allowed ${
                       isSyncDirty
                         ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-500/10'
                         : 'text-stone-400 hover:text-stone-200 hover:bg-stone-850'
                     }`}
                   >
-                    <UploadCloud className="w-3.5 h-3.5" />
+                    {syncStatus === 'loading' ? (
+                      <RefreshCw className="w-4.5 h-4.5 shrink-0 text-amber-400 animate-spin" />
+                    ) : (
+                      <UploadCloud className="w-4.5 h-4.5 shrink-0" />
+                    )}
                   </button>
 
                   {/* Pull Button with Safe Confirmation state */}
@@ -1048,7 +1023,7 @@ export default function TimerBar({
                       type="button"
                       onClick={handleQuickPull}
                       title="Confirm: overwrite local data from GitHub Gist backup"
-                      className="px-2 h-8 flex items-center text-[10px] font-mono font-bold text-amber-400 hover:text-amber-300 bg-amber-500/15 border border-amber-500/30 rounded-lg animate-pulse transition-all cursor-pointer"
+                      className="px-2 h-9 flex items-center text-[10px] font-mono font-bold text-amber-400 hover:text-amber-300 bg-amber-500/15 border border-amber-500/30 rounded-xl animate-pulse transition-all cursor-pointer shrink-0 select-none"
                     >
                       Sure?
                     </button>
@@ -1059,12 +1034,12 @@ export default function TimerBar({
                       onClick={handleQuickPull}
                       disabled={syncStatus === 'loading'}
                       title="Pull from Cloud (Restore latest backup)"
-                      className="px-2 h-8 rounded-lg text-stone-400 hover:text-sky-400 hover:bg-stone-850 flex items-center justify-center transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-2 bg-transparent text-stone-400 hover:text-sky-400 active:scale-95 transition-all h-9 w-9 rounded-xl hover:bg-stone-850 flex items-center justify-center cursor-pointer shrink-0 select-none disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <DownloadCloud className="w-3.5 h-3.5" />
+                      <DownloadCloud className="w-4.5 h-4.5 shrink-0" />
                     </button>
                   )}
-                </div>
+                </>
               )}
 
               {/* Settings Trigger Button */}
